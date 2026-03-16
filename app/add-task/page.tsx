@@ -71,11 +71,12 @@ function AddTaskForm() {
 
     try {
       if (editId) {
-        const { error } = await supabase.from('tasks').update(payload).eq('id', editId);
+        const { error } = await supabase.from('tasks').update(payload as any).eq('id', editId);
+
         if (error) throw error;
         toast.success('Task updated');
       } else {
-        const { error } = await supabase.from('tasks').insert(payload);
+        const { error } = await supabase.from('tasks').insert(payload as any);
         if (error) throw error;
         toast.success('Task created');
       }
