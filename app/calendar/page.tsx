@@ -1,0 +1,130 @@
+'use client';
+import { useState, useMemo } from 'react';
+import { useStore } from '@/lib/store';
+import PageHeader from '@/components/layout/PageHeader';
+import TaskCard from '@/components/tasks/TaskCard';
+import { useAppInit } from '@/hooks/useAppInit';
+import {
+  format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
+  eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday,
+} from 'date-fns';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+
+export default function CalendarPage() {
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const { tasks } = useStore();
+  const { loadData } = useAppInit();
+
+  const activeTasks = tasks.filter((t) => t.status !== 'completed' && t.status !== 'skipped' && !t.is_suggestion);
+
+  const calendarDays = useMemo(() => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(currentMonth);
+    const start = startOfWeek(monthStart);
+    const end = endOfWeek(monthEnd);
+    return eachDayOfInterval({ start, end });
+  }, [currentMonth]);
+
+  const tasksByDate = useMemo(() => {
+    const map: Record<string, number> = {};
+    activeTasks.forEach((t) => {
+      if (t.due_date) {
+        const key = t.due_date;
+        map[key] = (map[key] || 0) + 1;
+      }
+    });
+    return map;
+  }, [activeTasks]);
+
+  const selectedTasks = useMemo(() => {
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    return activeTasks.filter((t) => t.due_date === dateStr);
+  }, [selectedDate, activeTasks]);
+
+  const days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+  return (
+    <div>
+      <PageHeader title="Calendar" />
+
+      <div className="px-4 pt-3">
+        {/* Month Navigation */}
+        <div className="flex items-center justify-between mb-4">
+          <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 text-ink-secondary active:text-brand-500">
+            <ChevronLeft size={22} />
+          </button>
+          <h2 className="text-base font-bold">{format(currentMonth, 'MMMM yyyy')}</h2>
+          <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 text-ink-secondary active:text-brand-500">
+            <ChevronRight size={22} />
+          </button>
+        </div>
+
+        {/* Day Headers */}
+        <div className="grid grid-cols-7 mb-2">
+          {days.map((d, i) => (
+            <div key={i} className="text-center text-xs font-semibold text-ink-tertiary py-1">{d}</div>
+          ))}
+        </div>
+
+        {/* Calendar Grid */}
+        <div className="grid grid-cols-7 gap-px">
+          {calendarDays.map((day) => {
+            const dateStr = format(day, 'yyyy-MM-dd');
+            const count = tasksByDate[dateStr] || 0;
+            const isCurrentMonth = isSameMonth(day, currentMonth);
+            const isSelected = isSameDay(day, selectedDate);
+            const today = isToday(day);
+
+            return (
+              <button
+                key={dateStr}
+                onClick={() => setSelectedDate(day)}
+                className={`relative flex flex-col items-center justify-center py-2.5 rounded-xl transition-colors ${
+                  isSelected
+                    ? 'bg-brand-500 text-white'
+                    : today
+                    ? 'bg-brand-50'
+                    : 'active:bg-gray-100'
+                } ${!isCurrentMonth ? 'opacity-30' : ''}`}
+              >
+                <span className={`text-sm font-medium ${isSelected ? 'text-white' : today ? 'text-brand-600 font-bold' : ''}`}>
+                  {format(day, 'd')}
+                </span>
+                {count > 0 && (
+                  <div className={`flex gap-0.5 mt-0.5`}>
+                    {Array.from({ length: Math.min(count, 3) }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white/80' : 'bg-brand-400'}`}
+                      />
+                    ))}
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Selected Date Tasks */}
+      <div className="mt-4">
+        <p className="section-header">
+          {isToday(selectedDate) ? 'Today' : format(selectedDate, 'EEEE, MMMM d')}
+          {selectedTasks.length > 0 && ` · ${selectedTasks.length} task${selectedTasks.length !== 1 ? 's' : ''}`}
+        </p>
+        {selectedTasks.length > 0 ? (
+          <div className="mx-4 ios-card overflow-hidden">
+            {selectedTasks.map((t) => (
+              <TaskCard key={t.id} task={t} onComplete={loadData} />
+            ))}
+          </div>
+        ) : (
+          <div className="mx-4 ios-card px-4 py-8 text-center">
+            <p className="text-ink-tertiary text-sm">No tasks on this date</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

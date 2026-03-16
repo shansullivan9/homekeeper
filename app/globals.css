@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --nav-height: 82px;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+html, body {
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: #F2F2F7;
+  padding-top: var(--safe-top);
+  padding-bottom: calc(var(--nav-height) + var(--safe-bottom));
+}
+
+input, textarea, select {
+  font-size: 16px !important; /* Prevent iOS zoom on focus */
+}
+
+/* iOS-style card */
+@layer components {
+  .ios-card {
+    @apply bg-white rounded-ios-lg shadow-card;
+  }
+  .ios-list-item {
+    @apply flex items-center justify-between px-4 py-3.5 border-b border-gray-100 last:border-b-0 active:bg-gray-50 transition-colors;
+  }
+  .ios-input {
+    @apply w-full px-4 py-3 bg-surface-secondary rounded-ios text-base text-ink-primary placeholder:text-ink-tertiary outline-none focus:ring-2 focus:ring-brand-400/30;
+  }
+  .ios-button {
+    @apply w-full py-3.5 rounded-ios font-semibold text-base text-white bg-brand-500 active:bg-brand-600 transition-colors disabled:opacity-50;
+  }
+  .ios-button-secondary {
+    @apply w-full py-3.5 rounded-ios font-semibold text-base text-brand-500 bg-brand-50 active:bg-brand-100 transition-colors;
+  }
+  .urgency-dot {
+    @apply w-2.5 h-2.5 rounded-full flex-shrink-0;
+  }
+  .section-header {
+    @apply text-xs font-semibold uppercase text-ink-secondary tracking-wider px-4 pb-1.5 pt-5;
+  }
+}
+
+/* Smooth scroll for calendar */
+.smooth-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Animation */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}

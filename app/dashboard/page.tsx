@@ -1,0 +1,185 @@
+'use client';
+import { useMemo } from 'react';
+import { useStore } from '@/lib/store';
+import { isAfter, isBefore, startOfDay, endOfDay, addDays, endOfMonth, startOfMonth, subDays } from 'date-fns';
+import TaskCard from '@/components/tasks/TaskCard';
+import SuggestionBanner from '@/components/dashboard/SuggestionBanner';
+import PageHeader from '@/components/layout/PageHeader';
+import { useRouter } from 'next/navigation';
+import { useAppInit } from '@/hooks/useAppInit';
+import { Home as HomeIcon, Users, ChevronRight, Package, Clock3, Banknote } from 'lucide-react';
+
+export default function DashboardPage() {
+  const { tasks, home, user, members, history } = useStore();
+  const { loadData } = useAppInit();
+  const router = useRouter();
+
+  const activeTasks = useMemo(() => {
+    return tasks.filter((t) => t.status !== 'completed' && t.status !== 'skipped' && !t.is_suggestion);
+  }, [tasks]);
+
+  const now = startOfDay(new Date());
+  const weekEnd = endOfDay(addDays(now, 7));
+  const monthEnd = endOfDay(endOfMonth(now));
+
+  const overdue = useMemo(() =>
+    activeTasks.filter((t) => t.due_date && isBefore(new Date(t.due_date + 'T00:00:00'), now)),
+    [activeTasks, now]
+  );
+
+  const dueThisWeek = useMemo(() =>
+    activeTasks.filter((t) => {
+      if (!t.due_date) return false;
+      const d = new Date(t.due_date + 'T00:00:00');
+      return !isBefore(d, now) && isBefore(d, weekEnd);
+    }),
+    [activeTasks, now, weekEnd]
+  );
+
+  const dueThisMonth = useMemo(() =>
+    activeTasks.filter((t) => {
+      if (!t.due_date) return false;
+      const d = new Date(t.due_date + 'T00:00:00');
+      return !isBefore(d, weekEnd) && isBefore(d, monthEnd);
+    }),
+    [activeTasks, weekEnd, monthEnd]
+  );
+
+  const recentlyCompleted = useMemo(() =>
+    tasks
+      .filter((t) => t.status === 'completed')
+      .sort((a, b) => new Date(b.completed_at || 0).getTime() - new Date(a.completed_at || 0).getTime())
+      .slice(0, 5),
+    [tasks]
+  );
+
+  const totalSpending = useMemo(() =>
+    history.reduce((sum, h) => sum + (h.cost || 0), 0),
+    [history]
+  );
+
+  return (
+    <div>
+      <PageHeader
+        title={home?.name || 'HomeKeeper'}
+        subtitle={`${activeTasks.length} active tasks`}
+        rightAction={
+          <button onClick={() => router.push('/settings')} className="text-brand-500 text-sm font-semibold">
+            <Users size={22} />
+          </button>
+        }
+      />
+
+      <div className="pb-4">
+        {/* Quick Stats */}
+        <div className="grid grid-cols-3 gap-3 px-4 pt-4 pb-2">
+          <button onClick={() => router.push('/history')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
+            <div className="text-2xl font-bold text-brand-600">{history.length}</div>
+            <div className="text-[10px] text-ink-secondary font-medium mt-0.5">Completed</div>
+          </button>
+          <button onClick={() => router.push('/appliances')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
+            <div className="text-2xl font-bold text-purple-600">{members.length}</div>
+            <div className="text-[10px] text-ink-secondary font-medium mt-0.5">Members</div>
+          </button>
+          <button onClick={() => router.push('/expenses')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
+            <div className="text-2xl font-bold text-emerald-600">
+              ${totalSpending >= 1000 ? `${(totalSpending / 1000).toFixed(1)}k` : totalSpending.toFixed(0)}
+            </div>
+            <div className="text-[10px] text-ink-secondary font-medium mt-0.5">Spent</div>
+          </button>
+        </div>
+
+        {/* Suggestions */}
+        <SuggestionBanner />
+
+        {/* Quick Links */}
+        <div className="mx-4 mb-4">
+          <div className="ios-card overflow-hidden divide-y divide-gray-50">
+            {[
+              { label: 'Appliances & Systems', icon: Package, href: '/appliances', color: 'text-purple-500' },
+              { label: 'House Timeline', icon: Clock3, href: '/timeline', color: 'text-amber-500' },
+              { label: 'Expense Summary', icon: Banknote, href: '/expenses', color: 'text-emerald-500' },
+              { label: 'Home Profile', icon: HomeIcon, href: '/home-profile', color: 'text-brand-500' },
+            ].map(({ label, icon: Icon, href, color }) => (
+              <button key={href} onClick={() => router.push(href)} className="ios-list-item w-full">
+                <div className="flex items-center gap-3">
+                  <div className={`w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center ${color}`}>
+                    <Icon size={18} />
+                  </div>
+                  <span className="text-[15px] font-medium">{label}</span>
+                </div>
+                <ChevronRight size={16} className="text-ink-tertiary" />
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Overdue */}
+        {overdue.length > 0 && (
+          <div>
+            <p className="section-header">
+              <span className="inline-block w-2 h-2 rounded-full bg-status-red mr-1.5 -mb-px" />
+              Overdue ({overdue.length})
+            </p>
+            <div className="mx-4 ios-card overflow-hidden">
+              {overdue.map((t) => (
+                <TaskCard key={t.id} task={t} onComplete={loadData} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Due This Week */}
+        {dueThisWeek.length > 0 && (
+          <div>
+            <p className="section-header">
+              <span className="inline-block w-2 h-2 rounded-full bg-status-yellow mr-1.5 -mb-px" />
+              Due This Week ({dueThisWeek.length})
+            </p>
+            <div className="mx-4 ios-card overflow-hidden">
+              {dueThisWeek.map((t) => (
+                <TaskCard key={t.id} task={t} onComplete={loadData} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Due This Month */}
+        {dueThisMonth.length > 0 && (
+          <div>
+            <p className="section-header">
+              <span className="inline-block w-2 h-2 rounded-full bg-status-green mr-1.5 -mb-px" />
+              Due This Month ({dueThisMonth.length})
+            </p>
+            <div className="mx-4 ios-card overflow-hidden">
+              {dueThisMonth.map((t) => (
+                <TaskCard key={t.id} task={t} onComplete={loadData} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* No tasks state */}
+        {activeTasks.length === 0 && (
+          <div className="mx-4 mt-8 text-center">
+            <div className="text-4xl mb-3">🎉</div>
+            <p className="text-lg font-semibold text-ink-primary">All caught up!</p>
+            <p className="text-sm text-ink-secondary mt-1">No pending tasks. Tap + to add one.</p>
+          </div>
+        )}
+
+        {/* Recently Completed */}
+        {recentlyCompleted.length > 0 && (
+          <div>
+            <p className="section-header">Recently Completed</p>
+            <div className="mx-4 ios-card overflow-hidden">
+              {recentlyCompleted.map((t) => (
+                <TaskCard key={t.id} task={t} compact />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
