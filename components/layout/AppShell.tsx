@@ -1,25 +1,108 @@
 'use client';
-import { useAppInit } from '@/hooks/useAppInit';
+import { useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase-browser';
 import { useStore } from '@/lib/store';
+import { useRouter, usePathname } from 'next/navigation';
 import BottomNav from '@/components/layout/BottomNav';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  useAppInit();
-  const loading = useStore((s) => s.loading);
+  const router = useRouter();
+  const pathname = usePathname();
+  const store = useStore();
+  const supabase = createClient();
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState('');
 
-  if (loading) {
+  useEffect(() => {
+    async function init() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session) {
+          router.push('/auth');
+          return;
+        }
+
+        const userId = session.user.id;
+
+        // Load profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .maybeSingle();
+        if (profile) store.setUser(profile);
+
+        // Load home membership
+        const { data: membership } = await supabase
+          .from('home_members')
+          .select('*')
+          .eq('user_id', userId)
+          .limit(1)
+          .maybeSingle();
+
+        if (!membership) {
+          if (pathname !== '/home-profile') {
+            router.push('/home-profile');
+          }
+          setReady(true);
+          return;
+        }
+
+        // Load home
+        const { data: homeData } = await supabase
+          .from('homes')
+          .select('*')
+          .eq('id', membership.home_id)
+          .maybeSingle();
+
+        if (homeData) store.setHome(homeData);
+
+        // Load everything else in parallel
+        const homeId = homeData?.id || membership.home_id;
+        const results = await Promise.allSettled([
+          supabase.from('tasks').select('*').eq('home_id', homeId),
+          supabase.from('categories').select('*').order('sort_order'),
+          supabase.from('home_members').select('*').eq('home_id', homeId),
+          supabase.from('appliances').select('*').eq('home_id', homeId),
+          supabase.from('task_history').select('*').eq('home_id', homeId).order('completed_at', { ascending: false }).limit(100),
+        ]);
+
+        const getData = (r: any) => r.status === 'fulfilled' ? r.value.data || [] : [];
+        store.setTasks(getData(results[0]));
+        store.setCategories(getData(results[1]));
+        store.setMembers(getData(results[2]));
+        store.setAppliances(getData(results[3]));
+        store.setHistory(getData(results[4]));
+
+      } catch (err: any) {
+        setError(err.message || 'Something went wrong');
+      }
+
+      setReady(true);
+      store.setLoading(false);
+    }
+
+    init();
+  }, []);
+
+  if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-surface-secondary">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-brand-500/10 flex items-center justify-center animate-pulse">
-            <span className="text-2xl">🏠</span>
-          </div>
-          <div className="flex gap-1">
-            <div className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-            <div className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-            <div className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-          </div>
-        </div>
+      <div style={{ padding: 40, textAlign: 'center' }}>
+        <h2>Error</h2>
+        <p style={{ color: 'red' }}>{error}</p>
+        <button onClick={() => window.location.href = '/auth'} style={{ marginTop: 20, padding: '10px 20px' }}>
+          Back to Login
+        </button>
+      </div>
+    );
+  }
+
+  if (!ready) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+        <div style={{ fontSize: 32 }}>🏠</div>
+        <p style={{ color: '#888', marginTop: 8 }}>Loading...</p>
       </div>
     );
   }
