@@ -1,25 +1,27 @@
 'use client';
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase-browser';
 import { useStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
-import { Task } from '@/lib/types';
 
 export function useAppInit() {
   const router = useRouter();
   const {
     setUser, setHome, setMembers, setTasks, setCategories,
-    setAppliances, setHistory, setLoading, user, home,
+    setAppliances, setHistory, setLoading, home,
   } = useStore();
-
+  const hasLoaded = useRef(false);
   const supabase = createClient();
 
   const loadData = useCallback(async () => {
+    if (hasLoaded.current) return;
+    hasLoaded.current = true;
     setLoading(true);
+
     try {
-      // Get auth user
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) {
+        setLoading(false);
         router.push('/auth');
         return;
       }
@@ -30,16 +32,15 @@ export function useAppInit() {
         .select('*')
         .eq('id', authUser.id)
         .single();
-
       if (profile) setUser(profile);
 
-      // Get home membership
+      // Get home membership - simpler query without join
       const { data: membership } = await supabase
         .from('home_members')
-        .select('*, homes(*)')
+        .select('*')
         .eq('user_id', authUser.id)
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (!membership) {
         setLoading(false);
@@ -47,20 +48,46 @@ export function useAppInit() {
         return;
       }
 
-      const homeData = (membership as any).homes;
+      // Get home separately
+      const { data: homeData } = await supabase
+        .from('homes')
+        .select('*')
+        .eq('id', membership.home_id)
+        .single();
+
+      if (!homeData) {
+        setLoading(false);
+        router.push('/home-profile');
+        return;
+      }
+
       setHome(homeData);
 
-      // Load all home members with profiles
+      // Load members
       const { data: members } = await supabase
         .from('home_members')
-        .select('*, profiles(*)')
+        .select('*')
         .eq('home_id', homeData.id);
-      if (members) setMembers(members);
 
-      // Load tasks
+      // Get profiles for members
+      if (members && members.length > 0) {
+        const userIds = members.map(m => m.user_id);
+        const { data: memberProfiles } = await supabase
+          .from('profiles')
+          .select('*')
+          .in('id', userIds);
+
+        const enriched = members.map(m => ({
+          ...m,
+          profiles: memberProfiles?.find(p => p.id === m.user_id) || null
+        }));
+        setMembers(enriched);
+      }
+
+      // Load tasks without join first
       const { data: tasks } = await supabase
         .from('tasks')
-        .select('*, categories(*)')
+        .select('*')
         .eq('home_id', homeData.id)
         .order('due_date', { ascending: true, nullsFirst: false });
       if (tasks) setTasks(tasks);
@@ -69,7 +96,6 @@ export function useAppInit() {
       const { data: categories } = await supabase
         .from('categories')
         .select('*')
-        .or(`home_id.is.null,home_id.eq.${homeData.id}`)
         .order('sort_order');
       if (categories) setCategories(categories);
 
@@ -81,7 +107,7 @@ export function useAppInit() {
         .order('name');
       if (appliances) setAppliances(appliances);
 
-      // Load recent history
+      // Load history
       const { data: history } = await supabase
         .from('task_history')
         .select('*')
@@ -89,6 +115,7 @@ export function useAppInit() {
         .order('completed_at', { ascending: false })
         .limit(100);
       if (history) setHistory(history);
+
     } catch (err) {
       console.error('Init error:', err);
     } finally {
@@ -96,45 +123,27 @@ export function useAppInit() {
     }
   }, []);
 
-  // Realtime subscription
   useEffect(() => {
     loadData();
   }, [loadData]);
 
+  // Realtime subscription
   useEffect(() => {
-    if (!home) return;
+    const currentHome = useStore.getState().home;
+    if (!currentHome) return;
 
     const channel = supabase
       .channel('home-tasks')
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'tasks', filter: `home_id=eq.${home.id}` },
-        async (payload) => {
-          if (payload.eventType === 'INSERT') {
-            const { data } = await supabase
-              .from('tasks')
-              .select('*, categories(*)')
-              .eq('id', (payload.new as Task).id)
-              .single();
-            if (data) useStore.getState().addTask(data);
-          } else if (payload.eventType === 'UPDATE') {
-            const { data } = await supabase
-              .from('tasks')
-              .select('*, categories(*)')
-              .eq('id', (payload.new as Task).id)
-              .single();
-            if (data) useStore.getState().updateTask(data);
-          } else if (payload.eventType === 'DELETE') {
-            useStore.getState().removeTask((payload.old as any).id);
-          }
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'task_history', filter: `home_id=eq.${home.id}` },
-        (payload) => {
-          const current = useStore.getState().history;
-          useStore.getState().setHistory([payload.new as any, ...current]);
+        { event: '*', schema: 'public', table: 'tasks', filter: `home_id=eq.${currentHome.id}` },
+        async () => {
+          const { data } = await supabase
+            .from('tasks')
+            .select('*')
+            .eq('home_id', currentHome.id)
+            .order('due_date', { ascending: true, nullsFirst: false });
+          if (data) useStore.getState().setTasks(data);
         }
       )
       .subscribe();
@@ -142,5 +151,5 @@ export function useAppInit() {
     return () => { supabase.removeChannel(channel); };
   }, [home?.id]);
 
-  return { loadData };
+  return { loadData: () => { hasLoaded.current = false; loadData(); } };
 }
