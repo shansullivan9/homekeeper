@@ -3,11 +3,14 @@ import { Recurrence } from './types';
 export const RECURRENCE_LABELS: Record<Recurrence, string> = {
   one_time: 'One Time',
   weekly: 'Weekly',
+  bi_monthly: 'Every 2 Months',
   monthly: 'Monthly',
   quarterly: 'Every 3 Months',
+  bi_annual: 'Every 6 Months',
   yearly: 'Yearly',
   custom: 'Custom',
 };
+
 
 export const PRIORITY_CONFIG = {
   low: { label: 'Low', color: '#34C759', bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200' },
