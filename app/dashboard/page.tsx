@@ -1,7 +1,7 @@
 'use client';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useStore } from '@/lib/store';
-import { isAfter, isBefore, startOfDay, endOfDay, addDays, endOfMonth, startOfMonth, subDays } from 'date-fns';
+import { isBefore, startOfDay, endOfDay, addDays, endOfMonth } from 'date-fns';
 import TaskCard from '@/components/tasks/TaskCard';
 import SuggestionBanner from '@/components/dashboard/SuggestionBanner';
 import PageHeader from '@/components/layout/PageHeader';
@@ -9,40 +9,51 @@ import { useRouter } from 'next/navigation';
 import { useAppInit } from '@/hooks/useAppInit';
 import { Home as HomeIcon, Users, ChevronRight, Package, Clock3, Banknote } from 'lucide-react';
 
+type ClaimFilter = 'all' | 'unclaimed' | 'mine' | 'theirs';
+
 export default function DashboardPage() {
   const { tasks, home, user, members, history } = useStore();
   const { loadData } = useAppInit();
   const router = useRouter();
+  const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
 
   const activeTasks = useMemo(() => {
     return tasks.filter((t) => t.status !== 'completed' && t.status !== 'skipped' && !t.is_suggestion);
   }, [tasks]);
+
+  const filteredTasks = useMemo(() => {
+    if (claimFilter === 'all') return activeTasks;
+    if (claimFilter === 'unclaimed') return activeTasks.filter((t: any) => !t.assigned_to);
+    if (claimFilter === 'mine') return activeTasks.filter((t: any) => t.assigned_to === user?.id);
+    if (claimFilter === 'theirs') return activeTasks.filter((t: any) => t.assigned_to && t.assigned_to !== user?.id);
+    return activeTasks;
+  }, [activeTasks, claimFilter, user]);
 
   const now = startOfDay(new Date());
   const weekEnd = endOfDay(addDays(now, 7));
   const monthEnd = endOfDay(endOfMonth(now));
 
   const overdue = useMemo(() =>
-    activeTasks.filter((t) => t.due_date && isBefore(new Date(t.due_date + 'T00:00:00'), now)),
-    [activeTasks, now]
+    filteredTasks.filter((t) => t.due_date && isBefore(new Date(t.due_date + 'T00:00:00'), now)),
+    [filteredTasks, now]
   );
 
   const dueThisWeek = useMemo(() =>
-    activeTasks.filter((t) => {
+    filteredTasks.filter((t) => {
       if (!t.due_date) return false;
       const d = new Date(t.due_date + 'T00:00:00');
       return !isBefore(d, now) && isBefore(d, weekEnd);
     }),
-    [activeTasks, now, weekEnd]
+    [filteredTasks, now, weekEnd]
   );
 
   const dueThisMonth = useMemo(() =>
-    activeTasks.filter((t) => {
+    filteredTasks.filter((t) => {
       if (!t.due_date) return false;
       const d = new Date(t.due_date + 'T00:00:00');
       return !isBefore(d, weekEnd) && isBefore(d, monthEnd);
     }),
-    [activeTasks, weekEnd, monthEnd]
+    [filteredTasks, weekEnd, monthEnd]
   );
 
   const recentlyCompleted = useMemo(() =>
@@ -58,6 +69,38 @@ export default function DashboardPage() {
     [history]
   );
 
+  const unclaimedCount = useMemo(() => activeTasks.filter((t: any) => !t.assigned_to).length, [activeTasks]);
+  const mineCount = useMemo(() => activeTasks.filter((t: any) => t.assigned_to === user?.id).length, [activeTasks, user]);
+  const theirsCount = useMemo(() => activeTasks.filter((t: any) => t.assigned_to && t.assigned_to !== user?.id).length, [activeTasks, user]);
+
+  const partnerLabel = members.length > 1 ? 'Theirs' : 'Theirs';
+  const showFilters = members.length > 1 || mineCount > 0 || theirsCount > 0;
+
+  const FilterChip = ({ value, label, count }: { value: ClaimFilter; label: string; count: number }) => (
+    <button
+      onClick={() => setClaimFilter(value)}
+      className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
+        claimFilter === value
+          ? 'bg-brand-500 text-white'
+          : 'bg-gray-100 text-ink-secondary active:bg-gray-200'
+      }`}
+    >
+      {label} {count > 0 && <span className="opacity-75">· {count}</span>}
+    </button>
+  );
+
+  const emptyState = (
+    <div className="mx-4 mt-8 text-center">
+      <div className="text-4xl mb-3">🎉</div>
+      <p className="text-lg font-semibold text-ink-primary">All caught up!</p>
+      <p className="text-sm text-ink-secondary mt-1">
+        {claimFilter === 'all'
+          ? 'No pending tasks. Tap + to add one.'
+          : 'Nothing in this view.'}
+      </p>
+    </div>
+  );
+
   return (
     <div>
       <PageHeader
@@ -71,13 +114,13 @@ export default function DashboardPage() {
       />
 
       <div className="pb-4">
-             {/* Quick Stats */}
+        {/* Quick Stats */}
         <div className="grid grid-cols-3 gap-3 px-4 pt-4 pb-2">
           <button onClick={() => router.push('/history')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
             <div className="text-2xl font-bold text-brand-600">{history.length}</div>
             <div className="text-[10px] text-ink-secondary font-medium mt-0.5">Completed</div>
           </button>
-          <button onClick={() => router.push('/appliances')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
+          <button onClick={() => router.push('/settings')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
             <div className="text-2xl font-bold text-purple-600">{members.length}</div>
             <div className="text-[10px] text-ink-secondary font-medium mt-0.5">Members</div>
           </button>
@@ -91,6 +134,16 @@ export default function DashboardPage() {
 
         {/* Suggestions */}
         <SuggestionBanner />
+
+        {/* Claim filter chips */}
+        {showFilters && (
+          <div className="px-4 pt-2 pb-3 flex gap-2 overflow-x-auto no-scrollbar">
+            <FilterChip value="all" label="All" count={activeTasks.length} />
+            <FilterChip value="unclaimed" label="Unclaimed" count={unclaimedCount} />
+            <FilterChip value="mine" label="Yours" count={mineCount} />
+            {theirsCount > 0 && <FilterChip value="theirs" label={partnerLabel} count={theirsCount} />}
+          </div>
+        )}
 
         {/* Quick Links */}
         <div className="mx-4 mb-4">
@@ -113,6 +166,9 @@ export default function DashboardPage() {
             ))}
           </div>
         </div>
+
+        {/* No-tasks empty state — shows above any other sections */}
+        {filteredTasks.length === 0 && emptyState}
 
         {/* Overdue */}
         {overdue.length > 0 && (
@@ -156,15 +212,6 @@ export default function DashboardPage() {
                 <TaskCard key={t.id} task={t} onComplete={loadData} />
               ))}
             </div>
-          </div>
-        )}
-
-        {/* No tasks state */}
-        {activeTasks.length === 0 && (
-          <div className="mx-4 mt-8 text-center">
-            <div className="text-4xl mb-3">🎉</div>
-            <p className="text-lg font-semibold text-ink-primary">All caught up!</p>
-            <p className="text-sm text-ink-secondary mt-1">No pending tasks. Tap + to add one.</p>
           </div>
         )}
 
