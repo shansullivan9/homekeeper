@@ -143,4 +143,172 @@ export default function HomeProfilePage() {
 
         if (error) throw error;
         setHome(data);
-        await supabase.rpc('generate_suggest
+        await supabase.rpc('generate_suggestions', { p_home_id: home!.id });
+
+        toast.success('Home profile updated');
+        router.push('/dashboard');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const ToggleItem = ({ label, field }: { label: string; field: string }) => (
+    <button
+      onClick={() => update(field, !(form as any)[field])}
+      className="ios-list-item w-full"
+    >
+      <span className="text-[15px]">{label}</span>
+      <div className={`w-12 h-7 rounded-full transition-colors relative ${(form as any)[field] ? 'bg-status-green' : 'bg-gray-200'}`}>
+        <div className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${(form as any)[field] ? 'translate-x-5' : 'translate-x-0.5'}`} />
+      </div>
+    </button>
+  );
+
+  return (
+    <div>
+      <PageHeader title={isNew ? 'Set Up Your Home' : 'Home Profile'} back={!isNew} />
+
+      <div className="py-4 space-y-5">
+        <div>
+          <p className="section-header">Property Basics</p>
+          <p className="text-[13px] text-gray-500 mx-4 mb-2">ZIP and state help us tailor maintenance tasks to your climate and season.</p>
+          <div className="mx-4 space-y-3">
+            <input
+              type="text" value={form.name} onChange={(e) => update('name', e.target.value)}
+              placeholder="Home name *" className="ios-input"
+            />
+            <input
+              type="text" value={form.address} onChange={(e) => update('address', e.target.value)}
+              placeholder="Address" className="ios-input"
+            />
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                type="text" value={form.zip_code} onChange={(e) => update('zip_code', e.target.value)}
+                placeholder="ZIP code" maxLength={10} className="ios-input"
+              />
+              <input
+                type="text" value={form.state} onChange={(e) => update('state', e.target.value.toUpperCase())}
+                placeholder="State (e.g. NC)" maxLength={2} className="ios-input"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                type="number" value={form.year_built} onChange={(e) => update('year_built', e.target.value)}
+                placeholder="Year built" className="ios-input"
+              />
+              <input
+                type="number" value={form.square_footage} onChange={(e) => update('square_footage', e.target.value)}
+                placeholder="Sq. footage" className="ios-input"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                type="number" value={form.floors} onChange={(e) => update('floors', e.target.value)}
+                placeholder="Floors" className="ios-input"
+              />
+              <select value={form.roof_type} onChange={(e) => update('roof_type', e.target.value)} className="ios-input">
+                <option value="">Roof type</option>
+                <option value="asphalt_shingle">Asphalt Shingle</option>
+                <option value="metal">Metal</option>
+                <option value="tile">Tile</option>
+                <option value="slate">Slate</option>
+                <option value="flat">Flat</option>
+              </select>
+            </div>
+            <input
+              type="number" value={form.roof_installed_year} onChange={(e) => update('roof_installed_year', e.target.value)}
+              placeholder="Roof installed year (if known)" className="ios-input"
+            />
+            <select value={form.exterior_type} onChange={(e) => update('exterior_type', e.target.value)} className="ios-input">
+              <option value="">Exterior type</option>
+              <option value="vinyl">Vinyl Siding</option>
+              <option value="brick">Brick</option>
+              <option value="stucco">Stucco</option>
+              <option value="wood">Wood</option>
+              <option value="stone">Stone</option>
+              <option value="fiber_cement">Fiber Cement</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <p className="section-header">Major Systems</p>
+          <p className="text-[13px] text-gray-500 mx-4 mb-2">Install years are optional but make recommendations more accurate.</p>
+          <div className="mx-4 space-y-3">
+            <select value={form.hvac_type} onChange={(e) => update('hvac_type', e.target.value)} className="ios-input">
+              <option value="">HVAC type</option>
+              <option value="central_air">Central Air</option>
+              <option value="heat_pump">Heat Pump</option>
+              <option value="window_units">Window Units</option>
+              <option value="mini_split">Mini Split</option>
+              <option value="radiant">Radiant</option>
+            </select>
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                type="number" value={form.hvac_units} onChange={(e) => update('hvac_units', e.target.value)}
+                placeholder="# HVAC units" className="ios-input"
+              />
+              <input
+                type="number" value={form.hvac_installed_year} onChange={(e) => update('hvac_installed_year', e.target.value)}
+                placeholder="HVAC year" className="ios-input"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <select value={form.water_heater_type} onChange={(e) => update('water_heater_type', e.target.value)} className="ios-input">
+                <option value="">Water heater type</option>
+                <option value="tank">Tank</option>
+                <option value="tankless">Tankless</option>
+                <option value="heat_pump">Heat Pump</option>
+                <option value="solar">Solar</option>
+              </select>
+              <input
+                type="number" value={form.water_heater_installed_year} onChange={(e) => update('water_heater_installed_year', e.target.value)}
+                placeholder="Water heater year" className="ios-input"
+              />
+            </div>
+            <select value={form.plumbing_type} onChange={(e) => update('plumbing_type', e.target.value)} className="ios-input">
+              <option value="">Plumbing type</option>
+              <option value="copper">Copper</option>
+              <option value="pex">PEX</option>
+              <option value="pvc">PVC</option>
+              <option value="galvanized">Galvanized</option>
+              <option value="mixed">Mixed</option>
+            </select>
+            <select value={form.dryer_type} onChange={(e) => update('dryer_type', e.target.value)} className="ios-input">
+              <option value="">Dryer type</option>
+              <option value="electric">Electric Dryer</option>
+              <option value="gas">Gas Dryer</option>
+              <option value="none">No Dryer</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <p className="section-header">Features & Systems</p>
+          <div className="mx-4 ios-card overflow-hidden">
+            <ToggleItem label="🌧️ Irrigation System" field="has_irrigation" />
+            <ToggleItem label="🪵 Deck" field="has_deck" />
+            <ToggleItem label="🏊 Pool" field="has_pool" />
+            <ToggleItem label="🚗 Garage" field="has_garage" />
+            <ToggleItem label="🔥 Fireplace" field="has_fireplace" />
+            <ToggleItem label="🚰 Septic System" field="has_septic" />
+            <ToggleItem label="💧 Well Water" field="has_well_water" />
+            <ToggleItem label="🏠 Basement" field="has_basement" />
+            <ToggleItem label="📐 Attic" field="has_attic" />
+            <ToggleItem label="🕸️ Crawlspace" field="has_crawlspace" />
+            <ToggleItem label="🏘️ HOA" field="has_hoa" />
+          </div>
+        </div>
+
+        <div className="mx-4 pb-4">
+          <button onClick={handleSave} disabled={saving} className="ios-button">
+            {saving ? 'Saving...' : isNew ? 'Create Home' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
