@@ -1,5 +1,4 @@
 'use client';
-import RecommendationSummary from '@/components/recommendations/RecommendationSummary';
 import { useMemo } from 'react';
 import { useStore } from '@/lib/store';
 import { isAfter, isBefore, startOfDay, endOfDay, addDays, endOfMonth, startOfMonth, subDays } from 'date-fns';
@@ -72,8 +71,7 @@ export default function DashboardPage() {
       />
 
       <div className="pb-4">
-      <RecommendationSummary />
-        {/* Quick Stats */}
+             {/* Quick Stats */}
         <div className="grid grid-cols-3 gap-3 px-4 pt-4 pb-2">
           <button onClick={() => router.push('/history')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
             <div className="text-2xl font-bold text-brand-600">{history.length}</div>
