@@ -7,7 +7,7 @@ import SuggestionBanner from '@/components/dashboard/SuggestionBanner';
 import PageHeader from '@/components/layout/PageHeader';
 import { useRouter } from 'next/navigation';
 import { useAppInit } from '@/hooks/useAppInit';
-import { Home as HomeIcon, Users, ChevronRight, Package, Clock3, Banknote } from 'lucide-react';
+import { Home as HomeIcon, Users, ChevronRight, Package, Clock3, Banknote, FileText } from 'lucide-react';
 
 type ClaimFilter = 'all' | 'unclaimed' | 'mine' | 'theirs';
 
@@ -150,6 +150,7 @@ export default function DashboardPage() {
           <div className="ios-card overflow-hidden divide-y divide-gray-50">
             {[
               { label: 'Appliances & Systems', icon: Package, href: '/appliances', color: 'text-purple-500' },
+              { label: 'Documents', icon: FileText, href: '/documents', color: 'text-sky-500' },
               { label: 'House Timeline', icon: Clock3, href: '/timeline', color: 'text-amber-500' },
               { label: 'Expense Summary', icon: Banknote, href: '/expenses', color: 'text-emerald-500' },
               { label: 'Home Profile', icon: HomeIcon, href: '/home-profile', color: 'text-brand-500' },
