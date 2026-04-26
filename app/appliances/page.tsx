@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase-browser';
 import PageHeader from '@/components/layout/PageHeader';
@@ -18,6 +18,26 @@ export default function AppliancesPage() {
     category: '', location: '', installation_date: '', warranty_expiration: '',
     purchase_price: '', notes: '',
   });
+
+  useEffect(() => {
+    const raw = sessionStorage.getItem('appliancePrefill');
+    if (!raw) return;
+    sessionStorage.removeItem('appliancePrefill');
+    try {
+      const p = JSON.parse(raw);
+      setForm((f) => ({
+        ...f,
+        name: p.name || '',
+        manufacturer: p.manufacturer || '',
+        model_number: p.model_number || '',
+        serial_number: p.serial_number || '',
+        category: p.category || '',
+        notes: p.notes || '',
+      }));
+      setShowForm(true);
+      toast('Review the details, then save.', { icon: '✏️' });
+    } catch {}
+  }, []);
 
   const resetForm = () => {
     setForm({
