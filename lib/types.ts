@@ -125,6 +125,22 @@ export interface TimelineEvent {
   created_at: string;
 }
 
+export interface Document {
+  id: string;
+  home_id: string;
+  title: string;
+  category: string | null;
+  file_path: string;
+  file_name: string;
+  mime_type: string | null;
+  file_size: number | null;
+  notes: string | null;
+  uploaded_by: string | null;
+  uploaded_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface NotificationPreference {
   id: string;
   user_id: string;

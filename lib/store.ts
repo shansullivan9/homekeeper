@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Profile, Home, Task, Category, Appliance, TaskHistory, HomeMember } from './types';
+import { Profile, Home, Task, Category, Appliance, TaskHistory, HomeMember, Document } from './types';
 
 interface AppState {
   user: Profile | null;
@@ -9,6 +9,7 @@ interface AppState {
   categories: Category[];
   appliances: Appliance[];
   history: TaskHistory[];
+  documents: Document[];
   loading: boolean;
   setUser: (user: Profile | null) => void;
   setHome: (home: Home | null) => void;
@@ -17,6 +18,7 @@ interface AppState {
   setCategories: (categories: Category[]) => void;
   setAppliances: (appliances: Appliance[]) => void;
   setHistory: (history: TaskHistory[]) => void;
+  setDocuments: (documents: Document[]) => void;
   setLoading: (loading: boolean) => void;
   addTask: (task: Task) => void;
   updateTask: (task: Task) => void;
@@ -31,6 +33,7 @@ export const useStore = create<AppState>((set) => ({
   categories: [],
   appliances: [],
   history: [],
+  documents: [],
   loading: true,
   setUser: (user) => set({ user }),
   setHome: (home) => set({ home }),
@@ -39,6 +42,7 @@ export const useStore = create<AppState>((set) => ({
   setCategories: (categories) => set({ categories }),
   setAppliances: (appliances) => set({ appliances }),
   setHistory: (history) => set({ history }),
+  setDocuments: (documents) => set({ documents }),
   setLoading: (loading) => set({ loading }),
   addTask: (task) => set((s) => ({ tasks: [task, ...s.tasks] })),
   updateTask: (task) => set((s) => ({ tasks: s.tasks.map((t) => (t.id === task.id ? task : t)) })),

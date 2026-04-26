@@ -66,6 +66,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           supabase.from('home_members').select('*').eq('home_id', homeId),
           supabase.from('appliances').select('*').eq('home_id', homeId),
           supabase.from('task_history').select('*').eq('home_id', homeId).order('completed_at', { ascending: false }).limit(100),
+          supabase.from('documents').select('*').eq('home_id', homeId).order('uploaded_at', { ascending: false }),
         ]);
 
         const getData = (r: any) => r.status === 'fulfilled' ? r.value.data || [] : [];
@@ -74,6 +75,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         store.setMembers(getData(results[2]));
         store.setAppliances(getData(results[3]));
         store.setHistory(getData(results[4]));
+        store.setDocuments(getData(results[5]));
 
       } catch (err: any) {
         setError(err.message || 'Something went wrong');
