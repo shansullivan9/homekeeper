@@ -1,5 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase-browser';
 import PageHeader from '@/components/layout/PageHeader';
@@ -49,12 +50,51 @@ function fileIcon(mime: string | null) {
 export default function DocumentsPage() {
   const { documents, home, setDocuments, user } = useStore();
   const supabase = createClient();
+  const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Document | null>(null);
   const [filter, setFilter] = useState<string>('all');
   const [uploading, setUploading] = useState(false);
+  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [form, setForm] = useState({ title: '', category: '', notes: '' });
+
+  const analyzeManual = async (doc: Document) => {
+    setAnalyzingId(doc.id);
+    const t = toast.loading('Reading manual…');
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      if (!token) throw new Error('Not signed in');
+
+      const res = await fetch('/api/manuals/extract', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ documentId: doc.id }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Could not analyze file');
+
+      if (!json.ok) {
+        toast.dismiss(t);
+        toast(json.message || "This doesn't look like a manual.");
+        return;
+      }
+
+      sessionStorage.setItem('appliancePrefill', JSON.stringify(json.appliance));
+      toast.dismiss(t);
+      toast.success('Manual read — review and save the appliance');
+      router.push('/appliances');
+    } catch (err: any) {
+      toast.dismiss(t);
+      toast.error(err.message || 'Analysis failed');
+    } finally {
+      setAnalyzingId(null);
+    }
+  };
 
   const resetForm = () => {
     setForm({ title: '', category: '', notes: '' });
@@ -139,9 +179,14 @@ export default function DocumentsPage() {
         await supabase.storage.from('documents').remove([path]);
         throw error;
       }
-      setDocuments([data as Document, ...documents]);
+      const inserted = data as Document;
+      setDocuments([inserted, ...documents]);
       toast.success('Document uploaded');
+      const wasManual = inserted.category === 'Manual';
       resetForm();
+      if (wasManual) {
+        await analyzeManual(inserted);
+      }
     } catch (err: any) {
       toast.error(err.message || 'Upload failed');
     } finally {
@@ -295,6 +340,15 @@ export default function DocumentsPage() {
           >
             {uploading ? 'Uploading…' : editing ? 'Update' : 'Upload'}
           </button>
+          {editing && editing.category === 'Manual' && (
+            <button
+              onClick={() => analyzeManual(editing)}
+              disabled={analyzingId === editing.id}
+              className="ios-button-secondary"
+            >
+              {analyzingId === editing.id ? 'Reading manual…' : 'Create appliance from this manual'}
+            </button>
+          )}
           {editing && (
             <button
               onClick={handleDelete}
