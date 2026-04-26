@@ -1,6 +1,7 @@
 -- ============================================================
 -- HomeKeeper — Documents feature
--- Run this in Supabase SQL Editor after the base schema.
+-- Safe to re-run: every CREATE is paired with IF NOT EXISTS or
+-- a preceding DROP IF EXISTS.
 -- ============================================================
 
 -- ============================================================
@@ -24,18 +25,22 @@ CREATE TABLE IF NOT EXISTS public.documents (
 
 ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Home members can view documents" ON public.documents;
 CREATE POLICY "Home members can view documents"
   ON public.documents FOR SELECT
   USING (home_id IN (SELECT home_id FROM public.home_members WHERE user_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Home members can insert documents" ON public.documents;
 CREATE POLICY "Home members can insert documents"
   ON public.documents FOR INSERT
   WITH CHECK (home_id IN (SELECT home_id FROM public.home_members WHERE user_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Home members can update documents" ON public.documents;
 CREATE POLICY "Home members can update documents"
   ON public.documents FOR UPDATE
   USING (home_id IN (SELECT home_id FROM public.home_members WHERE user_id = auth.uid()));
 
+DROP POLICY IF EXISTS "Home members can delete documents" ON public.documents;
 CREATE POLICY "Home members can delete documents"
   ON public.documents FOR DELETE
   USING (home_id IN (SELECT home_id FROM public.home_members WHERE user_id = auth.uid()));
@@ -53,6 +58,7 @@ ON CONFLICT (id) DO NOTHING;
 
 -- A user can read/write objects only when the first path segment
 -- (the home_id) matches a household they belong to.
+DROP POLICY IF EXISTS "Home members can read documents bucket" ON storage.objects;
 CREATE POLICY "Home members can read documents bucket"
   ON storage.objects FOR SELECT
   USING (
@@ -62,6 +68,7 @@ CREATE POLICY "Home members can read documents bucket"
     )
   );
 
+DROP POLICY IF EXISTS "Home members can upload to documents bucket" ON storage.objects;
 CREATE POLICY "Home members can upload to documents bucket"
   ON storage.objects FOR INSERT
   WITH CHECK (
@@ -71,6 +78,7 @@ CREATE POLICY "Home members can upload to documents bucket"
     )
   );
 
+DROP POLICY IF EXISTS "Home members can delete from documents bucket" ON storage.objects;
 CREATE POLICY "Home members can delete from documents bucket"
   ON storage.objects FOR DELETE
   USING (
