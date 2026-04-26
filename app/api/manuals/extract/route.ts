@@ -35,7 +35,7 @@ const SCHEMA = {
     },
     serial_number: {
       type: SchemaType.STRING,
-      description: 'Serial number ONLY if visibly written/handwritten in this specific document. Manuals typically do not contain serial numbers — return an empty string when not present.',
+      description: 'Serial number exactly as printed in the document — including on warranty registration pages, rating-plate photos, sticker images, install paperwork, or hand-written entries. Empty string only if no serial number appears anywhere in the document. Do not invent or guess.',
     },
     category: {
       type: SchemaType.STRING,
@@ -144,10 +144,10 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  const prompt = `You are extracting appliance details from a household appliance manual.
+  const prompt = `You are extracting appliance details from a household appliance manual or appliance paperwork.
 Return strict JSON matching the schema. Use empty strings for unknown text fields.
-Set is_appliance_manual=false if the document is not actually an appliance manual.
-Do not invent serial numbers — they are almost never printed in manuals.`;
+Set is_appliance_manual=false if the document is not actually an appliance manual or related paperwork.
+Look carefully for the serial number anywhere in the document — warranty registration pages, rating-plate photos, install records, stickers, packing slips, hand-written entries. If a serial number is present, return it exactly. If you cannot find one, return an empty string. Never invent or guess.`;
 
   let result;
   try {

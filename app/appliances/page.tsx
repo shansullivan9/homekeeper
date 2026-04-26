@@ -131,15 +131,27 @@ export default function AppliancesPage() {
           }
         />
         <div className="px-4 py-4 space-y-3">
-          <input type="text" value={form.name} onChange={(e) => u('name', e.target.value)} placeholder="Appliance name *" className="ios-input" autoFocus />
-          <input type="text" value={form.manufacturer} onChange={(e) => u('manufacturer', e.target.value)} placeholder="Manufacturer" className="ios-input" />
-          <div className="grid grid-cols-2 gap-3">
-            <input type="text" value={form.model_number} onChange={(e) => u('model_number', e.target.value)} placeholder="Model #" className="ios-input" />
-            <input type="text" value={form.serial_number} onChange={(e) => u('serial_number', e.target.value)} placeholder="Serial #" className="ios-input" />
+          <div>
+            <label className="text-xs text-ink-secondary mb-1 block">Appliance name *</label>
+            <input type="text" value={form.name} onChange={(e) => u('name', e.target.value)} className="ios-input" autoFocus />
+          </div>
+          <div>
+            <label className="text-xs text-ink-secondary mb-1 block">Manufacturer</label>
+            <input type="text" value={form.manufacturer} onChange={(e) => u('manufacturer', e.target.value)} className="ios-input" />
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <input type="text" value={form.category} onChange={(e) => u('category', e.target.value)} placeholder="Category" className="ios-input" />
-            <input type="text" value={form.location} onChange={(e) => u('location', e.target.value)} placeholder="Location" className="ios-input" />
+            <div>
+              <label className="text-xs text-ink-secondary mb-1 block">Model #</label>
+              <input type="text" value={form.model_number} onChange={(e) => u('model_number', e.target.value)} className="ios-input" />
+            </div>
+            <div>
+              <label className="text-xs text-ink-secondary mb-1 block">Serial #</label>
+              <input type="text" value={form.serial_number} onChange={(e) => u('serial_number', e.target.value)} className="ios-input" />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-ink-secondary mb-1 block">Category</label>
+            <input type="text" value={form.category} onChange={(e) => u('category', e.target.value)} className="ios-input" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -151,8 +163,14 @@ export default function AppliancesPage() {
               <input type="date" value={form.warranty_expiration} onChange={(e) => u('warranty_expiration', e.target.value)} className="ios-input" />
             </div>
           </div>
-          <input type="number" step="0.01" value={form.purchase_price} onChange={(e) => u('purchase_price', e.target.value)} placeholder="Purchase price ($)" className="ios-input" />
-          <textarea value={form.notes} onChange={(e) => u('notes', e.target.value)} placeholder="Notes..." rows={3} className="ios-input resize-none" />
+          <div>
+            <label className="text-xs text-ink-secondary mb-1 block">Purchase price ($)</label>
+            <input type="number" step="0.01" value={form.purchase_price} onChange={(e) => u('purchase_price', e.target.value)} className="ios-input" />
+          </div>
+          <div>
+            <label className="text-xs text-ink-secondary mb-1 block">Notes</label>
+            <textarea value={form.notes} onChange={(e) => u('notes', e.target.value)} rows={3} className="ios-input resize-none" />
+          </div>
 
           <button onClick={handleSave} disabled={!form.name.trim()} className="ios-button">
             {editing ? 'Update' : 'Add Appliance'}
