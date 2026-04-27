@@ -81,8 +81,6 @@ export default function DocumentsPage() {
   const [search, setSearch] = useState('');
   const [uploading, setUploading] = useState(false);
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
-  const [prefilling, setPrefilling] = useState(false);
-  const [prefilledSearchable, setPrefilledSearchable] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [form, setForm] = useState({ title: '', category: '', notes: '' });
 
@@ -673,7 +671,6 @@ export default function DocumentsPage() {
   const resetForm = () => {
     setForm({ title: '', category: '', notes: '' });
     setFiles([]);
-    setPrefilledSearchable(null);
     setEditing(null);
     setShowForm(false);
   };
@@ -685,64 +682,15 @@ export default function DocumentsPage() {
     setShowForm(true);
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files || []);
     if (selected.length === 0) return;
     setFiles(selected);
-    setPrefilledSearchable(null);
     if (selected.length === 1 && !form.title) {
       const name = selected[0].name.replace(/\.[^.]+$/, '');
       setForm((prev) => ({ ...prev, title: name }));
     } else if (selected.length > 1) {
       setForm((prev) => ({ ...prev, title: '' }));
-    }
-    if (selected.length === 1) {
-      await prefillFromFile(selected[0]);
-    }
-  };
-
-  const prefillFromFile = async (file: File) => {
-    if (!file.type.startsWith('application/pdf') && !file.type.startsWith('image/')) {
-      return;
-    }
-    if (file.size > 18 * 1024 * 1024) {
-      toast('File is too large for AI prefill (>18 MB).', { icon: 'ℹ️' });
-      return;
-    }
-    setPrefilling(true);
-    try {
-      const { data: sess } = await supabase.auth.getSession();
-      const token = sess.session?.access_token;
-      if (!token) return;
-
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const res = await fetch('/api/documents/classify', {
-        method: 'POST',
-        headers: { authorization: `Bearer ${token}` },
-        body: formData,
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.ok) {
-        const msg = json?.error || `Prefill failed (${res.status})`;
-        toast.error(msg);
-        return;
-      }
-
-      setForm((prev) => ({
-        title:
-          prev.title && prev.title !== file.name.replace(/\.[^.]+$/, '')
-            ? prev.title
-            : json.title || prev.title,
-        category: prev.category || json.category || '',
-        notes: prev.notes || json.notes || '',
-      }));
-      setPrefilledSearchable(json.searchable_text || null);
-    } catch (err: any) {
-      toast.error(err?.message || 'Could not pre-read the file');
-    } finally {
-      setPrefilling(false);
     }
   };
 
@@ -804,7 +752,6 @@ export default function DocumentsPage() {
             mime_type: f.type || null,
             file_size: f.size,
             notes: isBatch ? null : form.notes || null,
-            searchable_text: !isBatch ? prefilledSearchable : null,
             uploaded_by: user?.id || null,
           })
           .select()
@@ -824,15 +771,9 @@ export default function DocumentsPage() {
         uploaded.length === 1 ? 'Document uploaded' : `Uploaded ${uploaded.length} documents`
       );
       const userCategory = form.category || null;
-      const skipClassify = !isBatch && !!prefilledSearchable;
       resetForm();
 
-      // If we already classified this single file before upload, the inserted
-      // doc already has searchable_text + the right title/category, so skip
-      // the redundant post-upload classify call.
-      const classified = skipClassify
-        ? uploaded
-        : await classifyAndUpdate(uploaded, userCategory);
+      const classified = await classifyAndUpdate(uploaded, userCategory);
 
       const buckets: Record<string, Document[]> = {};
       for (const doc of classified) {
@@ -961,10 +902,7 @@ export default function DocumentsPage() {
                   ) : files.length === 1 ? (
                     <>
                       <p className="text-[15px] font-medium truncate">{files[0].name}</p>
-                      <p className="text-xs text-ink-secondary">
-                        {formatBytes(files[0].size)}
-                        {prefilling && ' · Reading…'}
-                      </p>
+                      <p className="text-xs text-ink-secondary">{formatBytes(files[0].size)}</p>
                     </>
                   ) : (
                     <>
@@ -1050,15 +988,12 @@ export default function DocumentsPage() {
             onClick={handleSave}
             disabled={
               uploading ||
-              prefilling ||
               (!editing && files.length === 0) ||
               (files.length <= 1 && !editing && !form.title.trim())
             }
             className="ios-button"
           >
-            {prefilling
-              ? 'Reading file…'
-              : uploading
+            {uploading
               ? 'Uploading…'
               : editing
               ? 'Update'
