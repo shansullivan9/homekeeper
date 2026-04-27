@@ -233,12 +233,12 @@ export default function DashboardPage() {
         {upcoming.length > 0 && (
           <div>
             <p className="section-header">
-              <span className="inline-block w-2 h-2 rounded-full bg-brand-400 mr-1.5 -mb-px" />
+              <span className="inline-block w-2 h-2 rounded-full mr-1.5 -mb-px" style={{ backgroundColor: '#36ADF6' }} />
               Upcoming ({upcoming.length})
             </p>
             <div className="mx-4 ios-card overflow-hidden">
               {upcoming.map((t) => (
-                <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#5AC8FA" />
+                <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#36ADF6" />
               ))}
             </div>
           </div>
@@ -247,7 +247,10 @@ export default function DashboardPage() {
         {/* Recently Completed */}
         {recentlyCompleted.length > 0 && (
           <div>
-            <p className="section-header">Recently Completed</p>
+            <p className="section-header">
+              <span className="inline-block w-2 h-2 rounded-full mr-1.5 -mb-px" style={{ backgroundColor: '#8E8E93' }} />
+              Recently Completed ({recentlyCompleted.length})
+            </p>
             <div className="mx-4 ios-card overflow-hidden">
               {recentlyCompleted.map((t) => (
                 <TaskCard key={t.id} task={t} compact sectionColor="#8E8E93" />

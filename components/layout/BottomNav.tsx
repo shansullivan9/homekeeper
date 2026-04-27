@@ -1,6 +1,8 @@
 'use client';
+import { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { LayoutDashboard, Calendar, PlusCircle, Clock, Settings } from 'lucide-react';
+import QuickAddMenu from '@/components/layout/QuickAddMenu';
 
 const tabs = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -13,18 +15,7 @@ const tabs = [
 export default function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
-
-  const handleAddClick = () => {
-    if (pathname.startsWith('/documents')) {
-      router.push('/documents?new=1');
-      return;
-    }
-    if (pathname.startsWith('/appliances')) {
-      router.push('/appliances?new=1');
-      return;
-    }
-    router.push('/add-task');
-  };
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-lg border-t border-gray-200/60 shadow-nav"
@@ -38,7 +29,7 @@ export default function BottomNav() {
           return (
             <button
               key={tab.href}
-              onClick={() => (isAdd ? handleAddClick() : router.push(tab.href))}
+              onClick={() => (isAdd ? setMenuOpen(true) : router.push(tab.href))}
               className={`flex flex-col items-center justify-center gap-0.5 min-w-[64px] py-1 transition-colors ${
                 isAdd ? '' : active ? 'text-brand-500' : 'text-ink-tertiary'
               }`}
@@ -59,6 +50,7 @@ export default function BottomNav() {
           );
         })}
       </div>
+      <QuickAddMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
     </nav>
   );
 }
