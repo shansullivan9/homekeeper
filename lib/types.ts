@@ -137,6 +137,7 @@ export interface Document {
   mime_type: string | null;
   file_size: number | null;
   notes: string | null;
+  searchable_text: string | null;
   uploaded_by: string | null;
   uploaded_at: string;
   created_at: string;

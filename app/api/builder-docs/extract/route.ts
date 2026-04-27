@@ -63,6 +63,28 @@ const SCHEMA = {
     has_attic: { type: SchemaType.STRING, description: "'yes', 'no', or 'unknown'." },
     has_crawlspace: { type: SchemaType.STRING, description: "'yes', 'no', or 'unknown'." },
     has_hoa: { type: SchemaType.STRING, description: "'yes', 'no', or 'unknown'." },
+    appliances: {
+      type: SchemaType.ARRAY,
+      description:
+        "Built-in equipment / fixtures / appliances mentioned. Examples: Fireplace, Garage Door, Garage Door Opener, Tankless Water Heater, HVAC Unit, Range, Dishwasher, Microwave, Disposal, Range Hood, Sump Pump, Doorbell. Skip generic mentions of features without enough detail to be a tracked item. Empty array if none clearly described.",
+      items: {
+        type: SchemaType.OBJECT,
+        properties: {
+          name: {
+            type: SchemaType.STRING,
+            description: "Short product name, e.g. 'Living Room Fireplace', 'Garage Door', 'Whirlpool Dishwasher'.",
+          },
+          manufacturer: { type: SchemaType.STRING, description: 'Brand. Empty if unknown.' },
+          model_number: { type: SchemaType.STRING, description: 'Model number. Empty if unknown.' },
+          category: {
+            type: SchemaType.STRING,
+            description: "Category, e.g. 'Fireplace', 'Garage', 'HVAC', 'Plumbing', 'Kitchen', 'Laundry'. Empty if unknown.",
+          },
+          notes: { type: SchemaType.STRING, description: 'One short note about this item if helpful.' },
+        },
+        required: ['name', 'manufacturer', 'model_number', 'category', 'notes'],
+      },
+    },
   },
   required: [
     'is_builder_doc',
@@ -90,6 +112,7 @@ const SCHEMA = {
     'has_attic',
     'has_crawlspace',
     'has_hoa',
+    'appliances',
   ],
 };
 
@@ -248,8 +271,22 @@ For a brand-new build, treat year_built as the year roof, HVAC, and water heater
     );
   }
 
+  const cleanText = (raw: unknown) =>
+    typeof raw === 'string' && raw.trim() ? raw.trim() : '';
+  const appliancesRaw = Array.isArray(parsed.appliances) ? parsed.appliances : [];
+  const appliances = appliancesRaw
+    .map((a: any) => ({
+      name: cleanText(a?.name),
+      manufacturer: cleanText(a?.manufacturer),
+      model_number: cleanText(a?.model_number),
+      category: cleanText(a?.category),
+      notes: cleanText(a?.notes),
+    }))
+    .filter((a: any) => a.name);
+
   return NextResponse.json({
     ok: true,
+    appliances,
     profile: {
       year_built: cleanNum(parsed.year_built),
       square_footage: cleanNum(parsed.square_footage),
