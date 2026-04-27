@@ -48,8 +48,17 @@ export default function AppliancesPage() {
     if (searchParams.get('new') === '1') {
       setShowForm(true);
       router.replace('/appliances');
+      return;
     }
-  }, [searchParams, router]);
+    const editId = searchParams.get('edit');
+    if (editId) {
+      const target = appliances.find((a) => a.id === editId);
+      if (target) {
+        openEdit(target);
+        router.replace('/appliances');
+      }
+    }
+  }, [searchParams, router, appliances]);
 
   const resetForm = () => {
     setForm({
