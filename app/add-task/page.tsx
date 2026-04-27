@@ -21,6 +21,8 @@ function AddTaskForm() {
   const [title, setTitle] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [completedOn, setCompletedOn] = useState('');
+  const [isCompleted, setIsCompleted] = useState(false);
   const [sourceDocumentId, setSourceDocumentId] = useState<string | null>(null);
   const [recurrence, setRecurrence] = useState<Recurrence>('one_time');
   const [recurrenceDays, setRecurrenceDays] = useState('');
@@ -47,6 +49,9 @@ function AddTaskForm() {
         setPriority(task.priority);
         setApplianceId(task.appliance_id || '');
         setSourceDocumentId(task.source_document_id || null);
+        const done = task.status === 'completed';
+        setIsCompleted(done);
+        setCompletedOn(done && task.completed_at ? task.completed_at.slice(0, 10) : '');
       }
     }
   }, [editId, tasks]);
@@ -71,7 +76,7 @@ function AddTaskForm() {
     if (!title.trim() || !home) return;
     setSaving(true);
 
-    const payload = {
+    const payload: any = {
       home_id: home.id,
       title: title.trim(),
       category_id: categoryId || null,
@@ -86,11 +91,23 @@ function AddTaskForm() {
       created_by: user?.id,
     };
 
+    if (isCompleted && completedOn) {
+      payload.completed_at = `${completedOn}T12:00:00Z`;
+    }
+
     try {
       if (editId) {
         const { error } = await supabase.from('tasks').update(payload as any).eq('id', editId);
 
         if (error) throw error;
+
+        if (isCompleted && completedOn) {
+          await supabase
+            .from('task_history')
+            .update({ completed_at: `${completedOn}T12:00:00Z` })
+            .eq('task_id', editId);
+        }
+
         toast.success('Task updated');
       } else {
         const { error } = await supabase.from('tasks').insert(payload as any);
@@ -186,16 +203,27 @@ function AddTaskForm() {
           </div>
         </div>
 
-        {/* Due Date */}
-        <div>
-          <label className="text-xs font-semibold text-ink-secondary uppercase tracking-wide mb-1.5 block">Due Date</label>
-          <input
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            className="ios-input"
-          />
-        </div>
+        {isCompleted ? (
+          <div>
+            <label className="text-xs font-semibold text-ink-secondary uppercase tracking-wide mb-1.5 block">Completed On</label>
+            <input
+              type="date"
+              value={completedOn}
+              onChange={(e) => setCompletedOn(e.target.value)}
+              className="ios-input"
+            />
+          </div>
+        ) : (
+          <div>
+            <label className="text-xs font-semibold text-ink-secondary uppercase tracking-wide mb-1.5 block">Due Date</label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="ios-input"
+            />
+          </div>
+        )}
 
         {/* Recurrence */}
         <div>
