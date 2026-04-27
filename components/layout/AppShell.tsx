@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase-browser';
 import { useStore } from '@/lib/store';
 import { useRouter, usePathname } from 'next/navigation';
 import BottomNav from '@/components/layout/BottomNav';
+import SideNav from '@/components/layout/SideNav';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -111,7 +112,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-surface-secondary">
-      {children}
+      <SideNav />
+      <div className="md:pl-60">
+        <div className="md:max-w-3xl md:mx-auto md:px-2">
+          {children}
+        </div>
+      </div>
       <BottomNav />
     </div>
   );

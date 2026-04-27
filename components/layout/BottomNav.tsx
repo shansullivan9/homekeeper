@@ -27,7 +27,7 @@ export default function BottomNav() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-lg border-t border-gray-200/60 shadow-nav"
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-lg border-t border-gray-200/60 shadow-nav"
          style={{ paddingBottom: 'env(safe-area-inset-bottom, 8px)' }}>
       <div className="flex items-center justify-around max-w-lg mx-auto h-[54px]">
         {tabs.map((tab) => {
