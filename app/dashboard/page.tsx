@@ -185,95 +185,106 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* No-tasks empty state — shows above any other sections */}
-        {filteredTasks.length === 0 && emptyState}
-
-        {/* Overdue */}
-        {overdue.length > 0 && (
-          <div>
-            <p className="section-header">
-              <span className="inline-block w-2 h-2 rounded-full bg-status-red mr-1.5 -mb-px" />
-              Overdue ({overdue.length})
-            </p>
-            <div className="mx-4 ios-card overflow-hidden">
-              {overdue.map((t) => (
+        {/* Overdue — always visible */}
+        <div>
+          <p className="section-header">
+            <span className="inline-block w-2 h-2 rounded-full bg-status-red mr-1.5 -mb-px" />
+            Overdue ({overdue.length})
+          </p>
+          <div className="mx-4 ios-card overflow-hidden">
+            {overdue.length > 0 ? (
+              overdue.map((t) => (
                 <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#FF3B30" />
-              ))}
-            </div>
+              ))
+            ) : (
+              <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
+            )}
           </div>
-        )}
+        </div>
 
-        {/* Due This Week */}
-        {dueThisWeek.length > 0 && (
-          <div>
-            <p className="section-header">
-              <span className="inline-block w-2 h-2 rounded-full mr-1.5 -mb-px" style={{ backgroundColor: '#FF9F0A' }} />
-              Due This Week ({dueThisWeek.length})
-            </p>
-            <div className="mx-4 ios-card overflow-hidden">
-              {dueThisWeek.map((t) => (
+        {/* Due This Week — always visible */}
+        <div>
+          <p className="section-header">
+            <span className="inline-block w-2 h-2 rounded-full mr-1.5 -mb-px" style={{ backgroundColor: '#FF9F0A' }} />
+            Due This Week ({dueThisWeek.length})
+          </p>
+          <div className="mx-4 ios-card overflow-hidden">
+            {dueThisWeek.length > 0 ? (
+              dueThisWeek.map((t) => (
                 <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#FF9F0A" />
-              ))}
-            </div>
+              ))
+            ) : (
+              <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
+            )}
           </div>
-        )}
+        </div>
 
-        {/* Due This Month */}
-        {dueThisMonth.length > 0 && (
-          <div>
-            <p className="section-header">
-              <span className="inline-block w-2 h-2 rounded-full bg-status-green mr-1.5 -mb-px" />
-              Due This Month ({dueThisMonth.length})
-            </p>
-            <div className="mx-4 ios-card overflow-hidden">
-              {dueThisMonth.map((t) => (
+        {/* Due This Month — always visible */}
+        <div>
+          <p className="section-header">
+            <span className="inline-block w-2 h-2 rounded-full bg-status-green mr-1.5 -mb-px" />
+            Due This Month ({dueThisMonth.length})
+          </p>
+          <div className="mx-4 ios-card overflow-hidden">
+            {dueThisMonth.length > 0 ? (
+              dueThisMonth.map((t) => (
                 <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#34C759" />
-              ))}
-            </div>
+              ))
+            ) : (
+              <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
+            )}
           </div>
-        )}
+        </div>
 
-        {/* Upcoming */}
-        {upcoming.length > 0 && (
-          <div>
-            <p className="section-header">
-              <span className="inline-block w-2 h-2 rounded-full mr-1.5 -mb-px" style={{ backgroundColor: '#4B9CD3' }} />
-              Upcoming ({upcoming.length})
-            </p>
-            <div className="mx-4 ios-card overflow-hidden">
-              {upcoming.map((t) => (
+        {/* Upcoming — always visible */}
+        <div>
+          <p className="section-header">
+            <span className="inline-block w-2 h-2 rounded-full mr-1.5 -mb-px" style={{ backgroundColor: '#4B9CD3' }} />
+            Upcoming ({upcoming.length})
+          </p>
+          <div className="mx-4 ios-card overflow-hidden">
+            {upcoming.length > 0 ? (
+              upcoming.map((t) => (
                 <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#4B9CD3" />
-              ))}
-            </div>
+              ))
+            ) : (
+              <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
+            )}
           </div>
-        )}
+        </div>
 
-        {/* Later (no date, or beyond 6 weeks) */}
-        {later.length > 0 && (
-          <div>
-            <p className="section-header">
-              <span className="inline-block w-2 h-2 rounded-full mr-1.5 -mb-px" style={{ backgroundColor: '#36ADF6' }} />
-              Later ({later.length})
-            </p>
-            <div className="mx-4 ios-card overflow-hidden">
-              {later.map((t) => (
+        {/* Later — always visible */}
+        <div>
+          <p className="section-header">
+            <span className="inline-block w-2 h-2 rounded-full mr-1.5 -mb-px" style={{ backgroundColor: '#36ADF6' }} />
+            Later ({later.length})
+          </p>
+          <div className="mx-4 ios-card overflow-hidden">
+            {later.length > 0 ? (
+              later.map((t) => (
                 <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#36ADF6" />
-              ))}
-            </div>
+              ))
+            ) : (
+              <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Recently Completed — only on the unfiltered view */}
-        {claimFilter === 'all' && recentlyCompleted.length > 0 && (
+        {claimFilter === 'all' && (
           <div>
             <p className="section-header">
               <span className="inline-block w-2 h-2 rounded-full mr-1.5 -mb-px" style={{ backgroundColor: '#8E8E93' }} />
               Recently Completed ({recentlyCompleted.length})
             </p>
             <div className="mx-4 ios-card overflow-hidden">
-              {recentlyCompleted.map((t) => (
-                <TaskCard key={t.id} task={t} compact sectionColor="#8E8E93" />
-              ))}
+              {recentlyCompleted.length > 0 ? (
+                recentlyCompleted.map((t) => (
+                  <TaskCard key={t.id} task={t} compact sectionColor="#8E8E93" />
+                ))
+              ) : (
+                <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
+              )}
             </div>
           </div>
         )}
