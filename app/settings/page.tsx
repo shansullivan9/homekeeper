@@ -162,7 +162,7 @@ export default function SettingsPage() {
             {[
               { label: 'Appliances & Systems', icon: Package, href: '/appliances' },
               { label: 'Expense Summary', icon: Banknote, href: '/expenses' },
-              { label: 'House Timeline', icon: Clock3, href: '/timeline' },
+              { label: 'Home Timeline', icon: Clock3, href: '/timeline' },
               { label: 'Home Profile', icon: Home, href: '/home-profile' },
             ].map(({ label, icon: Icon, href }) => (
               <button key={href} onClick={() => router.push(href)} className="ios-list-item w-full">
