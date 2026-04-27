@@ -1,4 +1,5 @@
 'use client';
+import { useMemo } from 'react';
 import { Task } from '@/lib/types';
 import { createClient } from '@/lib/supabase-browser';
 import { useStore } from '@/lib/store';
@@ -8,7 +9,20 @@ import toast from 'react-hot-toast';
 export default function SuggestionBanner() {
   const { tasks, removeTask, updateTask } = useStore();
   const supabase = createClient();
-  const suggestions = tasks.filter((t) => t.is_suggestion && t.status === 'pending');
+
+  const suggestions = useMemo(() => {
+    const realTitles = new Set(
+      tasks
+        .filter((t) => !t.is_suggestion && t.status !== 'skipped')
+        .map((t) => t.title.trim().toLowerCase())
+    );
+    return tasks.filter(
+      (t) =>
+        t.is_suggestion &&
+        t.status === 'pending' &&
+        !realTitles.has(t.title.trim().toLowerCase())
+    );
+  }, [tasks]);
 
   if (suggestions.length === 0) return null;
 
