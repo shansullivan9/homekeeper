@@ -127,23 +127,25 @@ export default function DashboardPage() {
       />
 
       <div className="pb-4">
-        {/* Quick Stats */}
-        <div className="grid grid-cols-3 gap-3 px-4 pt-4 pb-2">
-          <button onClick={() => router.push('/history')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
-            <div className="text-2xl font-bold text-brand-600">{history.length}</div>
-            <div className="text-[10px] text-ink-secondary font-medium mt-0.5">Completed</div>
-          </button>
-          <button onClick={() => router.push('/settings')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
-            <div className="text-2xl font-bold text-purple-600">{members.length}</div>
-            <div className="text-[10px] text-ink-secondary font-medium mt-0.5">Members</div>
-          </button>
-          <button onClick={() => router.push('/expenses')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
-            <div className="text-2xl font-bold text-emerald-600">
-              ${totalSpending >= 1000 ? `${(totalSpending / 1000).toFixed(1)}k` : totalSpending.toFixed(0)}
-            </div>
-            <div className="text-[10px] text-ink-secondary font-medium mt-0.5">Spent</div>
-          </button>
-        </div>
+        {/* Quick Stats — only on the unfiltered view */}
+        {claimFilter === 'all' && (
+          <div className="grid grid-cols-3 gap-3 px-4 pt-4 pb-2">
+            <button onClick={() => router.push('/history')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
+              <div className="text-2xl font-bold text-brand-600">{history.length}</div>
+              <div className="text-[10px] text-ink-secondary font-medium mt-0.5">Completed</div>
+            </button>
+            <button onClick={() => router.push('/settings')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
+              <div className="text-2xl font-bold text-purple-600">{members.length}</div>
+              <div className="text-[10px] text-ink-secondary font-medium mt-0.5">Members</div>
+            </button>
+            <button onClick={() => router.push('/expenses')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
+              <div className="text-2xl font-bold text-emerald-600">
+                ${totalSpending >= 1000 ? `${(totalSpending / 1000).toFixed(1)}k` : totalSpending.toFixed(0)}
+              </div>
+              <div className="text-[10px] text-ink-secondary font-medium mt-0.5">Spent</div>
+            </button>
+          </div>
+        )}
 
         {/* Suggestions */}
         <SuggestionBanner />
@@ -158,28 +160,30 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Quick Links */}
-        <div className="mx-4 mb-4">
-          <div className="ios-card overflow-hidden">
-            {[
-              { label: 'Appliances & Systems', icon: Package, href: '/appliances', color: 'text-purple-500' },
-              { label: 'Documents', icon: FileText, href: '/documents', color: 'text-sky-500' },
-              { label: 'Expense Summary', icon: Banknote, href: '/expenses', color: 'text-emerald-500' },
-              { label: 'Home Profile', icon: HomeIcon, href: '/home-profile', color: 'text-brand-500' },
-              { label: 'House Timeline', icon: Clock3, href: '/timeline', color: 'text-amber-500' },
-            ].map(({ label, icon: Icon, href, color }) => (
-              <button key={href} onClick={() => router.push(href)} className="ios-list-item w-full">
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center ${color}`}>
-                    <Icon size={18} />
+        {/* Quick Links — only on the unfiltered view */}
+        {claimFilter === 'all' && (
+          <div className="mx-4 mb-4">
+            <div className="ios-card overflow-hidden">
+              {[
+                { label: 'Appliances & Systems', icon: Package, href: '/appliances', color: 'text-purple-500' },
+                { label: 'Documents', icon: FileText, href: '/documents', color: 'text-sky-500' },
+                { label: 'Expense Summary', icon: Banknote, href: '/expenses', color: 'text-emerald-500' },
+                { label: 'Home Profile', icon: HomeIcon, href: '/home-profile', color: 'text-brand-500' },
+                { label: 'Home Timeline', icon: Clock3, href: '/timeline', color: 'text-amber-500' },
+              ].map(({ label, icon: Icon, href, color }) => (
+                <button key={href} onClick={() => router.push(href)} className="ios-list-item w-full">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center ${color}`}>
+                      <Icon size={18} />
+                    </div>
+                    <span className="text-[15px] font-medium">{label}</span>
                   </div>
-                  <span className="text-[15px] font-medium">{label}</span>
-                </div>
-                <ChevronRight size={16} className="text-ink-tertiary" />
-              </button>
-            ))}
+                  <ChevronRight size={16} className="text-ink-tertiary" />
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* No-tasks empty state — shows above any other sections */}
         {filteredTasks.length === 0 && emptyState}
@@ -244,8 +248,8 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Recently Completed */}
-        {recentlyCompleted.length > 0 && (
+        {/* Recently Completed — only on the unfiltered view */}
+        {claimFilter === 'all' && recentlyCompleted.length > 0 && (
           <div>
             <p className="section-header">
               <span className="inline-block w-2 h-2 rounded-full mr-1.5 -mb-px" style={{ backgroundColor: '#8E8E93' }} />

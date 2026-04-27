@@ -99,7 +99,7 @@ export default function TimelinePage() {
   return (
     <div>
       <PageHeader
-        title="House Timeline"
+        title="Home Timeline"
         subtitle={`${events.length} events`}
         back
         rightAction={
