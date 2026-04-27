@@ -976,7 +976,12 @@ export default function DocumentsPage() {
     else if (filter !== 'all') list = list.filter((d) => d.category === filter);
     const q = search.trim().toLowerCase();
     if (q) {
-      const words = q.split(/\s+/).filter(Boolean);
+      const STOP_WORDS = new Set([
+        'the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'and', 'or',
+        'but', 'is', 'are', 'was', 'were', 'be', 'with', 'by', 'as', 'it',
+        'this', 'that', 'my', 'your', 'our', 'their',
+      ]);
+      const words = q.split(/\s+/).filter((w) => w && !STOP_WORDS.has(w));
       list = list.filter((d) => {
         const haystack = [
           d.title,
@@ -988,6 +993,9 @@ export default function DocumentsPage() {
           .filter(Boolean)
           .join(' ')
           .toLowerCase();
+        if (words.length === 0) {
+          return haystack.includes(q);
+        }
         return words.every((w) => haystack.includes(w));
       });
     }
