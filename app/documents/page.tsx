@@ -1,6 +1,6 @@
 'use client';
-import { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase-browser';
 import PageHeader from '@/components/layout/PageHeader';
@@ -67,7 +67,15 @@ export default function DocumentsPage() {
   } = useStore();
   const supabase = createClient();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setShowForm(true);
+      router.replace('/documents');
+    }
+  }, [searchParams, router]);
   const [editing, setEditing] = useState<Document | null>(null);
   const [filter, setFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
@@ -833,11 +841,6 @@ export default function DocumentsPage() {
         title="Documents"
         subtitle={`${documents.length} stored`}
         back
-        rightAction={
-          <button onClick={() => setShowForm(true)} className="text-brand-500">
-            <Plus size={24} />
-          </button>
-        }
       />
 
       {documents.length > 0 && (
