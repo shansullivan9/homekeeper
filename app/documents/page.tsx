@@ -24,6 +24,7 @@ const CATEGORIES = [
   'Deed / Title',
   'Mortgage',
   'Warranty',
+  'Invoice',
   'Receipt',
   'Manual',
   'Inspection',
@@ -48,7 +49,19 @@ function fileIcon(mime: string | null) {
 }
 
 export default function DocumentsPage() {
-  const { documents, home, setDocuments, user } = useStore();
+  const {
+    documents,
+    home,
+    setDocuments,
+    user,
+    appliances,
+    setAppliances,
+    tasks,
+    setTasks,
+    history,
+    setHistory,
+    categories,
+  } = useStore();
   const supabase = createClient();
   const router = useRouter();
   const [showForm, setShowForm] = useState(false);
@@ -56,7 +69,7 @@ export default function DocumentsPage() {
   const [filter, setFilter] = useState<string>('all');
   const [uploading, setUploading] = useState(false);
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [form, setForm] = useState({ title: '', category: '', notes: '' });
 
   const analyzeManual = async (doc: Document) => {
@@ -109,9 +122,188 @@ export default function DocumentsPage() {
     }
   };
 
+  const batchAnalyzeManuals = async (docs: Document[]) => {
+    if (!home || docs.length === 0) return;
+    const t = toast.loading(`Reading ${docs.length} manual${docs.length === 1 ? '' : 's'}…`);
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess.session?.access_token;
+    if (!token) {
+      toast.dismiss(t);
+      toast.error('Not signed in');
+      return;
+    }
+
+    const titleUpdates: Record<string, string> = {};
+    const newAppliances: any[] = [];
+
+    for (const doc of docs) {
+      try {
+        const res = await fetch('/api/manuals/extract', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+          body: JSON.stringify({ documentId: doc.id }),
+        });
+        const json = await res.json();
+        if (!res.ok || !json.ok) continue;
+
+        const newTitle: string = (json.document_title || '').trim();
+        if (newTitle && newTitle !== doc.title) {
+          await supabase
+            .from('documents')
+            .update({ title: newTitle, updated_at: new Date().toISOString() })
+            .eq('id', doc.id);
+          titleUpdates[doc.id] = newTitle;
+        }
+
+        const a = json.appliance || {};
+        const { data: app } = await supabase
+          .from('appliances')
+          .insert({
+            home_id: home.id,
+            name: a.name || doc.file_name,
+            manufacturer: a.manufacturer || null,
+            model_number: a.model_number || null,
+            serial_number: a.serial_number || null,
+            category: a.category || null,
+            notes: a.notes || null,
+          })
+          .select()
+          .single();
+        if (app) newAppliances.push(app);
+      } catch {
+        // skip on error; keep going
+      }
+    }
+
+    if (Object.keys(titleUpdates).length) {
+      setDocuments(
+        documents.map((d) =>
+          titleUpdates[d.id] ? { ...d, title: titleUpdates[d.id] } : d
+        )
+      );
+    }
+    if (newAppliances.length) {
+      setAppliances([...appliances, ...newAppliances]);
+    }
+
+    toast.dismiss(t);
+    if (newAppliances.length > 0) {
+      toast.success(`Added ${newAppliances.length} appliance${newAppliances.length === 1 ? '' : 's'}`);
+      router.push('/appliances');
+    } else {
+      toast('No appliance details could be extracted.');
+    }
+  };
+
+  const processInvoices = async (docs: Document[]) => {
+    if (!home || docs.length === 0) return;
+    const t = toast.loading(`Reading ${docs.length} invoice${docs.length === 1 ? '' : 's'}…`);
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess.session?.access_token;
+    if (!token) {
+      toast.dismiss(t);
+      toast.error('Not signed in');
+      return;
+    }
+
+    const titleUpdates: Record<string, string> = {};
+    const newTasks: any[] = [];
+    const newHistoryRows: any[] = [];
+
+    for (const doc of docs) {
+      try {
+        const res = await fetch('/api/invoices/extract', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
+          body: JSON.stringify({ documentId: doc.id }),
+        });
+        const json = await res.json();
+        if (!res.ok || !json.ok) continue;
+
+        const newTitle: string = (json.document_title || '').trim();
+        if (newTitle && newTitle !== doc.title) {
+          await supabase
+            .from('documents')
+            .update({ title: newTitle, updated_at: new Date().toISOString() })
+            .eq('id', doc.id);
+          titleUpdates[doc.id] = newTitle;
+        }
+
+        const inv = json.invoice || {};
+        const title = inv.task_title || inv.vendor || 'Service';
+        const completedDate = inv.completed_date || null;
+        const completedAt = completedDate ? `${completedDate}T12:00:00Z` : new Date().toISOString();
+        const matchedCategory =
+          (inv.category_hint &&
+            categories.find((c) => c.name === inv.category_hint)) ||
+          null;
+        const description = [inv.vendor && `Vendor: ${inv.vendor}`, inv.notes]
+          .filter(Boolean)
+          .join('\n');
+
+        const { data: task } = await supabase
+          .from('tasks')
+          .insert({
+            home_id: home.id,
+            category_id: matchedCategory?.id || null,
+            title,
+            description: description || null,
+            due_date: completedDate || null,
+            recurrence: 'one_time',
+            priority: 'medium',
+            status: 'completed',
+            completed_at: completedAt,
+            completed_by: user?.id || null,
+            estimated_cost: inv.cost || null,
+            created_by: user?.id || null,
+          })
+          .select()
+          .single();
+        if (!task) continue;
+        newTasks.push(task);
+
+        const { data: hist } = await supabase
+          .from('task_history')
+          .insert({
+            task_id: (task as any).id,
+            home_id: home.id,
+            title,
+            category_name: matchedCategory?.name || null,
+            completed_by: user?.id || null,
+            completed_by_name: user?.display_name || null,
+            completed_at: completedAt,
+            notes: description || null,
+            cost: inv.cost || null,
+          })
+          .select()
+          .single();
+        if (hist) newHistoryRows.push(hist);
+      } catch {
+        // skip on error; keep going
+      }
+    }
+
+    if (Object.keys(titleUpdates).length) {
+      setDocuments(
+        documents.map((d) =>
+          titleUpdates[d.id] ? { ...d, title: titleUpdates[d.id] } : d
+        )
+      );
+    }
+    if (newTasks.length) setTasks([...newTasks, ...tasks]);
+    if (newHistoryRows.length) setHistory([...newHistoryRows, ...history]);
+
+    toast.dismiss(t);
+    if (newTasks.length > 0) {
+      toast.success(`Logged ${newTasks.length} completed task${newTasks.length === 1 ? '' : 's'}`);
+    } else {
+      toast('No invoice details could be extracted.');
+    }
+  };
+
   const resetForm = () => {
     setForm({ title: '', category: '', notes: '' });
-    setFile(null);
+    setFiles([]);
     setEditing(null);
     setShowForm(false);
   };
@@ -119,17 +311,19 @@ export default function DocumentsPage() {
   const openEdit = (d: Document) => {
     setEditing(d);
     setForm({ title: d.title, category: d.category || '', notes: d.notes || '' });
-    setFile(null);
+    setFiles([]);
     setShowForm(true);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    setFile(f);
-    if (!form.title) {
-      const name = f.name.replace(/\.[^.]+$/, '');
+    const selected = Array.from(e.target.files || []);
+    if (selected.length === 0) return;
+    setFiles(selected);
+    if (selected.length === 1 && !form.title) {
+      const name = selected[0].name.replace(/\.[^.]+$/, '');
       setForm((prev) => ({ ...prev, title: name }));
+    } else if (selected.length > 1) {
+      setForm((prev) => ({ ...prev, title: '' }));
     }
   };
 
@@ -158,47 +352,65 @@ export default function DocumentsPage() {
       return;
     }
 
-    if (!file) {
-      toast.error('Pick a file to upload');
+    if (files.length === 0) {
+      toast.error('Pick at least one file to upload');
       return;
     }
 
     setUploading(true);
+    const uploaded: Document[] = [];
+    const isBatch = files.length > 1;
     try {
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const path = `${home.id}/${crypto.randomUUID()}-${safeName}`;
-      const { error: upErr } = await supabase.storage.from('documents').upload(path, file, {
-        contentType: file.type || undefined,
-        upsert: false,
-      });
-      if (upErr) throw upErr;
-
-      const { data, error } = await supabase
-        .from('documents')
-        .insert({
-          home_id: home.id,
-          title: form.title.trim() || file.name,
-          category: form.category || null,
-          file_path: path,
-          file_name: file.name,
-          mime_type: file.type || null,
-          file_size: file.size,
-          notes: form.notes || null,
-          uploaded_by: user?.id || null,
-        })
-        .select()
-        .single();
-      if (error) {
-        await supabase.storage.from('documents').remove([path]);
-        throw error;
+      for (const f of files) {
+        const safeName = f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = `${home.id}/${crypto.randomUUID()}-${safeName}`;
+        const { error: upErr } = await supabase.storage.from('documents').upload(path, f, {
+          contentType: f.type || undefined,
+          upsert: false,
+        });
+        if (upErr) {
+          toast.error(`${f.name}: ${upErr.message}`);
+          continue;
+        }
+        const { data, error } = await supabase
+          .from('documents')
+          .insert({
+            home_id: home.id,
+            title: isBatch
+              ? f.name.replace(/\.[^.]+$/, '')
+              : form.title.trim() || f.name,
+            category: form.category || null,
+            file_path: path,
+            file_name: f.name,
+            mime_type: f.type || null,
+            file_size: f.size,
+            notes: isBatch ? null : form.notes || null,
+            uploaded_by: user?.id || null,
+          })
+          .select()
+          .single();
+        if (error) {
+          await supabase.storage.from('documents').remove([path]);
+          toast.error(`${f.name}: ${error.message}`);
+          continue;
+        }
+        uploaded.push(data as Document);
       }
-      const inserted = data as Document;
-      setDocuments([inserted, ...documents]);
-      toast.success('Document uploaded');
-      const wasManual = inserted.category === 'Manual';
+
+      if (uploaded.length === 0) return;
+
+      setDocuments([...uploaded, ...documents]);
+      toast.success(
+        uploaded.length === 1 ? 'Document uploaded' : `Uploaded ${uploaded.length} documents`
+      );
+      const cat = form.category || null;
       resetForm();
-      if (wasManual) {
-        await analyzeManual(inserted);
+      if (cat === 'Manual' && uploaded.length === 1) {
+        await analyzeManual(uploaded[0]);
+      } else if (cat === 'Manual') {
+        await batchAnalyzeManuals(uploaded);
+      } else if (cat === 'Invoice') {
+        await processInvoices(uploaded);
       }
     } catch (err: any) {
       toast.error(err.message || 'Upload failed');
@@ -275,20 +487,28 @@ export default function DocumentsPage() {
                   <Upload size={20} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  {file ? (
+                  {files.length === 0 ? (
                     <>
-                      <p className="text-[15px] font-medium truncate">{file.name}</p>
-                      <p className="text-xs text-ink-secondary">{formatBytes(file.size)}</p>
+                      <p className="text-[15px] font-medium">Choose files</p>
+                      <p className="text-xs text-ink-secondary">PDF or image. Pick multiple to batch upload.</p>
+                    </>
+                  ) : files.length === 1 ? (
+                    <>
+                      <p className="text-[15px] font-medium truncate">{files[0].name}</p>
+                      <p className="text-xs text-ink-secondary">{formatBytes(files[0].size)}</p>
                     </>
                   ) : (
                     <>
-                      <p className="text-[15px] font-medium">Choose a file</p>
-                      <p className="text-xs text-ink-secondary">PDF, image, or any file</p>
+                      <p className="text-[15px] font-medium">{files.length} files selected</p>
+                      <p className="text-xs text-ink-secondary truncate">
+                        {files.map((f) => f.name).join(', ')}
+                      </p>
                     </>
                   )}
                 </div>
                 <input
                   type="file"
+                  multiple
                   className="hidden"
                   onChange={handleFileChange}
                 />
@@ -314,13 +534,17 @@ export default function DocumentsPage() {
             </button>
           )}
 
-          <input
-            type="text"
-            value={form.title}
-            onChange={(e) => u('title', e.target.value)}
-            placeholder="Title *"
-            className="ios-input"
-          />
+          {(editing || files.length <= 1) && (
+            <div>
+              <label className="text-xs text-ink-secondary mb-1 block">Title *</label>
+              <input
+                type="text"
+                value={form.title}
+                onChange={(e) => u('title', e.target.value)}
+                className="ios-input"
+              />
+            </div>
+          )}
 
           <div>
             <label className="text-xs text-ink-secondary mb-1 block">Category</label>
@@ -336,22 +560,39 @@ export default function DocumentsPage() {
                 </option>
               ))}
             </select>
+            {!editing && files.length > 1 && (
+              <p className="text-xs text-ink-tertiary mt-1">Applied to all {files.length} files</p>
+            )}
           </div>
 
-          <textarea
-            value={form.notes}
-            onChange={(e) => u('notes', e.target.value)}
-            placeholder="Notes..."
-            rows={3}
-            className="ios-input resize-none"
-          />
+          {(editing || files.length <= 1) && (
+            <div>
+              <label className="text-xs text-ink-secondary mb-1 block">Notes</label>
+              <textarea
+                value={form.notes}
+                onChange={(e) => u('notes', e.target.value)}
+                rows={3}
+                className="ios-input resize-none"
+              />
+            </div>
+          )}
 
           <button
             onClick={handleSave}
-            disabled={uploading || (!editing && !file) || !form.title.trim()}
+            disabled={
+              uploading ||
+              (!editing && files.length === 0) ||
+              (files.length <= 1 && !editing && !form.title.trim())
+            }
             className="ios-button"
           >
-            {uploading ? 'Uploading…' : editing ? 'Update' : 'Upload'}
+            {uploading
+              ? 'Uploading…'
+              : editing
+              ? 'Update'
+              : files.length > 1
+              ? `Upload ${files.length} files`
+              : 'Upload'}
           </button>
           {editing && editing.category === 'Manual' && (
             <button
