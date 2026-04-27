@@ -1,13 +1,92 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { useStore } from '@/lib/store';
+import { createClient } from '@/lib/supabase-browser';
+import { TaskHistory } from '@/lib/types';
 import PageHeader from '@/components/layout/PageHeader';
-import { format, parseISO, isThisMonth, isThisYear } from 'date-fns';
-import { CheckCircle2, Search } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { CheckCircle2, Search, RotateCcw, Trash2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function HistoryPage() {
-  const { history } = useStore();
+  const { history, tasks, setHistory, setTasks } = useStore();
+  const supabase = createClient();
   const [search, setSearch] = useState('');
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const handleUndo = async (h: TaskHistory) => {
+    if (
+      !confirm(
+        `Mark "${h.title}" as not completed? It will go back to your task list.`
+      )
+    )
+      return;
+    setBusyId(h.id);
+    try {
+      if (h.task_id) {
+        const { error } = await supabase
+          .from('tasks')
+          .update({
+            status: 'pending',
+            completed_at: null,
+            completed_by: null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', h.task_id);
+        if (error) throw error;
+      }
+      const { error: hErr } = await supabase
+        .from('task_history')
+        .delete()
+        .eq('id', h.id);
+      if (hErr) throw hErr;
+
+      setHistory(history.filter((x) => x.id !== h.id));
+      if (h.task_id) {
+        setTasks(
+          tasks.map((t) =>
+            t.id === h.task_id
+              ? { ...t, status: 'pending' as const, completed_at: null, completed_by: null }
+              : t
+          )
+        );
+      }
+      toast.success('Marked as not completed');
+    } catch (err: any) {
+      toast.error(err.message || 'Could not undo');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleDelete = async (h: TaskHistory) => {
+    if (
+      !confirm(
+        `Delete this history entry for "${h.title}"? The task itself will also be removed.`
+      )
+    )
+      return;
+    setBusyId(h.id);
+    try {
+      const { error: hErr } = await supabase
+        .from('task_history')
+        .delete()
+        .eq('id', h.id);
+      if (hErr) throw hErr;
+      if (h.task_id) {
+        await supabase.from('tasks').delete().eq('id', h.task_id);
+      }
+      setHistory(history.filter((x) => x.id !== h.id));
+      if (h.task_id) {
+        setTasks(tasks.filter((t) => t.id !== h.task_id));
+      }
+      toast.success('Deleted');
+    } catch (err: any) {
+      toast.error(err.message || 'Could not delete');
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const filtered = useMemo(() => {
     if (!search.trim()) return history;
@@ -20,7 +99,6 @@ export default function HistoryPage() {
     );
   }, [history, search]);
 
-  // Group by month
   const grouped = useMemo(() => {
     const groups: Record<string, typeof history> = {};
     filtered.forEach((h) => {
@@ -35,7 +113,6 @@ export default function HistoryPage() {
     <div>
       <PageHeader title="History" subtitle={`${history.length} completed tasks`} />
 
-      {/* Search */}
       <div className="px-4 pt-3 pb-2">
         <div className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary" />
@@ -49,7 +126,6 @@ export default function HistoryPage() {
         </div>
       </div>
 
-      {/* History List */}
       {Object.entries(grouped).map(([month, items]) => (
         <div key={month}>
           <p className="section-header">{month}</p>
@@ -62,12 +138,20 @@ export default function HistoryPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[15px] font-medium truncate">{h.title}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       <span className="text-xs text-ink-secondary">
                         {format(parseISO(h.completed_at), 'MMM d, h:mm a')}
                       </span>
                       {h.completed_by_name && (
                         <span className="text-xs text-ink-tertiary">by {h.completed_by_name}</span>
+                      )}
+                      {h.cost && (
+                        <span className="text-xs font-semibold text-emerald-600">${h.cost}</span>
+                      )}
+                      {h.category_name && (
+                        <span className="text-[10px] text-ink-tertiary bg-gray-50 px-2 py-0.5 rounded-full">
+                          {h.category_name}
+                        </span>
                       )}
                     </div>
                     {h.notes && (
@@ -75,13 +159,25 @@ export default function HistoryPage() {
                     )}
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
-                  {h.cost && (
-                    <span className="text-xs font-semibold text-emerald-600">${h.cost}</span>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  {h.task_id && (
+                    <button
+                      onClick={() => handleUndo(h)}
+                      disabled={busyId === h.id}
+                      title="Mark as not completed"
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-ink-tertiary active:bg-gray-100 disabled:opacity-50"
+                    >
+                      <RotateCcw size={15} />
+                    </button>
                   )}
-                  {h.category_name && (
-                    <span className="text-[10px] text-ink-tertiary bg-gray-50 px-2 py-0.5 rounded-full">{h.category_name}</span>
-                  )}
+                  <button
+                    onClick={() => handleDelete(h)}
+                    disabled={busyId === h.id}
+                    title="Delete entry"
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-ink-tertiary active:bg-red-50 active:text-status-red disabled:opacity-50"
+                  >
+                    <Trash2 size={15} />
+                  </button>
                 </div>
               </div>
             ))}

@@ -1,7 +1,7 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { useStore } from '@/lib/store';
-import { isBefore, startOfDay, endOfDay, addDays, endOfMonth } from 'date-fns';
+import { isBefore, startOfDay, endOfDay, addDays, endOfMonth, subDays } from 'date-fns';
 import TaskCard from '@/components/tasks/TaskCard';
 import SuggestionBanner from '@/components/dashboard/SuggestionBanner';
 import PageHeader from '@/components/layout/PageHeader';
@@ -56,12 +56,25 @@ export default function DashboardPage() {
     [filteredTasks, weekEnd, monthEnd]
   );
 
+  const upcoming = useMemo(() =>
+    filteredTasks.filter((t) => {
+      if (!t.due_date) return false;
+      const d = new Date(t.due_date + 'T00:00:00');
+      return !isBefore(d, monthEnd);
+    }),
+    [filteredTasks, monthEnd]
+  );
+
+  const recentlyCompletedCutoff = useMemo(() => subDays(now, 30), [now]);
   const recentlyCompleted = useMemo(() =>
     tasks
-      .filter((t) => t.status === 'completed')
+      .filter((t) => {
+        if (t.status !== 'completed' || !t.completed_at) return false;
+        return new Date(t.completed_at) >= recentlyCompletedCutoff;
+      })
       .sort((a, b) => new Date(b.completed_at || 0).getTime() - new Date(a.completed_at || 0).getTime())
       .slice(0, 5),
-    [tasks]
+    [tasks, recentlyCompletedCutoff]
   );
 
   const totalSpending = useMemo(() =>
@@ -210,6 +223,21 @@ export default function DashboardPage() {
             </p>
             <div className="mx-4 ios-card overflow-hidden">
               {dueThisMonth.map((t) => (
+                <TaskCard key={t.id} task={t} onComplete={loadData} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Upcoming */}
+        {upcoming.length > 0 && (
+          <div>
+            <p className="section-header">
+              <span className="inline-block w-2 h-2 rounded-full bg-brand-400 mr-1.5 -mb-px" />
+              Upcoming ({upcoming.length})
+            </p>
+            <div className="mx-4 ios-card overflow-hidden">
+              {upcoming.map((t) => (
                 <TaskCard key={t.id} task={t} onComplete={loadData} />
               ))}
             </div>
