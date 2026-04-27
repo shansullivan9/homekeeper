@@ -72,93 +72,60 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
   }
 
-  const contentType = req.headers.get('content-type') || '';
-  let mime: string | null = null;
-  let base64 = '';
-  let sourceDocId: string | null = null;
-
-  if (contentType.includes('multipart/form-data')) {
-    // Inline path: client uploads the raw file as multipart so we avoid the
-    // ~33% base64-in-JSON overhead that pushes us past Vercel's body limit.
-    const formData = await req.formData();
-    const file = formData.get('file') as File | null;
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-    }
-    mime = file.type;
-    if (!mime || !SUPPORTED_MIME.has(mime)) {
-      return NextResponse.json(
-        { error: 'This file type cannot be analyzed.' },
-        { status: 415 }
-      );
-    }
-    if (file.size > 18 * 1024 * 1024) {
-      return NextResponse.json(
-        { error: 'File is too large to analyze (limit 18 MB).' },
-        { status: 413 }
-      );
-    }
-    const arrayBuf = await file.arrayBuffer();
-    base64 = Buffer.from(arrayBuf).toString('base64');
-  } else {
-    let body: any;
-    try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-    }
-
-    if (body.documentId) {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        { global: { headers: { Authorization: `Bearer ${token}` } } }
-      );
-
-      const { data: doc, error: docErr } = await supabase
-        .from('documents')
-        .select('id, file_path, mime_type')
-        .eq('id', body.documentId)
-        .maybeSingle();
-      if (docErr || !doc) {
-        return NextResponse.json(
-          { error: 'Document not found or access denied' },
-          { status: 404 }
-        );
-      }
-      mime = (doc as any).mime_type as string | null;
-      sourceDocId = (doc as any).id;
-      if (!mime || !SUPPORTED_MIME.has(mime)) {
-        return NextResponse.json(
-          { error: 'This file type cannot be analyzed.' },
-          { status: 415 }
-        );
-      }
-      const { data: file, error: dlErr } = await supabase.storage
-        .from('documents')
-        .download((doc as any).file_path);
-      if (dlErr || !file) {
-        return NextResponse.json(
-          { error: 'Could not read the uploaded file' },
-          { status: 500 }
-        );
-      }
-      const arrayBuf = await file.arrayBuffer();
-      const sizeMb = arrayBuf.byteLength / (1024 * 1024);
-      if (sizeMb > 18) {
-        return NextResponse.json(
-          { error: 'File is too large to analyze (limit 18 MB).' },
-          { status: 413 }
-        );
-      }
-      base64 = Buffer.from(arrayBuf).toString('base64');
-    } else {
-      return NextResponse.json(
-        { error: 'documentId or multipart file required' },
-        { status: 400 }
-      );
-    }
+  let body: { documentId?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
+  const documentId = body.documentId;
+  if (!documentId) {
+    return NextResponse.json({ error: 'documentId is required' }, { status: 400 });
+  }
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { global: { headers: { Authorization: `Bearer ${token}` } } }
+  );
+
+  const { data: doc, error: docErr } = await supabase
+    .from('documents')
+    .select('id, file_path, mime_type')
+    .eq('id', documentId)
+    .maybeSingle();
+  if (docErr || !doc) {
+    return NextResponse.json(
+      { error: 'Document not found or access denied' },
+      { status: 404 }
+    );
+  }
+  const mime = (doc as any).mime_type as string | null;
+  const sourceDocId = (doc as any).id;
+  if (!mime || !SUPPORTED_MIME.has(mime)) {
+    return NextResponse.json(
+      { error: 'This file type cannot be analyzed.' },
+      { status: 415 }
+    );
+  }
+  const { data: file, error: dlErr } = await supabase.storage
+    .from('documents')
+    .download((doc as any).file_path);
+  if (dlErr || !file) {
+    return NextResponse.json(
+      { error: 'Could not read the uploaded file' },
+      { status: 500 }
+    );
+  }
+  const arrayBuf = await file.arrayBuffer();
+  const sizeMb = arrayBuf.byteLength / (1024 * 1024);
+  if (sizeMb > 18) {
+    return NextResponse.json(
+      { error: 'File is too large to analyze (limit 18 MB).' },
+      { status: 413 }
+    );
+  }
+  const base64 = Buffer.from(arrayBuf).toString('base64');
 
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
