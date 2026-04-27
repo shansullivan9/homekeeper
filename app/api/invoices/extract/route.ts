@@ -45,6 +45,10 @@ const SCHEMA = {
       type: SchemaType.STRING,
       description: 'Best-matching task category from this exact list: Interior, Exterior, HVAC, Plumbing, Electrical, Yard, Appliances, Cleaning, HOA / Bills, Projects. Empty string if none clearly fit.',
     },
+    recurrence: {
+      type: SchemaType.STRING,
+      description: 'How often this service recurs. One of: one_time, weekly, monthly, quarterly, yearly. Use yearly for things that are typically annual (termite inspection, HVAC tune-up, chimney sweep, roof inspection). Use one_time for one-off repairs or installations. Default to one_time when uncertain.',
+    },
     notes: {
       type: SchemaType.STRING,
       description: 'Optional 1-sentence summary of what was done. Empty string if nothing notable.',
@@ -58,6 +62,7 @@ const SCHEMA = {
     'completed_date',
     'cost',
     'category_hint',
+    'recurrence',
     'notes',
   ],
 };
@@ -201,6 +206,16 @@ Never invent vendors or amounts.`;
     return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : '';
   };
 
+  const allowedRecurrence = new Set([
+    'one_time',
+    'weekly',
+    'monthly',
+    'quarterly',
+    'yearly',
+  ]);
+  const rawRec = cleanStr(parsed.recurrence).toLowerCase();
+  const recurrence = allowedRecurrence.has(rawRec) ? rawRec : 'one_time';
+
   return NextResponse.json({
     ok: true,
     document_title: cleanStr(parsed.document_title),
@@ -210,6 +225,7 @@ Never invent vendors or amounts.`;
       completed_date: cleanDate(parsed.completed_date),
       cost: cleanNum(parsed.cost),
       category_hint: cleanStr(parsed.category_hint),
+      recurrence,
       notes: cleanStr(parsed.notes),
     },
     sourceDocumentId: (doc as any).id,

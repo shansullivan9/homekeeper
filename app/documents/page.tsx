@@ -16,7 +16,7 @@ import {
   FileSpreadsheet,
   File as FileIcon,
 } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, addDays, addMonths, addYears } from 'date-fns';
 import toast from 'react-hot-toast';
 
 const CATEGORIES = [
@@ -210,6 +210,22 @@ export default function DocumentsPage() {
     const newTasks: any[] = [];
     const newHistoryRows: any[] = [];
 
+    const nextDueDate = (completed: string, recurrence: string): string | null => {
+      const d = parseISO(completed);
+      switch (recurrence) {
+        case 'weekly':
+          return format(addDays(d, 7), 'yyyy-MM-dd');
+        case 'monthly':
+          return format(addMonths(d, 1), 'yyyy-MM-dd');
+        case 'quarterly':
+          return format(addMonths(d, 3), 'yyyy-MM-dd');
+        case 'yearly':
+          return format(addYears(d, 1), 'yyyy-MM-dd');
+        default:
+          return null;
+      }
+    };
+
     for (const doc of docs) {
       try {
         const res = await fetch('/api/invoices/extract', {
@@ -233,6 +249,7 @@ export default function DocumentsPage() {
         const title = inv.task_title || inv.vendor || 'Service';
         const completedDate = inv.completed_date || null;
         const completedAt = completedDate ? `${completedDate}T12:00:00Z` : new Date().toISOString();
+        const recurrence = inv.recurrence || 'one_time';
         const matchedCategory =
           (inv.category_hint &&
             categories.find((c) => c.name === inv.category_hint)) ||
@@ -249,7 +266,7 @@ export default function DocumentsPage() {
             title,
             description: description || null,
             due_date: completedDate || null,
-            recurrence: 'one_time',
+            recurrence,
             priority: 'medium',
             status: 'completed',
             completed_at: completedAt,
@@ -278,6 +295,29 @@ export default function DocumentsPage() {
           .select()
           .single();
         if (hist) newHistoryRows.push(hist);
+
+        if (recurrence !== 'one_time' && completedDate) {
+          const next = nextDueDate(completedDate, recurrence);
+          if (next) {
+            const { data: nextTask } = await supabase
+              .from('tasks')
+              .insert({
+                home_id: home.id,
+                category_id: matchedCategory?.id || null,
+                title,
+                description: description || null,
+                due_date: next,
+                recurrence,
+                priority: 'medium',
+                status: 'pending',
+                estimated_cost: inv.cost || null,
+                created_by: user?.id || null,
+              })
+              .select()
+              .single();
+            if (nextTask) newTasks.push(nextTask);
+          }
+        }
       } catch {
         // skip on error; keep going
       }
@@ -294,8 +334,16 @@ export default function DocumentsPage() {
     if (newHistoryRows.length) setHistory([...newHistoryRows, ...history]);
 
     toast.dismiss(t);
-    if (newTasks.length > 0) {
-      toast.success(`Logged ${newTasks.length} completed task${newTasks.length === 1 ? '' : 's'}`);
+    const completedCount = newHistoryRows.length;
+    const upcomingCount = newTasks.length - completedCount;
+    if (completedCount > 0) {
+      const parts = [
+        `Logged ${completedCount} completed task${completedCount === 1 ? '' : 's'}`,
+      ];
+      if (upcomingCount > 0) {
+        parts.push(`+ ${upcomingCount} upcoming`);
+      }
+      toast.success(parts.join(' '));
     } else {
       toast('No invoice details could be extracted.');
     }
