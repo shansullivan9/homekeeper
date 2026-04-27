@@ -1125,11 +1125,12 @@ export default function DocumentsPage() {
             {visible.map((d) => {
               const Icon = fileIcon(d.mime_type);
               return (
-                <div key={d.id} className="ios-list-item">
-                  <button
-                    onClick={() => handleOpen(d)}
-                    className="flex items-center gap-3 flex-1 min-w-0 text-left"
-                  >
+                <button
+                  key={d.id}
+                  onClick={() => openEdit(d)}
+                  className="ios-list-item w-full text-left"
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
                     <div className="w-9 h-9 rounded-lg bg-sky-50 text-sky-500 flex items-center justify-center flex-shrink-0">
                       <Icon size={18} />
                     </div>
@@ -1153,15 +1154,9 @@ export default function DocumentsPage() {
                         </span>
                       </div>
                     </div>
-                  </button>
-                  <button
-                    onClick={() => openEdit(d)}
-                    className="p-1 -mr-1 text-ink-tertiary active:opacity-60"
-                    aria-label="Edit"
-                  >
-                    <ChevronRight size={16} />
-                  </button>
-                </div>
+                  </div>
+                  <ChevronRight size={16} className="text-ink-tertiary flex-shrink-0 ml-2" />
+                </button>
               );
             })}
           </div>
