@@ -46,7 +46,7 @@ const SCHEMA = {
     searchable_text: {
       type: SchemaType.STRING,
       description:
-        "300-1500 characters of plain-text key content from this document for full-text search. Include vendor/company names, dates, amounts, addresses, model numbers, party names, important terms, room or area names, materials, brand names, anything a user might search for. Just space-separated words and short phrases — no markdown, no narrative, no headings.",
+        "500-3000 characters of plain-text keywords from this document for full-text search. INCLUDE BOTH METADATA AND TOPIC TERMS. Examples to include if present: vendor/company names, dates, amounts, addresses, model and serial numbers, party names, sections and procedures (e.g. 'venting', 'cleaning lint trap', 'leveling', 'gas connection', 'thermostat installation', 'warranty registration'), fixture and feature names (fireplace, garage door, dishwasher), room and area names, materials, brand names, recurring topics, terminology a homeowner might search for. List the actual words even when they only appear as section headings. Output is JUST space-separated words and short phrases — no markdown, no narrative, no headings, no bullet lists.",
     },
   },
   required: ['category', 'title', 'searchable_text'],
@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
 
   const prompt = `Classify this homeowner document and produce searchable content.
 Pick the single best category from the allowed list. Generate a clean human title.
-Return concise space-separated key terms in searchable_text — vendor names, model numbers, dates, addresses, amounts, materials, anything a user would search for.`;
+For searchable_text, list every term a homeowner might type into a search box: vendor/brand names, dates, addresses, amounts, model and serial numbers, AND topical/section terms from the document (e.g. 'venting', 'lint trap', 'gas connection', 'fireplace', 'gutters', 'shingle replacement', 'garage door opener', 'mortgage payment'). Include words even if they appear only in headings or procedures. Space-separated words and short phrases only — no narrative.`;
 
   let result;
   try {
