@@ -188,20 +188,24 @@ export default function DashboardPage() {
         {/* No-tasks empty state — shows above any other sections */}
         {filteredTasks.length === 0 && emptyState}
 
-        {/* Overdue */}
-        {overdue.length > 0 && (
-          <div>
-            <p className="section-header">
-              <span className="inline-block w-2 h-2 rounded-full bg-status-red mr-1.5 -mb-px" />
-              Overdue ({overdue.length})
-            </p>
-            <div className="mx-4 ios-card overflow-hidden">
-              {overdue.map((t) => (
+        {/* Overdue — always visible */}
+        <div>
+          <p className="section-header">
+            <span className="inline-block w-2 h-2 rounded-full bg-status-red mr-1.5 -mb-px" />
+            Overdue ({overdue.length})
+          </p>
+          <div className="mx-4 ios-card overflow-hidden">
+            {overdue.length > 0 ? (
+              overdue.map((t) => (
                 <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#FF3B30" />
-              ))}
-            </div>
+              ))
+            ) : (
+              <div className="px-4 py-3.5 text-sm text-ink-tertiary">
+                Nothing overdue — you&apos;re caught up.
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Due This Week */}
         {dueThisWeek.length > 0 && (
