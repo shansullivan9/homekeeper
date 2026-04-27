@@ -28,6 +28,7 @@ const CATEGORIES = [
   'Invoice',
   'Receipt',
   'Manual',
+  'Builder Doc',
   'Inspection',
   'Tax',
   'Permit',
@@ -53,6 +54,7 @@ export default function DocumentsPage() {
   const {
     documents,
     home,
+    setHome,
     setDocuments,
     user,
     appliances,
@@ -356,6 +358,147 @@ export default function DocumentsPage() {
     }
   };
 
+  const processBuilderDocs = async (docs: Document[]) => {
+    if (!home || docs.length === 0) return;
+    const t = toast.loading(
+      `Reading ${docs.length} builder doc${docs.length === 1 ? '' : 's'}…`
+    );
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess.session?.access_token;
+    if (!token) {
+      toast.dismiss(t);
+      toast.error('Not signed in');
+      return;
+    }
+
+    type Profile = {
+      year_built: number;
+      square_footage: number;
+      floors: number;
+      roof_type: string;
+      roof_installed_year: number;
+      exterior_type: string;
+      hvac_type: string;
+      hvac_units: number;
+      hvac_installed_year: number;
+      water_heater_type: string;
+      water_heater_installed_year: number;
+      plumbing_type: string;
+      dryer_type: string;
+      has_irrigation: boolean | null;
+      has_septic: boolean | null;
+      has_well_water: boolean | null;
+      has_deck: boolean | null;
+      has_pool: boolean | null;
+      has_garage: boolean | null;
+      has_fireplace: boolean | null;
+      has_basement: boolean | null;
+      has_attic: boolean | null;
+      has_crawlspace: boolean | null;
+      has_hoa: boolean | null;
+    };
+    const merged: Partial<Profile> = {};
+    let docsAccepted = 0;
+
+    const setIfMissingStr = (k: keyof Profile, v: string) => {
+      if (v && !merged[k]) (merged as any)[k] = v;
+    };
+    const setIfMissingNum = (k: keyof Profile, v: number) => {
+      if (v > 0 && !merged[k]) (merged as any)[k] = v;
+    };
+    const setIfMissingBool = (k: keyof Profile, v: boolean | null) => {
+      if (v !== null && merged[k] === undefined) (merged as any)[k] = v;
+    };
+
+    for (const doc of docs) {
+      try {
+        const res = await fetch('/api/builder-docs/extract', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ documentId: doc.id }),
+        });
+        const json = await res.json();
+        if (!res.ok || !json.ok) continue;
+        docsAccepted += 1;
+        const p = json.profile || {};
+        setIfMissingNum('year_built', p.year_built);
+        setIfMissingNum('square_footage', p.square_footage);
+        setIfMissingNum('floors', p.floors);
+        setIfMissingStr('roof_type', p.roof_type);
+        setIfMissingNum('roof_installed_year', p.roof_installed_year);
+        setIfMissingStr('exterior_type', p.exterior_type);
+        setIfMissingStr('hvac_type', p.hvac_type);
+        setIfMissingNum('hvac_units', p.hvac_units);
+        setIfMissingNum('hvac_installed_year', p.hvac_installed_year);
+        setIfMissingStr('water_heater_type', p.water_heater_type);
+        setIfMissingNum('water_heater_installed_year', p.water_heater_installed_year);
+        setIfMissingStr('plumbing_type', p.plumbing_type);
+        setIfMissingStr('dryer_type', p.dryer_type);
+        setIfMissingBool('has_irrigation', p.has_irrigation);
+        setIfMissingBool('has_septic', p.has_septic);
+        setIfMissingBool('has_well_water', p.has_well_water);
+        setIfMissingBool('has_deck', p.has_deck);
+        setIfMissingBool('has_pool', p.has_pool);
+        setIfMissingBool('has_garage', p.has_garage);
+        setIfMissingBool('has_fireplace', p.has_fireplace);
+        setIfMissingBool('has_basement', p.has_basement);
+        setIfMissingBool('has_attic', p.has_attic);
+        setIfMissingBool('has_crawlspace', p.has_crawlspace);
+        setIfMissingBool('has_hoa', p.has_hoa);
+      } catch {
+        // skip on error; keep going
+      }
+    }
+
+    if (docsAccepted === 0) {
+      toast.dismiss(t);
+      toast("None of those looked like builder paperwork.");
+      return;
+    }
+
+    const update: Record<string, any> = {};
+    let dryerSet = false;
+    for (const [key, val] of Object.entries(merged)) {
+      if (val === undefined || val === '' || val === null) continue;
+      if (key === 'dryer_type') {
+        update.dryer_type = val;
+        update.has_dryer = val === 'electric' || val === 'gas';
+        dryerSet = true;
+      } else {
+        update[key] = val;
+      }
+    }
+    if (Object.keys(update).length === 0) {
+      toast.dismiss(t);
+      toast('No new home profile fields could be extracted.');
+      return;
+    }
+
+    update.updated_at = new Date().toISOString();
+
+    try {
+      const { data: updatedHome, error } = await supabase
+        .from('homes')
+        .update(update)
+        .eq('id', home.id)
+        .select()
+        .single();
+      if (error) throw error;
+      if (updatedHome) setHome(updatedHome as any);
+      await supabase.rpc('generate_suggestions', { p_home_id: home.id });
+      const fieldCount = Object.keys(update).length - 1 - (dryerSet ? 1 : 0);
+      toast.dismiss(t);
+      toast.success(`Filled in ${fieldCount} home profile field${fieldCount === 1 ? '' : 's'}`);
+      router.push('/home-profile');
+    } catch (err: any) {
+      toast.dismiss(t);
+      toast.error(err.message || 'Could not update home profile');
+    }
+  };
+
   const resetForm = () => {
     setForm({ title: '', category: '', notes: '' });
     setFiles([]);
@@ -466,6 +609,8 @@ export default function DocumentsPage() {
         await batchAnalyzeManuals(uploaded);
       } else if (cat === 'Invoice') {
         await processInvoices(uploaded);
+      } else if (cat === 'Builder Doc') {
+        await processBuilderDocs(uploaded);
       }
     } catch (err: any) {
       toast.error(err.message || 'Upload failed');
