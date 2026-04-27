@@ -56,14 +56,14 @@ export default function DashboardPage() {
     [filteredTasks, weekEnd, monthEnd]
   );
 
-  const upcoming = useMemo(() =>
-    filteredTasks.filter((t) => {
+  const upcoming = useMemo(() => {
+    const sixWeeksOut = endOfDay(addDays(now, 42));
+    return filteredTasks.filter((t) => {
       if (!t.due_date) return false;
       const d = new Date(t.due_date + 'T00:00:00');
-      return !isBefore(d, monthEnd);
-    }),
-    [filteredTasks, monthEnd]
-  );
+      return !isBefore(d, monthEnd) && isBefore(d, sixWeeksOut);
+    });
+  }, [filteredTasks, monthEnd, now]);
 
   const recentlyCompletedCutoff = useMemo(() => subDays(now, 30), [now]);
   const recentlyCompleted = useMemo(() =>
