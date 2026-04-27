@@ -168,7 +168,9 @@ export default function DocumentsPage() {
       const token = sess.session?.access_token;
       if (!token) throw new Error('Not signed in');
 
-      const needsClassify = documents.filter((d) => !d.searchable_text);
+      // Always re-classify all documents so improvements to the classifier
+      // prompt (search terms, section topics, etc.) get picked up on rescan.
+      const needsClassify = documents;
       const builderDocs = documents.filter((d) => d.category === 'Builder Doc');
 
       const stateUpdates: Record<string, Document> = {};
@@ -974,14 +976,20 @@ export default function DocumentsPage() {
     else if (filter !== 'all') list = list.filter((d) => d.category === filter);
     const q = search.trim().toLowerCase();
     if (q) {
-      list = list.filter(
-        (d) =>
-          d.title.toLowerCase().includes(q) ||
-          d.file_name.toLowerCase().includes(q) ||
-          (d.category || '').toLowerCase().includes(q) ||
-          (d.notes || '').toLowerCase().includes(q) ||
-          (d.searchable_text || '').toLowerCase().includes(q)
-      );
+      const words = q.split(/\s+/).filter(Boolean);
+      list = list.filter((d) => {
+        const haystack = [
+          d.title,
+          d.file_name,
+          d.category,
+          d.notes,
+          d.searchable_text,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return words.every((w) => haystack.includes(w));
+      });
     }
     return list;
   }, [documents, filter, search]);
