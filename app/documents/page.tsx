@@ -316,23 +316,46 @@ export default function DocumentsPage() {
         if (recurrence !== 'one_time' && completedDate) {
           const next = nextDueDate(completedDate, recurrence);
           if (next) {
-            const { data: nextTask } = await supabase
-              .from('tasks')
-              .insert({
-                home_id: home.id,
-                category_id: matchedCategory?.id || null,
-                title,
-                description: description || null,
-                due_date: next,
-                recurrence,
-                priority: 'medium',
-                status: 'pending',
-                estimated_cost: inv.cost || null,
-                created_by: user?.id || null,
-              })
-              .select()
-              .single();
-            if (nextTask) newTasks.push(nextTask);
+            const normalized = title.trim().toLowerCase();
+            const existing = tasks.find(
+              (t) =>
+                t.status === 'pending' &&
+                !t.is_suggestion &&
+                t.title.trim().toLowerCase() === normalized
+            );
+            if (existing) {
+              if (!existing.due_date || existing.due_date < next) {
+                const { data: updated } = await supabase
+                  .from('tasks')
+                  .update({
+                    due_date: next,
+                    recurrence,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', existing.id)
+                  .select()
+                  .single();
+                if (updated) newTasks.push(updated);
+              }
+            } else {
+              const { data: nextTask } = await supabase
+                .from('tasks')
+                .insert({
+                  home_id: home.id,
+                  category_id: matchedCategory?.id || null,
+                  title,
+                  description: description || null,
+                  due_date: next,
+                  recurrence,
+                  priority: 'medium',
+                  status: 'pending',
+                  estimated_cost: inv.cost || null,
+                  created_by: user?.id || null,
+                })
+                .select()
+                .single();
+              if (nextTask) newTasks.push(nextTask);
+            }
           }
         }
       } catch {
@@ -347,7 +370,10 @@ export default function DocumentsPage() {
         )
       );
     }
-    if (newTasks.length) setTasks([...newTasks, ...tasks]);
+    if (newTasks.length) {
+      const newIds = new Set(newTasks.map((t: any) => t.id));
+      setTasks([...newTasks, ...tasks.filter((t) => !newIds.has(t.id))]);
+    }
     if (newHistoryRows.length) setHistory([...newHistoryRows, ...history]);
 
     toast.dismiss(t);
