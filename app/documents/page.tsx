@@ -84,6 +84,76 @@ export default function DocumentsPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [form, setForm] = useState({ title: '', category: '', notes: '' });
 
+  // Run classify on each uploaded document. If the user didn't pick a
+  // category in the form, use the classifier's pick. Always store the
+  // searchable_text. Returns the documents reflecting any updates so the
+  // caller can route by final category.
+  const classifyAndUpdate = async (
+    uploaded: Document[],
+    userCategory: string | null
+  ): Promise<Document[]> => {
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess.session?.access_token;
+    if (!token || uploaded.length === 0) return uploaded;
+
+    const t = toast.loading(
+      uploaded.length === 1 ? 'Reading document…' : `Reading ${uploaded.length} documents…`
+    );
+
+    const out: Document[] = [];
+    const stateUpdates: Record<string, Partial<Document>> = {};
+
+    for (const doc of uploaded) {
+      try {
+        const res = await fetch('/api/documents/classify', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ documentId: doc.id }),
+        });
+        const json = await res.json();
+        if (!res.ok || !json.ok) {
+          out.push(doc);
+          continue;
+        }
+        const finalCategory = userCategory || json.category || doc.category;
+        const finalTitle = (json.title || '').trim() || doc.title;
+        const patch: Record<string, any> = {
+          category: finalCategory || null,
+          title: finalTitle,
+          searchable_text: json.searchable_text || null,
+          updated_at: new Date().toISOString(),
+        };
+        const { data: updated } = await supabase
+          .from('documents')
+          .update(patch)
+          .eq('id', doc.id)
+          .select()
+          .single();
+        if (updated) {
+          out.push(updated as Document);
+          stateUpdates[doc.id] = updated as Document;
+        } else {
+          out.push(doc);
+        }
+      } catch {
+        out.push(doc);
+      }
+    }
+
+    if (Object.keys(stateUpdates).length > 0) {
+      setDocuments(
+        documents.map((d) =>
+          stateUpdates[d.id] ? (stateUpdates[d.id] as Document) : d
+        )
+      );
+    }
+    toast.dismiss(t);
+    return out;
+  };
+
   const analyzeManual = async (doc: Document) => {
     setAnalyzingId(doc.id);
     const t = toast.loading('Reading manual…');
@@ -433,6 +503,15 @@ export default function DocumentsPage() {
     };
     const merged: Partial<Profile> = {};
     let docsAccepted = 0;
+    type ExtractedAppliance = {
+      name: string;
+      manufacturer: string;
+      model_number: string;
+      category: string;
+      notes: string;
+    };
+    const extractedAppliances: ExtractedAppliance[] = [];
+    const seenApplianceNames = new Set<string>();
 
     const setIfMissingStr = (k: keyof Profile, v: string) => {
       if (v && !merged[k]) (merged as any)[k] = v;
@@ -482,6 +561,14 @@ export default function DocumentsPage() {
         setIfMissingBool('has_attic', p.has_attic);
         setIfMissingBool('has_crawlspace', p.has_crawlspace);
         setIfMissingBool('has_hoa', p.has_hoa);
+
+        const fromDoc: ExtractedAppliance[] = Array.isArray(json.appliances) ? json.appliances : [];
+        for (const a of fromDoc) {
+          const key = a.name?.trim().toLowerCase();
+          if (!key || seenApplianceNames.has(key)) continue;
+          seenApplianceNames.add(key);
+          extractedAppliances.push(a);
+        }
       } catch {
         // skip on error; keep going
       }
@@ -505,28 +592,73 @@ export default function DocumentsPage() {
         update[key] = val;
       }
     }
-    if (Object.keys(update).length === 0) {
-      toast.dismiss(t);
-      toast('No new home profile fields could be extracted.');
-      return;
+    const profileUpdateNeeded = Object.keys(update).length > 0;
+    const insertedAppliances: any[] = [];
+    if (profileUpdateNeeded) {
+      update.updated_at = new Date().toISOString();
     }
 
-    update.updated_at = new Date().toISOString();
-
     try {
-      const { data: updatedHome, error } = await supabase
-        .from('homes')
-        .update(update)
-        .eq('id', home.id)
-        .select()
-        .single();
-      if (error) throw error;
-      if (updatedHome) setHome(updatedHome as any);
-      await supabase.rpc('generate_suggestions', { p_home_id: home.id });
-      const fieldCount = Object.keys(update).length - 1 - (dryerSet ? 1 : 0);
+      let fieldCount = 0;
+      if (profileUpdateNeeded) {
+        const { data: updatedHome, error } = await supabase
+          .from('homes')
+          .update(update)
+          .eq('id', home.id)
+          .select()
+          .single();
+        if (error) throw error;
+        if (updatedHome) setHome(updatedHome as any);
+        await supabase.rpc('generate_suggestions', { p_home_id: home.id });
+        fieldCount = Object.keys(update).length - 1 - (dryerSet ? 1 : 0);
+      }
+
+      // Insert any builder-doc-extracted appliances (deduped against existing
+      // ones by lowered name).
+      if (extractedAppliances.length > 0) {
+        const existingNames = new Set(
+          appliances.map((a: any) => (a.name || '').trim().toLowerCase())
+        );
+        const fresh = extractedAppliances.filter(
+          (a) => !existingNames.has(a.name.trim().toLowerCase())
+        );
+        if (fresh.length > 0) {
+          const { data: applianceRows } = await supabase
+            .from('appliances')
+            .insert(
+              fresh.map((a) => ({
+                home_id: home.id,
+                name: a.name,
+                manufacturer: a.manufacturer || null,
+                model_number: a.model_number || null,
+                category: a.category || null,
+                notes: a.notes || null,
+              }))
+            )
+            .select();
+          if (applianceRows) {
+            insertedAppliances.push(...applianceRows);
+            setAppliances([...appliances, ...applianceRows]);
+          }
+        }
+      }
+
       toast.dismiss(t);
-      toast.success(`Filled in ${fieldCount} home profile field${fieldCount === 1 ? '' : 's'}`);
-      router.push('/home-profile');
+      const parts: string[] = [];
+      if (fieldCount > 0) {
+        parts.push(`Filled in ${fieldCount} home profile field${fieldCount === 1 ? '' : 's'}`);
+      }
+      if (insertedAppliances.length > 0) {
+        parts.push(
+          `+ ${insertedAppliances.length} appliance${insertedAppliances.length === 1 ? '' : 's'}`
+        );
+      }
+      if (parts.length === 0) {
+        toast('No new home profile fields could be extracted.');
+        return;
+      }
+      toast.success(parts.join(' '));
+      router.push(profileUpdateNeeded ? '/home-profile' : '/appliances');
     } catch (err: any) {
       toast.dismiss(t);
       toast.error(err.message || 'Could not update home profile');
@@ -635,16 +767,28 @@ export default function DocumentsPage() {
       toast.success(
         uploaded.length === 1 ? 'Document uploaded' : `Uploaded ${uploaded.length} documents`
       );
-      const cat = form.category || null;
+      const userCategory = form.category || null;
       resetForm();
-      if (cat === 'Manual' && uploaded.length === 1) {
-        await analyzeManual(uploaded[0]);
-      } else if (cat === 'Manual') {
-        await batchAnalyzeManuals(uploaded);
-      } else if (cat === 'Invoice') {
-        await processInvoices(uploaded);
-      } else if (cat === 'Builder Doc') {
-        await processBuilderDocs(uploaded);
+
+      const classified = await classifyAndUpdate(uploaded, userCategory);
+
+      const buckets: Record<string, Document[]> = {};
+      for (const doc of classified) {
+        const cat = doc.category || 'Other';
+        if (!buckets[cat]) buckets[cat] = [];
+        buckets[cat].push(doc);
+      }
+
+      if (buckets['Manual']?.length === 1) {
+        await analyzeManual(buckets['Manual'][0]);
+      } else if (buckets['Manual']?.length) {
+        await batchAnalyzeManuals(buckets['Manual']);
+      }
+      if (buckets['Invoice']?.length) {
+        await processInvoices(buckets['Invoice']);
+      }
+      if (buckets['Builder Doc']?.length) {
+        await processBuilderDocs(buckets['Builder Doc']);
       }
     } catch (err: any) {
       toast.error(err.message || 'Upload failed');
@@ -701,7 +845,8 @@ export default function DocumentsPage() {
           d.title.toLowerCase().includes(q) ||
           d.file_name.toLowerCase().includes(q) ||
           (d.category || '').toLowerCase().includes(q) ||
-          (d.notes || '').toLowerCase().includes(q)
+          (d.notes || '').toLowerCase().includes(q) ||
+          (d.searchable_text || '').toLowerCase().includes(q)
       );
     }
     return list;
