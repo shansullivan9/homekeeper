@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
@@ -12,6 +13,7 @@ import {
   Banknote,
   Clock3,
 } from 'lucide-react';
+import QuickAddMenu from '@/components/layout/QuickAddMenu';
 
 const primaryTabs = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -31,18 +33,7 @@ const secondaryTabs = [
 export default function SideNav() {
   const pathname = usePathname();
   const router = useRouter();
-
-  const handleAddClick = () => {
-    if (pathname.startsWith('/documents')) {
-      router.push('/documents?new=1');
-      return;
-    }
-    if (pathname.startsWith('/appliances')) {
-      router.push('/appliances?new=1');
-      return;
-    }
-    router.push('/add-task');
-  };
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const renderTab = (tab: { href: string; label: string; icon: any }) => {
     const Icon = tab.icon;
@@ -76,8 +67,8 @@ export default function SideNav() {
 
       <div className="px-3 py-4">
         <button
-          onClick={handleAddClick}
-          className="w-full flex items-center gap-2 justify-center bg-brand-500 text-white rounded-ios py-2.5 text-[14px] font-semibold shadow-md shadow-brand-500/20 active:bg-brand-600 transition-colors"
+          onClick={() => setMenuOpen(true)}
+          className="w-full flex items-center gap-2 justify-center bg-brand-500 text-white rounded-ios py-2.5 text-[14px] font-semibold shadow-md shadow-brand-500/20 active:bg-brand-600 hover:bg-brand-600 transition-colors"
         >
           <PlusCircle size={18} strokeWidth={2.2} />
           New
@@ -91,6 +82,7 @@ export default function SideNav() {
         </p>
         {secondaryTabs.map(renderTab)}
       </nav>
+      <QuickAddMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
     </aside>
   );
 }
