@@ -13,6 +13,7 @@ import {
   Upload,
   Download,
   Search,
+  Sparkles,
   Image as ImageIcon,
   FileSpreadsheet,
   File as FileIcon,
@@ -81,6 +82,7 @@ export default function DocumentsPage() {
   const [search, setSearch] = useState('');
   const [uploading, setUploading] = useState(false);
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [form, setForm] = useState({ title: '', category: '', notes: '' });
 
@@ -152,6 +154,138 @@ export default function DocumentsPage() {
     }
     toast.dismiss(t);
     return out;
+  };
+
+  // Backfill: classify docs missing searchable_text, and run builder-doc
+  // appliance extraction on existing Builder Doc rows. Skips appliance names
+  // that already exist on the home.
+  const scanAllDocuments = async () => {
+    if (!home || scanning) return;
+    setScanning(true);
+    const t = toast.loading('Scanning documents…');
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const token = sess.session?.access_token;
+      if (!token) throw new Error('Not signed in');
+
+      const needsClassify = documents.filter((d) => !d.searchable_text);
+      const builderDocs = documents.filter((d) => d.category === 'Builder Doc');
+
+      const stateUpdates: Record<string, Document> = {};
+      let classified = 0;
+
+      for (const doc of needsClassify) {
+        try {
+          const res = await fetch('/api/documents/classify', {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ documentId: doc.id }),
+          });
+          const json = await res.json();
+          if (!res.ok || !json.ok) continue;
+          const patch = {
+            // Don't overwrite a category the user has already curated; only
+            // fill in if it was empty.
+            category: doc.category || json.category || null,
+            title: doc.title || json.title || doc.file_name,
+            searchable_text: json.searchable_text || null,
+            updated_at: new Date().toISOString(),
+          };
+          const { data: updated } = await supabase
+            .from('documents')
+            .update(patch)
+            .eq('id', doc.id)
+            .select()
+            .single();
+          if (updated) {
+            stateUpdates[doc.id] = updated as Document;
+            classified += 1;
+          }
+        } catch {}
+      }
+
+      type ExtractedAppliance = {
+        name: string;
+        manufacturer: string;
+        model_number: string;
+        category: string;
+        notes: string;
+      };
+      const seenNames = new Set(
+        appliances.map((a: any) => (a.name || '').trim().toLowerCase())
+      );
+      const fresh: ExtractedAppliance[] = [];
+
+      for (const doc of builderDocs) {
+        try {
+          const res = await fetch('/api/builder-docs/extract', {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ documentId: doc.id }),
+          });
+          const json = await res.json();
+          if (!res.ok || !json.ok) continue;
+          const fromDoc: ExtractedAppliance[] = Array.isArray(json.appliances)
+            ? json.appliances
+            : [];
+          for (const a of fromDoc) {
+            const key = a.name?.trim().toLowerCase();
+            if (!key || seenNames.has(key)) continue;
+            seenNames.add(key);
+            fresh.push(a);
+          }
+        } catch {}
+      }
+
+      let appliancesAdded = 0;
+      if (fresh.length > 0) {
+        const { data: rows } = await supabase
+          .from('appliances')
+          .insert(
+            fresh.map((a) => ({
+              home_id: home.id,
+              name: a.name,
+              manufacturer: a.manufacturer || null,
+              model_number: a.model_number || null,
+              category: a.category || null,
+              notes: a.notes || null,
+            }))
+          )
+          .select();
+        if (rows) {
+          setAppliances([...appliances, ...rows]);
+          appliancesAdded = rows.length;
+        }
+      }
+
+      if (Object.keys(stateUpdates).length > 0) {
+        setDocuments(
+          documents.map((d) => stateUpdates[d.id] || d)
+        );
+      }
+
+      toast.dismiss(t);
+      const parts: string[] = [];
+      if (classified > 0) parts.push(`${classified} doc${classified === 1 ? '' : 's'} indexed`);
+      if (appliancesAdded > 0)
+        parts.push(`${appliancesAdded} appliance${appliancesAdded === 1 ? '' : 's'} added`);
+      if (parts.length === 0) {
+        toast('Nothing new to add — everything was already up to date.');
+      } else {
+        toast.success(parts.join(' · '));
+      }
+    } catch (err: any) {
+      toast.dismiss(t);
+      toast.error(err.message || 'Scan failed');
+    } finally {
+      setScanning(false);
+    }
   };
 
   const analyzeManual = async (doc: Document) => {
@@ -1012,6 +1146,19 @@ export default function DocumentsPage() {
         title="Documents"
         subtitle={`${documents.length} stored`}
         back
+        rightAction={
+          documents.length > 0 ? (
+            <button
+              onClick={scanAllDocuments}
+              disabled={scanning}
+              title="Scan all documents to index search and pull appliances from builder docs"
+              className="flex items-center gap-1 text-brand-500 disabled:opacity-50 text-sm font-semibold"
+            >
+              <Sparkles size={16} />
+              {scanning ? 'Scanning…' : 'Scan all'}
+            </button>
+          ) : undefined
+        }
       />
 
       {documents.length > 0 && (
