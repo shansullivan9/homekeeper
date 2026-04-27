@@ -21,6 +21,10 @@ const SCHEMA = {
       type: SchemaType.BOOLEAN,
       description: 'True only if this document is an owner/installation/service manual for a household appliance, system, or piece of equipment.',
     },
+    document_title: {
+      type: SchemaType.STRING,
+      description: 'A clean, human-readable title for this document, e.g. "Whirlpool WRX735SDHZ Refrigerator Owner\'s Manual" or "Trane XR16 Heat Pump Installation Guide". Avoid file extensions and SKU codes alone. Keep under ~80 characters. Empty string if unsure.',
+    },
     name: {
       type: SchemaType.STRING,
       description: 'Short product name to use as the appliance title, e.g. "Whirlpool Refrigerator" or "Trane XR16 Heat Pump". Empty string if unknown.',
@@ -48,6 +52,7 @@ const SCHEMA = {
   },
   required: [
     'is_appliance_manual',
+    'document_title',
     'name',
     'manufacturer',
     'model_number',
@@ -196,6 +201,7 @@ Look carefully for the serial number anywhere in the document — warranty regis
 
   return NextResponse.json({
     ok: true,
+    document_title: clean(parsed.document_title),
     appliance: {
       name: clean(parsed.name) || (doc as any).title || (doc as any).file_name,
       manufacturer: clean(parsed.manufacturer),
