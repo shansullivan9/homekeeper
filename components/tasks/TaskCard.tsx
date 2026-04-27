@@ -12,14 +12,15 @@ interface TaskCardProps {
   task: Task;
   compact?: boolean;
   onComplete?: () => void;
+  sectionColor?: string;
 }
 
-export default function TaskCard({ task, compact, onComplete }: TaskCardProps) {
+export default function TaskCard({ task, compact, onComplete, sectionColor }: TaskCardProps) {
   const { user, members } = useStore();
   const router = useRouter();
   const supabase = createClient();
   const urgency = getTaskUrgency(task.due_date);
-  const color = urgencyColor(urgency);
+  const color = sectionColor || urgencyColor(urgency);
   const catIcon = task.categories?.icon ? (CATEGORY_ICONS[task.categories.icon] || '🔧') : '📋';
 
   const assignee = (task as any).assigned_to
@@ -100,6 +101,11 @@ export default function TaskCard({ task, compact, onComplete }: TaskCardProps) {
               {task.title}
             </p>
           </div>
+          {compact && task.status === 'completed' && task.completed_at && (
+            <p className="text-xs text-ink-tertiary mt-0.5">
+              Completed {format(parseISO(task.completed_at), 'MMM d')}
+            </p>
+          )}
           {!compact && (
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
               {task.due_date && (

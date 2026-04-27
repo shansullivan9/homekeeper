@@ -193,7 +193,7 @@ export default function DashboardPage() {
             </p>
             <div className="mx-4 ios-card overflow-hidden">
               {overdue.map((t) => (
-                <TaskCard key={t.id} task={t} onComplete={loadData} />
+                <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#FF3B30" />
               ))}
             </div>
           </div>
@@ -208,7 +208,7 @@ export default function DashboardPage() {
             </p>
             <div className="mx-4 ios-card overflow-hidden">
               {dueThisWeek.map((t) => (
-                <TaskCard key={t.id} task={t} onComplete={loadData} />
+                <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#FFCC00" />
               ))}
             </div>
           </div>
@@ -223,7 +223,7 @@ export default function DashboardPage() {
             </p>
             <div className="mx-4 ios-card overflow-hidden">
               {dueThisMonth.map((t) => (
-                <TaskCard key={t.id} task={t} onComplete={loadData} />
+                <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#34C759" />
               ))}
             </div>
           </div>
@@ -238,7 +238,7 @@ export default function DashboardPage() {
             </p>
             <div className="mx-4 ios-card overflow-hidden">
               {upcoming.map((t) => (
-                <TaskCard key={t.id} task={t} onComplete={loadData} />
+                <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#5AC8FA" />
               ))}
             </div>
           </div>
@@ -250,7 +250,7 @@ export default function DashboardPage() {
             <p className="section-header">Recently Completed</p>
             <div className="mx-4 ios-card overflow-hidden">
               {recentlyCompleted.map((t) => (
-                <TaskCard key={t.id} task={t} compact />
+                <TaskCard key={t.id} task={t} compact sectionColor="#8E8E93" />
               ))}
             </div>
           </div>
