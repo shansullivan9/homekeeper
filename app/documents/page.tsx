@@ -1001,6 +1001,38 @@ export default function DocumentsPage() {
               ? `Upload ${files.length} files`
               : 'Upload'}
           </button>
+          {editing && (() => {
+            const linked = appliances.filter(
+              (a: any) => a.manual_document_id === editing.id
+            );
+            if (linked.length === 0) return null;
+            return (
+              <div>
+                <p className="text-xs font-semibold text-ink-secondary uppercase tracking-wide mb-1.5">
+                  Linked appliances
+                </p>
+                <div className="ios-card overflow-hidden">
+                  {linked.map((a: any) => (
+                    <button
+                      key={a.id}
+                      onClick={() => router.push(`/appliances?edit=${a.id}`)}
+                      className="ios-list-item w-full"
+                    >
+                      <div className="flex-1 min-w-0 text-left">
+                        <p className="text-[15px] font-medium truncate">{a.name}</p>
+                        <p className="text-xs text-ink-tertiary truncate">
+                          {[a.manufacturer, a.model_number, a.serial_number ? `S/N ${a.serial_number}` : 'No serial #']
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </p>
+                      </div>
+                      <ChevronRight size={16} className="text-ink-tertiary" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           {editing && editing.category === 'Manual' && (
             <button
               onClick={() => analyzeManual(editing)}
