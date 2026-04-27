@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase-browser';
 import PageHeader from '@/components/layout/PageHeader';
@@ -11,6 +12,8 @@ import toast from 'react-hot-toast';
 export default function AppliancesPage() {
   const { appliances, home, setAppliances, documents } = useStore();
   const supabase = createClient();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Appliance | null>(null);
   const [manualDocId, setManualDocId] = useState<string | null>(null);
@@ -40,6 +43,13 @@ export default function AppliancesPage() {
       toast('Review the details, then save.', { icon: '✏️' });
     } catch {}
   }, []);
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setShowForm(true);
+      router.replace('/appliances');
+    }
+  }, [searchParams, router]);
 
   const resetForm = () => {
     setForm({
@@ -228,9 +238,6 @@ export default function AppliancesPage() {
         title="Appliances"
         subtitle={`${appliances.length} registered`}
         back
-        rightAction={
-          <button onClick={() => setShowForm(true)} className="text-brand-500"><Plus size={24} /></button>
-        }
       />
 
       <div className="py-2">
