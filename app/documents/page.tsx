@@ -84,6 +84,19 @@ export default function DocumentsPage() {
         return;
       }
 
+      const newTitle: string = (json.document_title || '').trim();
+      if (newTitle && newTitle !== doc.title) {
+        const { data: updated } = await supabase
+          .from('documents')
+          .update({ title: newTitle, updated_at: new Date().toISOString() })
+          .eq('id', doc.id)
+          .select()
+          .single();
+        if (updated) {
+          setDocuments(documents.map((d) => (d.id === doc.id ? (updated as Document) : d)));
+        }
+      }
+
       sessionStorage.setItem('appliancePrefill', JSON.stringify(json.appliance));
       toast.dismiss(t);
       toast.success('Manual read — review and save the appliance');
