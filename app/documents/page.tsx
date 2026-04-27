@@ -705,44 +705,42 @@ export default function DocumentsPage() {
     if (!file.type.startsWith('application/pdf') && !file.type.startsWith('image/')) {
       return;
     }
-    if (file.size > 18 * 1024 * 1024) return;
+    if (file.size > 18 * 1024 * 1024) {
+      toast('File is too large for AI prefill (>18 MB).', { icon: 'ℹ️' });
+      return;
+    }
     setPrefilling(true);
     try {
       const { data: sess } = await supabase.auth.getSession();
       const token = sess.session?.access_token;
       if (!token) return;
 
-      const dataUrl: string = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      const base64 = dataUrl.split(',')[1] || '';
+      const formData = new FormData();
+      formData.append('file', file);
 
       const res = await fetch('/api/documents/classify', {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          inline: { mimeType: file.type, dataBase64: base64 },
-        }),
+        headers: { authorization: `Bearer ${token}` },
+        body: formData,
       });
-      const json = await res.json();
-      if (!res.ok || !json.ok) return;
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.ok) {
+        const msg = json?.error || `Prefill failed (${res.status})`;
+        toast.error(msg);
+        return;
+      }
 
       setForm((prev) => ({
-        title: prev.title && prev.title !== file.name.replace(/\.[^.]+$/, '')
-          ? prev.title
-          : json.title || prev.title,
+        title:
+          prev.title && prev.title !== file.name.replace(/\.[^.]+$/, '')
+            ? prev.title
+            : json.title || prev.title,
         category: prev.category || json.category || '',
         notes: prev.notes || json.notes || '',
       }));
       setPrefilledSearchable(json.searchable_text || null);
-    } catch {
-      // best-effort
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not pre-read the file');
     } finally {
       setPrefilling(false);
     }
