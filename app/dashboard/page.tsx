@@ -56,14 +56,22 @@ export default function DashboardPage() {
     [filteredTasks, weekEnd, monthEnd]
   );
 
+  const sixWeeksOut = useMemo(() => endOfDay(addDays(now, 42)), [now]);
   const upcoming = useMemo(() => {
-    const sixWeeksOut = endOfDay(addDays(now, 42));
     return filteredTasks.filter((t) => {
       if (!t.due_date) return false;
       const d = new Date(t.due_date + 'T00:00:00');
       return !isBefore(d, monthEnd) && isBefore(d, sixWeeksOut);
     });
-  }, [filteredTasks, monthEnd, now]);
+  }, [filteredTasks, monthEnd, sixWeeksOut]);
+
+  const later = useMemo(() => {
+    return filteredTasks.filter((t) => {
+      if (!t.due_date) return true;
+      const d = new Date(t.due_date + 'T00:00:00');
+      return !isBefore(d, sixWeeksOut);
+    });
+  }, [filteredTasks, sixWeeksOut]);
 
   const recentlyCompletedCutoff = useMemo(() => subDays(now, 30), [now]);
   const recentlyCompleted = useMemo(() =>
@@ -243,6 +251,21 @@ export default function DashboardPage() {
             <div className="mx-4 ios-card overflow-hidden">
               {upcoming.map((t) => (
                 <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#36ADF6" />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Later (no date, or beyond 6 weeks) */}
+        {later.length > 0 && (
+          <div>
+            <p className="section-header">
+              <span className="inline-block w-2 h-2 rounded-full mr-1.5 -mb-px" style={{ backgroundColor: '#8E8E93' }} />
+              Later ({later.length})
+            </p>
+            <div className="mx-4 ios-card overflow-hidden">
+              {later.map((t) => (
+                <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#8E8E93" />
               ))}
             </div>
           </div>
