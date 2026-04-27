@@ -43,7 +43,7 @@ const SCHEMA = {
     },
     category_hint: {
       type: SchemaType.STRING,
-      description: 'Best-matching task category from this exact list: Interior, Exterior, HVAC, Plumbing, Electrical, Yard, Appliances, Cleaning, HOA / Bills, Projects. Empty string if none clearly fit.',
+      description: 'Best-matching task category from this exact list: Interior, Exterior, HVAC, Plumbing, Electrical, Yard, Appliances, Cleaning, Pest Control, HOA / Bills, Projects. Empty string if none clearly fit.',
     },
     recurrence: {
       type: SchemaType.STRING,
