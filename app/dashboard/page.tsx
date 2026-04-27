@@ -208,7 +208,7 @@ export default function DashboardPage() {
             </p>
             <div className="mx-4 ios-card overflow-hidden">
               {dueThisWeek.map((t) => (
-                <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#FFCC00" />
+                <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#FF9F0A" />
               ))}
             </div>
           </div>
