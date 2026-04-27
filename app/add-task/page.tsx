@@ -78,6 +78,8 @@ function AddTaskForm() {
     if (!title.trim() || !home) return;
     setSaving(true);
 
+    const completedAtIso = isCompleted && completedOn ? `${completedOn}T12:00:00Z` : null;
+
     const payload: any = {
       home_id: home.id,
       title: title.trim(),
@@ -94,28 +96,73 @@ function AddTaskForm() {
       created_by: user?.id,
     };
 
-    if (isCompleted && completedOn) {
-      payload.completed_at = `${completedOn}T12:00:00Z`;
+    if (isCompleted) {
+      payload.status = 'completed';
+      payload.completed_at = completedAtIso || new Date().toISOString();
+      payload.completed_by = user?.id;
+    } else {
+      payload.status = 'pending';
+      payload.completed_at = null;
+      payload.completed_by = null;
     }
 
     try {
       if (editId) {
         const { error } = await supabase.from('tasks').update(payload as any).eq('id', editId);
-
         if (error) throw error;
 
-        if (isCompleted && completedOn) {
-          await supabase
+        if (isCompleted && completedAtIso) {
+          // Update existing history rows for this task; insert one if none.
+          const { data: existingHist } = await supabase
             .from('task_history')
-            .update({ completed_at: `${completedOn}T12:00:00Z` })
-            .eq('task_id', editId);
+            .select('id')
+            .eq('task_id', editId)
+            .limit(1);
+          if (existingHist && existingHist.length > 0) {
+            await supabase
+              .from('task_history')
+              .update({ completed_at: completedAtIso })
+              .eq('task_id', editId);
+          } else {
+            await supabase.from('task_history').insert({
+              task_id: editId,
+              home_id: home.id,
+              title: title.trim(),
+              category_name:
+                categories.find((c) => c.id === categoryId)?.name || null,
+              completed_by: user?.id || null,
+              completed_by_name: user?.display_name || null,
+              completed_at: completedAtIso,
+              cost: estimatedCost ? parseFloat(estimatedCost) : null,
+            });
+          }
+        } else if (!isCompleted) {
+          // If unchecking completed, remove the history row(s).
+          await supabase.from('task_history').delete().eq('task_id', editId);
         }
 
         toast.success('Task updated');
       } else {
-        const { error } = await supabase.from('tasks').insert(payload as any);
+        const { data: inserted, error } = await supabase
+          .from('tasks')
+          .insert(payload as any)
+          .select()
+          .single();
         if (error) throw error;
-        toast.success('Task created');
+        if (isCompleted && inserted) {
+          await supabase.from('task_history').insert({
+            task_id: (inserted as any).id,
+            home_id: home.id,
+            title: title.trim(),
+            category_name:
+              categories.find((c) => c.id === categoryId)?.name || null,
+            completed_by: user?.id || null,
+            completed_by_name: user?.display_name || null,
+            completed_at: completedAtIso || new Date().toISOString(),
+            cost: estimatedCost ? parseFloat(estimatedCost) : null,
+          });
+        }
+        toast.success(isCompleted ? 'Logged completed task' : 'Task created');
       }
       await loadData();
       router.push('/dashboard');
@@ -204,6 +251,19 @@ function AddTaskForm() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div>
+          <button
+            type="button"
+            onClick={() => setIsCompleted((v) => !v)}
+            className="ios-list-item w-full bg-white rounded-ios shadow-card"
+          >
+            <span className="text-[15px]">Already done?</span>
+            <div className={`w-12 h-7 rounded-full transition-colors relative ${isCompleted ? 'bg-status-green' : 'bg-gray-200'}`}>
+              <div className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${isCompleted ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </div>
+          </button>
         </div>
 
         {isCompleted ? (
