@@ -33,8 +33,9 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
     const d = parseISO(date);
     if (isToday(d)) return 'Today';
     if (isTomorrow(d)) return 'Tomorrow';
-    if (isPast(d)) return `Overdue · ${format(d, 'MMM d')}`;
-    return format(d, 'MMM d');
+    const fmt = d.getFullYear() === new Date().getFullYear() ? 'MMM d' : 'MMM d, yyyy';
+    if (isPast(d)) return `Overdue · ${format(d, fmt)}`;
+    return format(d, fmt);
   };
 
   const handleComplete = async (e: React.MouseEvent) => {
@@ -103,7 +104,12 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
           </div>
           {compact && task.status === 'completed' && task.completed_at && (
             <p className="text-xs text-ink-tertiary mt-0.5">
-              Completed {format(parseISO(task.completed_at), 'MMM d')}
+              Completed {format(
+                parseISO(task.completed_at),
+                parseISO(task.completed_at).getFullYear() === new Date().getFullYear()
+                  ? 'MMM d'
+                  : 'MMM d, yyyy'
+              )}
             </p>
           )}
           {!compact && (
