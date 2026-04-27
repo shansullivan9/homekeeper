@@ -12,6 +12,7 @@ import {
   ChevronRight,
   Upload,
   Download,
+  Search,
   Image as ImageIcon,
   FileSpreadsheet,
   File as FileIcon,
@@ -67,6 +68,7 @@ export default function DocumentsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Document | null>(null);
   const [filter, setFilter] = useState<string>('all');
+  const [search, setSearch] = useState('');
   const [uploading, setUploading] = useState(false);
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
@@ -110,7 +112,10 @@ export default function DocumentsPage() {
         }
       }
 
-      sessionStorage.setItem('appliancePrefill', JSON.stringify(json.appliance));
+      sessionStorage.setItem(
+        'appliancePrefill',
+        JSON.stringify({ ...json.appliance, manual_document_id: doc.id })
+      );
       toast.dismiss(t);
       toast.success('Manual read — review and save the appliance');
       router.push('/appliances');
@@ -166,6 +171,7 @@ export default function DocumentsPage() {
             serial_number: a.serial_number || null,
             category: a.category || null,
             notes: a.notes || null,
+            manual_document_id: doc.id,
           })
           .select()
           .single();
@@ -273,6 +279,7 @@ export default function DocumentsPage() {
             completed_by: user?.id || null,
             estimated_cost: inv.cost || null,
             created_by: user?.id || null,
+            source_document_id: doc.id,
           })
           .select()
           .single();
@@ -505,10 +512,21 @@ export default function DocumentsPage() {
   }, [documents]);
 
   const visible = useMemo(() => {
-    if (filter === 'all') return documents;
-    if (filter === 'Uncategorized') return documents.filter((d) => !d.category);
-    return documents.filter((d) => d.category === filter);
-  }, [documents, filter]);
+    let list = documents;
+    if (filter === 'Uncategorized') list = list.filter((d) => !d.category);
+    else if (filter !== 'all') list = list.filter((d) => d.category === filter);
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (d) =>
+          d.title.toLowerCase().includes(q) ||
+          d.file_name.toLowerCase().includes(q) ||
+          (d.category || '').toLowerCase().includes(q) ||
+          (d.notes || '').toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [documents, filter, search]);
 
   const activeChips = useMemo(() => {
     const chips = ['all', ...Object.keys(categoryCounts).filter((k) => k !== 'all')];
@@ -678,7 +696,22 @@ export default function DocumentsPage() {
       />
 
       {documents.length > 0 && (
-        <div className="px-4 pt-3 pb-2 flex gap-2 overflow-x-auto no-scrollbar">
+        <div className="px-4 pt-3 pb-2">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search documents..."
+              className="ios-input pl-9"
+            />
+          </div>
+        </div>
+      )}
+
+      {documents.length > 0 && (
+        <div className="px-4 pb-2 flex gap-2 overflow-x-auto no-scrollbar">
           {activeChips.map((key) => {
             const label = key === 'all' ? 'All' : key;
             const count = categoryCounts[key] || 0;

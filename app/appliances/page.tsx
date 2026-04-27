@@ -4,15 +4,16 @@ import { useStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase-browser';
 import PageHeader from '@/components/layout/PageHeader';
 import { Appliance } from '@/lib/types';
-import { Plus, X, Package, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Plus, X, Package, ChevronRight, FileText } from 'lucide-react';
 import { format, parseISO, isPast, differenceInDays } from 'date-fns';
 import toast from 'react-hot-toast';
 
 export default function AppliancesPage() {
-  const { appliances, home, setAppliances } = useStore();
+  const { appliances, home, setAppliances, documents } = useStore();
   const supabase = createClient();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Appliance | null>(null);
+  const [manualDocId, setManualDocId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '', manufacturer: '', model_number: '', serial_number: '',
     category: '', location: '', installation_date: '', warranty_expiration: '',
@@ -34,6 +35,7 @@ export default function AppliancesPage() {
         category: p.category || '',
         notes: p.notes || '',
       }));
+      if (p.manual_document_id) setManualDocId(p.manual_document_id);
       setShowForm(true);
       toast('Review the details, then save.', { icon: '✏️' });
     } catch {}
@@ -45,6 +47,7 @@ export default function AppliancesPage() {
       category: '', location: '', installation_date: '', warranty_expiration: '',
       purchase_price: '', notes: '',
     });
+    setManualDocId(null);
     setEditing(null);
     setShowForm(false);
   };
@@ -57,7 +60,24 @@ export default function AppliancesPage() {
       installation_date: a.installation_date || '', warranty_expiration: a.warranty_expiration || '',
       purchase_price: a.purchase_price?.toString() || '', notes: a.notes || '',
     });
+    setManualDocId(a.manual_document_id || null);
     setShowForm(true);
+  };
+
+  const linkedManual = manualDocId
+    ? documents.find((d) => d.id === manualDocId) || null
+    : null;
+
+  const openManual = async () => {
+    if (!linkedManual) return;
+    const { data, error } = await supabase.storage
+      .from('documents')
+      .createSignedUrl(linkedManual.file_path, 60 * 5);
+    if (error || !data) {
+      toast.error('Could not open manual');
+      return;
+    }
+    window.open(data.signedUrl, '_blank');
   };
 
   const handleSave = async () => {
@@ -75,6 +95,7 @@ export default function AppliancesPage() {
       warranty_expiration: form.warranty_expiration || null,
       purchase_price: form.purchase_price ? parseFloat(form.purchase_price) : null,
       notes: form.notes || null,
+      manual_document_id: manualDocId || null,
     };
 
     try {
@@ -131,6 +152,22 @@ export default function AppliancesPage() {
           }
         />
         <div className="px-4 py-4 space-y-3">
+          {linkedManual && (
+            <button
+              onClick={openManual}
+              className="ios-card flex items-center gap-3 p-3 active:bg-gray-50 w-full text-left"
+            >
+              <div className="w-9 h-9 rounded-lg bg-sky-50 text-sky-500 flex items-center justify-center flex-shrink-0">
+                <FileText size={18} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-ink-secondary">Linked manual</p>
+                <p className="text-[14px] font-medium truncate">{linkedManual.title}</p>
+              </div>
+              <ChevronRight size={16} className="text-ink-tertiary" />
+            </button>
+          )}
+
           <div>
             <label className="text-xs text-ink-secondary mb-1 block">Appliance name *</label>
             <input type="text" value={form.name} onChange={(e) => u('name', e.target.value)} className="ios-input" autoFocus />

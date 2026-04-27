@@ -7,21 +7,21 @@ import { useAppInit } from '@/hooks/useAppInit';
 import PageHeader from '@/components/layout/PageHeader';
 import { RECURRENCE_LABELS, CATEGORY_ICONS } from '@/lib/constants';
 import { Recurrence, Priority, Task } from '@/lib/types';
-import { Trash2 } from 'lucide-react';
+import { Trash2, FileText, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { format } from 'date-fns';
 
 function AddTaskForm() {
   const searchParams = useSearchParams();
   const editId = searchParams.get('edit');
   const router = useRouter();
   const supabase = createClient();
-  const { home, user, categories, tasks, appliances } = useStore();
+  const { home, user, categories, tasks, appliances, documents } = useStore();
   const { loadData } = useAppInit();
 
   const [title, setTitle] = useState('');
   const [categoryId, setCategoryId] = useState('');
-  const [dueDate, setDueDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [dueDate, setDueDate] = useState('');
+  const [sourceDocumentId, setSourceDocumentId] = useState<string | null>(null);
   const [recurrence, setRecurrence] = useState<Recurrence>('one_time');
   const [recurrenceDays, setRecurrenceDays] = useState('');
   const [notes, setNotes] = useState('');
@@ -46,9 +46,26 @@ function AddTaskForm() {
         setEstimatedCost(task.estimated_cost?.toString() || '');
         setPriority(task.priority);
         setApplianceId(task.appliance_id || '');
+        setSourceDocumentId(task.source_document_id || null);
       }
     }
   }, [editId, tasks]);
+
+  const linkedSource = sourceDocumentId
+    ? documents.find((d) => d.id === sourceDocumentId) || null
+    : null;
+
+  const openSource = async () => {
+    if (!linkedSource) return;
+    const { data, error } = await supabase.storage
+      .from('documents')
+      .createSignedUrl(linkedSource.file_path, 60 * 5);
+    if (error || !data) {
+      toast.error('Could not open source document');
+      return;
+    }
+    window.open(data.signedUrl, '_blank');
+  };
 
   const handleSave = async () => {
     if (!title.trim() || !home) return;
@@ -120,6 +137,22 @@ function AddTaskForm() {
       />
 
       <div className="px-4 py-4 space-y-4">
+        {linkedSource && (
+          <button
+            onClick={openSource}
+            className="ios-card flex items-center gap-3 p-3 active:bg-gray-50 w-full text-left"
+          >
+            <div className="w-9 h-9 rounded-lg bg-sky-50 text-sky-500 flex items-center justify-center flex-shrink-0">
+              <FileText size={18} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-ink-secondary">Source document</p>
+              <p className="text-[14px] font-medium truncate">{linkedSource.title}</p>
+            </div>
+            <ChevronRight size={16} className="text-ink-tertiary" />
+          </button>
+        )}
+
         {/* Title */}
         <div>
           <label className="text-xs font-semibold text-ink-secondary uppercase tracking-wide mb-1.5 block">Task Name *</label>

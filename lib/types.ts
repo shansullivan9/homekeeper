@@ -73,6 +73,7 @@ export interface Task {
   is_suggestion: boolean;
   completed_at: string | null;
   completed_by: string | null;
+  source_document_id: string | null;
   created_at: string;
   updated_at: string;
   categories?: Category;
@@ -107,6 +108,7 @@ export interface Appliance {
   purchase_price: number | null;
   notes: string | null;
   photo_url: string | null;
+  manual_document_id: string | null;
   created_at: string;
 }
 
