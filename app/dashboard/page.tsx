@@ -160,13 +160,13 @@ export default function DashboardPage() {
 
         {/* Quick Links */}
         <div className="mx-4 mb-4">
-          <div className="ios-card overflow-hidden divide-y divide-gray-50">
+          <div className="ios-card overflow-hidden">
             {[
               { label: 'Appliances & Systems', icon: Package, href: '/appliances', color: 'text-purple-500' },
               { label: 'Documents', icon: FileText, href: '/documents', color: 'text-sky-500' },
-              { label: 'House Timeline', icon: Clock3, href: '/timeline', color: 'text-amber-500' },
               { label: 'Expense Summary', icon: Banknote, href: '/expenses', color: 'text-emerald-500' },
               { label: 'Home Profile', icon: HomeIcon, href: '/home-profile', color: 'text-brand-500' },
+              { label: 'House Timeline', icon: Clock3, href: '/timeline', color: 'text-amber-500' },
             ].map(({ label, icon: Icon, href, color }) => (
               <button key={href} onClick={() => router.push(href)} className="ios-list-item w-full">
                 <div className="flex items-center gap-3">
