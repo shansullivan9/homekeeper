@@ -73,10 +73,32 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         const getData = (r: any) => r.status === 'fulfilled' ? r.value.data || [] : [];
         store.setTasks(getData(results[0]));
         store.setCategories(getData(results[1]));
-        store.setMembers(getData(results[2]));
+        const rawMembers = getData(results[2]);
         store.setAppliances(getData(results[3]));
         store.setHistory(getData(results[4]));
         store.setDocuments(getData(results[5]));
+
+        const memberUserIds = rawMembers
+          .map((m: any) => m.user_id)
+          .filter(Boolean);
+        if (memberUserIds.length > 0) {
+          const { data: memberProfiles } = await supabase
+            .from('profiles')
+            .select('id, display_name, email')
+            .in('id', memberUserIds);
+          const byId = new Map(
+            (memberProfiles || []).map((p: any) => [p.id, p])
+          );
+          store.setMembers(
+            rawMembers.map((m: any) => ({
+              ...m,
+              display_name: byId.get(m.user_id)?.display_name || null,
+              email: byId.get(m.user_id)?.email || null,
+            }))
+          );
+        } else {
+          store.setMembers(rawMembers);
+        }
 
       } catch (err: any) {
         setError(err.message || 'Something went wrong');
