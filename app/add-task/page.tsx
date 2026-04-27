@@ -15,7 +15,7 @@ function AddTaskForm() {
   const editId = searchParams.get('edit');
   const router = useRouter();
   const supabase = createClient();
-  const { home, user, categories, tasks, appliances, documents } = useStore();
+  const { home, user, categories, tasks, appliances, documents, members } = useStore();
   const { loadData } = useAppInit();
 
   const [title, setTitle] = useState('');
@@ -31,6 +31,7 @@ function AddTaskForm() {
   const [estimatedCost, setEstimatedCost] = useState('');
   const [priority, setPriority] = useState<Priority>('medium');
   const [applianceId, setApplianceId] = useState('');
+  const [assignedTo, setAssignedTo] = useState('');
   const [saving, setSaving] = useState(false);
 
   // Load existing task for editing
@@ -48,6 +49,7 @@ function AddTaskForm() {
         setEstimatedCost(task.estimated_cost?.toString() || '');
         setPriority(task.priority);
         setApplianceId(task.appliance_id || '');
+        setAssignedTo((task as any).assigned_to || '');
         setSourceDocumentId(task.source_document_id || null);
         const done = task.status === 'completed';
         setIsCompleted(done);
@@ -88,6 +90,7 @@ function AddTaskForm() {
       estimated_cost: estimatedCost ? parseFloat(estimatedCost) : null,
       priority,
       appliance_id: applianceId || null,
+      assigned_to: assignedTo || null,
       created_by: user?.id,
     };
 
@@ -298,6 +301,43 @@ function AddTaskForm() {
               placeholder="25.00"
               className="ios-input"
             />
+          </div>
+        </div>
+
+        {/* Owner */}
+        <div>
+          <label className="text-xs font-semibold text-ink-secondary uppercase tracking-wide mb-1.5 block">Owner</label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setAssignedTo('')}
+              className={`px-3 py-2 rounded-ios text-sm font-medium transition-colors ${
+                !assignedTo
+                  ? 'bg-brand-500 text-white'
+                  : 'bg-surface-secondary text-ink-secondary active:bg-surface-tertiary'
+              }`}
+            >
+              Unassigned
+            </button>
+            {members.map((m: any) => {
+              const isMe = m.user_id === user?.id;
+              const label = isMe
+                ? 'You'
+                : m.display_name || m.email?.split('@')[0] || 'Member';
+              const selected = assignedTo === m.user_id;
+              return (
+                <button
+                  key={m.user_id}
+                  onClick={() => setAssignedTo(m.user_id)}
+                  className={`px-3 py-2 rounded-ios text-sm font-medium transition-colors ${
+                    selected
+                      ? 'bg-brand-500 text-white'
+                      : 'bg-surface-secondary text-ink-secondary active:bg-surface-tertiary'
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
