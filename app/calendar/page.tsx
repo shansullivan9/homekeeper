@@ -4,6 +4,7 @@ import { useStore } from '@/lib/store';
 import PageHeader from '@/components/layout/PageHeader';
 import TaskCard from '@/components/tasks/TaskCard';
 import { useAppInit } from '@/hooks/useAppInit';
+import { getTaskUrgency, urgencyColor } from '@/lib/constants';
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday,
@@ -27,11 +28,23 @@ export default function CalendarPage() {
   }, [currentMonth]);
 
   const tasksByDate = useMemo(() => {
-    const map: Record<string, number> = {};
+    const order: Record<string, number> = { overdue: 0, due_soon: 1, upcoming: 2, none: 3 };
+    const map: Record<string, { count: number; color: string }> = {};
     activeTasks.forEach((t) => {
-      if (t.due_date) {
-        const key = t.due_date;
-        map[key] = (map[key] || 0) + 1;
+      if (!t.due_date) return;
+      const key = t.due_date;
+      const urgency = getTaskUrgency(t.due_date);
+      const existing = map[key];
+      if (!existing) {
+        map[key] = { count: 1, color: urgencyColor(urgency) };
+        (map[key] as any)._u = urgency;
+      } else {
+        existing.count += 1;
+        const prevU = (existing as any)._u as string;
+        if (order[urgency] < order[prevU]) {
+          existing.color = urgencyColor(urgency);
+          (existing as any)._u = urgency;
+        }
       }
     });
     return map;
@@ -71,7 +84,9 @@ export default function CalendarPage() {
         <div className="grid grid-cols-7 gap-px">
           {calendarDays.map((day) => {
             const dateStr = format(day, 'yyyy-MM-dd');
-            const count = tasksByDate[dateStr] || 0;
+            const dayInfo = tasksByDate[dateStr];
+            const count = dayInfo?.count || 0;
+            const dotColor = dayInfo?.color;
             const isCurrentMonth = isSameMonth(day, currentMonth);
             const isSelected = isSameDay(day, selectedDate);
             const today = isToday(day);
@@ -96,7 +111,10 @@ export default function CalendarPage() {
                     {Array.from({ length: Math.min(count, 3) }).map((_, i) => (
                       <div
                         key={i}
-                        className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white/80' : 'bg-brand-400'}`}
+                        className="w-1 h-1 rounded-full"
+                        style={{
+                          backgroundColor: isSelected ? 'rgba(255,255,255,0.85)' : dotColor,
+                        }}
                       />
                     ))}
                   </div>
