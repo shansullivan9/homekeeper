@@ -33,45 +33,37 @@ export default function DashboardPage() {
   const weekEnd = endOfDay(addDays(now, 7));
   const monthEnd = endOfDay(endOfMonth(now));
 
-  const overdue = useMemo(() =>
-    filteredTasks.filter((t) => t.due_date && isBefore(new Date(t.due_date + 'T00:00:00'), now)),
-    [filteredTasks, now]
-  );
-
-  const dueThisWeek = useMemo(() =>
-    filteredTasks.filter((t) => {
-      if (!t.due_date) return false;
-      const d = new Date(t.due_date + 'T00:00:00');
-      return !isBefore(d, now) && isBefore(d, weekEnd);
-    }),
-    [filteredTasks, now, weekEnd]
-  );
-
-  const dueThisMonth = useMemo(() =>
-    filteredTasks.filter((t) => {
-      if (!t.due_date) return false;
-      const d = new Date(t.due_date + 'T00:00:00');
-      return !isBefore(d, weekEnd) && isBefore(d, monthEnd);
-    }),
-    [filteredTasks, weekEnd, monthEnd]
-  );
-
   const sixWeeksOut = useMemo(() => endOfDay(addDays(now, 42)), [now]);
-  const upcoming = useMemo(() => {
-    return filteredTasks.filter((t) => {
-      if (!t.due_date) return false;
-      const d = new Date(t.due_date + 'T00:00:00');
-      return !isBefore(d, monthEnd) && isBefore(d, sixWeeksOut);
-    });
-  }, [filteredTasks, monthEnd, sixWeeksOut]);
 
-  const later = useMemo(() => {
-    return filteredTasks.filter((t) => {
-      if (!t.due_date) return true;
+  // Single-pass bucketing so each task lands in exactly one section even when
+  // the cutoffs overlap (e.g. weekEnd extending past monthEnd at end of month).
+  const buckets = useMemo(() => {
+    const overdue: typeof filteredTasks = [];
+    const dueThisWeek: typeof filteredTasks = [];
+    const dueThisMonth: typeof filteredTasks = [];
+    const upcoming: typeof filteredTasks = [];
+    const later: typeof filteredTasks = [];
+
+    for (const t of filteredTasks) {
+      if (!t.due_date) {
+        later.push(t);
+        continue;
+      }
       const d = new Date(t.due_date + 'T00:00:00');
-      return !isBefore(d, sixWeeksOut);
-    });
-  }, [filteredTasks, sixWeeksOut]);
+      if (isBefore(d, now)) overdue.push(t);
+      else if (isBefore(d, weekEnd)) dueThisWeek.push(t);
+      else if (isBefore(d, monthEnd)) dueThisMonth.push(t);
+      else if (isBefore(d, sixWeeksOut)) upcoming.push(t);
+      else later.push(t);
+    }
+    return { overdue, dueThisWeek, dueThisMonth, upcoming, later };
+  }, [filteredTasks, now, weekEnd, monthEnd, sixWeeksOut]);
+
+  const overdue = buckets.overdue;
+  const dueThisWeek = buckets.dueThisWeek;
+  const dueThisMonth = buckets.dueThisMonth;
+  const upcoming = buckets.upcoming;
+  const later = buckets.later;
 
   const recentlyCompletedCutoff = useMemo(() => subDays(now, 30), [now]);
   const recentlyCompleted = useMemo(() =>
