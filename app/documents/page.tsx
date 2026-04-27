@@ -146,8 +146,9 @@ export default function DocumentsPage() {
     }
 
     if (Object.keys(stateUpdates).length > 0) {
+      const current = useStore.getState().documents;
       setDocuments(
-        documents.map((d) =>
+        current.map((d) =>
           stateUpdates[d.id] ? (stateUpdates[d.id] as Document) : d
         )
       );
@@ -267,8 +268,9 @@ export default function DocumentsPage() {
       }
 
       if (Object.keys(stateUpdates).length > 0) {
+        const current = useStore.getState().documents;
         setDocuments(
-          documents.map((d) => stateUpdates[d.id] || d)
+          current.map((d) => stateUpdates[d.id] || d)
         );
       }
 
@@ -398,8 +400,9 @@ export default function DocumentsPage() {
     }
 
     if (Object.keys(titleUpdates).length) {
+      const current = useStore.getState().documents;
       setDocuments(
-        documents.map((d) =>
+        current.map((d) =>
           titleUpdates[d.id] ? { ...d, title: titleUpdates[d.id] } : d
         )
       );
@@ -570,8 +573,9 @@ export default function DocumentsPage() {
     }
 
     if (Object.keys(titleUpdates).length) {
+      const current = useStore.getState().documents;
       setDocuments(
-        documents.map((d) =>
+        current.map((d) =>
           titleUpdates[d.id] ? { ...d, title: titleUpdates[d.id] } : d
         )
       );
