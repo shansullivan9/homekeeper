@@ -177,9 +177,6 @@ export default function HistoryPage() {
                       <span className="text-xs text-ink-secondary">
                         {format(parseISO(h.completed_at), 'MMM d, h:mm a')}
                       </span>
-                      {h.completed_by_name && (
-                        <span className="text-xs text-ink-tertiary">by {h.completed_by_name}</span>
-                      )}
                       {h.cost && (
                         <span className="text-xs font-semibold text-emerald-600">${h.cost}</span>
                       )}
