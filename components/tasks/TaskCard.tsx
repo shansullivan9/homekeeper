@@ -1,6 +1,6 @@
 'use client';
 import { Task } from '@/lib/types';
-import { getTaskUrgency, urgencyColor, CATEGORY_ICONS, RECURRENCE_LABELS } from '@/lib/constants';
+import { getTaskUrgency, urgencyColor, sectionColorForTask, CATEGORY_ICONS, RECURRENCE_LABELS } from '@/lib/constants';
 import { format, isToday, isTomorrow, isPast, parseISO } from 'date-fns';
 import { Check, ChevronRight, RotateCcw, UserPlus, User, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase-browser';
@@ -21,9 +21,10 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
   const supabase = createClient();
   const urgency = getTaskUrgency(task.due_date);
   const isDone = task.status === 'completed';
-  // Completed tasks always show a muted grey accent unless an explicit
-  // section color is provided, so they don't look like "overdue" red.
-  const color = sectionColor || (isDone ? '#8E8E93' : urgencyColor(urgency));
+  // Use the unified section bucket → color map so a task's accent dot
+  // matches its dashboard section everywhere (calendar, recently
+  // completed, edit screens, etc.). Caller can still override.
+  const color = sectionColor || sectionColorForTask(task.due_date, task.status);
   const catIcon = task.categories?.icon ? (CATEGORY_ICONS[task.categories.icon] || '🔧') : '📋';
 
   const assignee = (task as any).assigned_to
@@ -83,6 +84,28 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
       );
       onComplete?.();
     }
+  };
+
+  const handleUncomplete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!confirm(`Mark "${task.title}" as not completed?`)) return;
+    const { error: tErr } = await supabase
+      .from('tasks')
+      .update({
+        status: 'pending',
+        completed_at: null,
+        completed_by: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', task.id);
+    if (tErr) {
+      toast.error('Failed to undo');
+      return;
+    }
+    await supabase.from('task_history').delete().eq('task_id', task.id);
+    toast.success('Marked as not completed');
+    onComplete?.();
   };
 
   const handleDelete = async (e: React.MouseEvent) => {
@@ -170,20 +193,26 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
       </div>
 
       <div className="flex items-center gap-2 flex-shrink-0">
-        {task.status !== 'completed' && !compact && (
+        <button
+          onClick={handleClaim}
+          title={isMine ? 'Unclaim' : isClaimed ? 'Take over' : 'Claim'}
+          className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${
+            isMine
+              ? 'bg-brand-50 border-brand-500 text-brand-600'
+              : 'border-brand-200 text-brand-500 active:bg-brand-50'
+          }`}
+        >
+          <UserPlus size={14} strokeWidth={2.5} />
+        </button>
+        {isDone ? (
           <button
-            onClick={handleClaim}
-            title={isMine ? 'Unclaim' : isClaimed ? 'Take over' : 'Claim'}
-            className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${
-              isMine
-                ? 'bg-brand-50 border-brand-500 text-brand-600'
-                : 'border-brand-200 text-brand-500 active:bg-brand-50'
-            }`}
+            onClick={handleUncomplete}
+            title="Mark as not completed"
+            className="w-8 h-8 rounded-full bg-status-green border-2 border-status-green text-white flex items-center justify-center active:opacity-80 transition-all"
           >
-            <UserPlus size={14} strokeWidth={2.5} />
+            <Check size={14} strokeWidth={3} />
           </button>
-        )}
-        {task.status !== 'completed' && (
+        ) : (
           <button
             onClick={handleComplete}
             title="Mark complete"
@@ -192,15 +221,13 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
             <Check size={14} strokeWidth={3} />
           </button>
         )}
-        {!compact && (
-          <button
-            onClick={handleDelete}
-            title="Delete task"
-            className="w-8 h-8 rounded-full border-2 border-status-red text-status-red flex items-center justify-center active:bg-status-red active:text-white transition-all"
-          >
-            <Trash2 size={14} />
-          </button>
-        )}
+        <button
+          onClick={handleDelete}
+          title="Delete task"
+          className="w-8 h-8 rounded-full border-2 border-status-red text-status-red flex items-center justify-center active:bg-status-red active:text-white transition-all"
+        >
+          <Trash2 size={14} />
+        </button>
         <ChevronRight size={16} className="text-ink-tertiary" />
       </div>
     </button>
