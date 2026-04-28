@@ -44,7 +44,7 @@ export default function TimelinePage() {
         .from('timeline_events')
         .select('*')
         .eq('home_id', home.id)
-        .order('event_date', { ascending: false });
+        .order('event_date', { ascending: true });
       if (data) setEvents(data);
       setLoading(false);
     };
@@ -80,6 +80,9 @@ export default function TimelinePage() {
     setShowForm(true);
   };
 
+  const sortAsc = (list: TimelineEvent[]) =>
+    [...list].sort((a, b) => a.event_date.localeCompare(b.event_date));
+
   const handleSave = async () => {
     if (!form.title.trim() || !home) return;
     const payload = {
@@ -102,7 +105,7 @@ export default function TimelinePage() {
       if (error) {
         toast.error('Failed to save event');
       } else {
-        setEvents(events.map((e) => (e.id === editingId ? data : e)));
+        setEvents(sortAsc(events.map((e) => (e.id === editingId ? data : e))));
         closeForm();
         toast.success('Event updated');
       }
@@ -115,7 +118,7 @@ export default function TimelinePage() {
       if (error) {
         toast.error('Failed to add event');
       } else {
-        setEvents([data, ...events]);
+        setEvents(sortAsc([...events, data]));
         closeForm();
         toast.success('Event added');
       }
