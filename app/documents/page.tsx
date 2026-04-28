@@ -13,6 +13,7 @@ import {
   Upload,
   Download,
   Search,
+  Package,
   Image as ImageIcon,
   FileSpreadsheet,
   File as FileIcon,
@@ -902,6 +903,7 @@ export default function DocumentsPage() {
         <PageHeader
           title={editing ? 'Edit Document' : 'Upload Document'}
           back
+          onBack={resetForm}
           rightAction={
             <button onClick={resetForm} className="text-brand-500">
               <X size={22} />
@@ -1023,61 +1025,62 @@ export default function DocumentsPage() {
               ? `Upload ${files.length} files`
               : 'Upload'}
           </button>
-          {editing && appliances.length > 0 && (
-            <div>
-              <label className="text-xs text-ink-secondary mb-1 block">Linked appliance</label>
-              <select
-                value={form.appliance_id}
-                onChange={(e) => u('appliance_id', e.target.value)}
-                className="ios-input"
-              >
-                <option value="">None</option>
-                {appliances.map((a: any) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
-              {form.appliance_id && (
-                <button
-                  onClick={() => router.push(`/appliances?edit=${form.appliance_id}`)}
-                  className="text-xs text-brand-500 mt-1 font-semibold"
-                >
-                  Open this appliance →
-                </button>
-              )}
-            </div>
-          )}
-
-          {editing && false && (() => {
-            const linked = appliances.filter(
-              (a: any) => a.manual_document_id === editing.id
-            );
-            if (linked.length === 0) return null;
+          {editing && (() => {
+            const selectedAppliance = form.appliance_id
+              ? appliances.find((a: any) => a.id === form.appliance_id)
+              : null;
             return (
               <div>
-                <p className="text-xs font-semibold text-ink-secondary uppercase tracking-wide mb-1.5">
-                  Linked appliances
-                </p>
+                <p className="text-xs text-ink-secondary mb-1 block">Linked appliance</p>
                 <div className="ios-card overflow-hidden">
-                  {linked.map((a: any) => (
+                  {selectedAppliance ? (
                     <button
-                      key={a.id}
-                      onClick={() => router.push(`/appliances?edit=${a.id}`)}
+                      onClick={() => router.push(`/appliances?edit=${(selectedAppliance as any).id}`)}
                       className="ios-list-item w-full"
                     >
-                      <div className="flex-1 min-w-0 text-left">
-                        <p className="text-[15px] font-medium truncate">{a.name}</p>
-                        <p className="text-xs text-ink-tertiary truncate">
-                          {[a.manufacturer, a.model_number, a.serial_number ? `S/N ${a.serial_number}` : 'No serial #']
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </p>
+                      <div className="flex items-center gap-3 flex-1 min-w-0 text-left">
+                        <div className="w-9 h-9 rounded-lg bg-purple-50 text-purple-500 flex items-center justify-center flex-shrink-0">
+                          <Package size={18} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[14px] font-medium truncate">
+                            {(selectedAppliance as any).name}
+                          </p>
+                          <p className="text-xs text-ink-tertiary truncate">
+                            {[
+                              (selectedAppliance as any).manufacturer,
+                              (selectedAppliance as any).model_number,
+                              (selectedAppliance as any).serial_number
+                                ? `S/N ${(selectedAppliance as any).serial_number}`
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ') || 'No details yet'}
+                          </p>
+                        </div>
                       </div>
-                      <ChevronRight size={16} className="text-ink-tertiary" />
+                      <ChevronRight size={16} className="text-ink-tertiary flex-shrink-0" />
                     </button>
-                  ))}
+                  ) : (
+                    <div className="px-4 py-3.5 text-sm text-ink-tertiary">
+                      No appliance linked yet.
+                    </div>
+                  )}
                 </div>
+                {appliances.length > 0 && (
+                  <select
+                    value={form.appliance_id}
+                    onChange={(e) => u('appliance_id', e.target.value)}
+                    className="ios-input mt-2"
+                  >
+                    <option value="">None</option>
+                    {appliances.map((a: any) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             );
           })()}
