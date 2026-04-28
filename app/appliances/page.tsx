@@ -201,6 +201,7 @@ export default function AppliancesPage() {
         <PageHeader
           title={editing ? 'Edit Appliance' : 'Add Appliance'}
           back
+          onBack={resetForm}
           rightAction={
             <button onClick={resetForm} className="text-brand-500"><X size={22} /></button>
           }

@@ -6,10 +6,11 @@ interface PageHeaderProps {
   title: string;
   subtitle?: string;
   back?: boolean;
+  onBack?: () => void;
   rightAction?: React.ReactNode;
 }
 
-export default function PageHeader({ title, subtitle, back, rightAction }: PageHeaderProps) {
+export default function PageHeader({ title, subtitle, back, onBack, rightAction }: PageHeaderProps) {
   const router = useRouter();
 
   return (
@@ -18,7 +19,10 @@ export default function PageHeader({ title, subtitle, back, rightAction }: PageH
            style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {back && (
-            <button onClick={() => router.back()} className="p-1 -ml-1 text-brand-500 active:opacity-60">
+            <button
+              onClick={() => (onBack ? onBack() : router.back())}
+              className="p-1 -ml-1 text-brand-500 active:opacity-60"
+            >
               <ChevronLeft size={28} strokeWidth={2.2} />
             </button>
           )}
