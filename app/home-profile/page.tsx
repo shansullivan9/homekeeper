@@ -5,7 +5,7 @@ import { useStore } from '@/lib/store';
 import PageHeader from '@/components/layout/PageHeader';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { ChevronRight, ExternalLink } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 
 export default function HomeProfilePage() {
   const { home, user, setHome } = useStore();
@@ -197,12 +197,33 @@ export default function HomeProfilePage() {
     .filter((s) => s && s.trim())
     .join(', ');
   const encodedAddress = encodeURIComponent(fullAddress);
+  const zip = form.zip_code?.trim();
   const externalLinks = fullAddress
     ? [
-        { name: 'Zillow', url: `https://www.zillow.com/homes/${encodedAddress}_rb/`, color: 'text-[#006AFF]' },
-        { name: 'Redfin', url: `https://www.google.com/search?q=${encodedAddress}+site%3Aredfin.com`, color: 'text-[#A02021]' },
-        { name: 'Realtor.com', url: `https://www.realtor.com/realestateandhomes-search/${encodedAddress}`, color: 'text-[#BA0C2F]' },
-        { name: 'Google Maps', url: `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, color: 'text-[#4285F4]' },
+        {
+          name: 'Zillow',
+          url: `https://www.zillow.com/homes/${encodedAddress}_rb/`,
+          domain: 'zillow.com',
+        },
+        {
+          name: 'Redfin',
+          url: zip
+            ? `https://www.redfin.com/zipcode/${zip}`
+            : `https://www.redfin.com/`,
+          domain: 'redfin.com',
+        },
+        {
+          name: 'Realtor.com',
+          url: zip
+            ? `https://www.realtor.com/realestateandhomes-search/${zip}`
+            : `https://www.realtor.com/`,
+          domain: 'realtor.com',
+        },
+        {
+          name: 'Google Maps',
+          url: `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`,
+          domain: 'maps.google.com',
+        },
       ]
     : [];
 
@@ -286,13 +307,16 @@ export default function HomeProfilePage() {
                     rel="noopener noreferrer"
                     className="ios-list-item"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center ${link.color}`}>
-                        <ExternalLink size={16} />
-                      </div>
-                      <span className="text-[15px] font-medium">{link.name}</span>
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <img
+                        src={`https://www.google.com/s2/favicons?domain=${link.domain}&sz=64`}
+                        alt=""
+                        className="w-7 h-7 rounded-md flex-shrink-0"
+                        loading="lazy"
+                      />
+                      <span className="text-[15px] font-medium truncate">{link.name}</span>
                     </div>
-                    <ChevronRight size={16} className="text-ink-tertiary" />
+                    <ExternalLink size={14} className="text-ink-tertiary flex-shrink-0" />
                   </a>
                 ))}
               </div>
