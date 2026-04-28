@@ -4,7 +4,7 @@ import { useStore } from '@/lib/store';
 import PageHeader from '@/components/layout/PageHeader';
 import TaskCard from '@/components/tasks/TaskCard';
 import { useAppInit } from '@/hooks/useAppInit';
-import { getTaskUrgency, urgencyColor } from '@/lib/constants';
+import { sectionColorForTask, SECTION_COLORS } from '@/lib/constants';
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday,
@@ -29,34 +29,37 @@ export default function CalendarPage() {
   }, [currentMonth]);
 
   const tasksByDate = useMemo(() => {
-    const order: Record<string, number> = { overdue: 0, due_soon: 1, upcoming: 2, none: 3 };
+    // Priority order for picking the dominant dot color when a date has
+    // multiple tasks. Lower index = more urgent and wins.
+    const PRIORITY: Record<string, number> = {
+      [SECTION_COLORS.overdue]: 0,
+      [SECTION_COLORS.thisWeek]: 1,
+      [SECTION_COLORS.thisMonth]: 2,
+      [SECTION_COLORS.upcoming]: 3,
+      [SECTION_COLORS.later]: 4,
+      [SECTION_COLORS.completed]: 5,
+    };
     const map: Record<string, { count: number; color: string }> = {};
-    activeTasks.forEach((t) => {
-      if (!t.due_date) return;
-      const key = t.due_date;
-      const urgency = getTaskUrgency(t.due_date);
+    const place = (key: string, color: string) => {
       const existing = map[key];
       if (!existing) {
-        map[key] = { count: 1, color: urgencyColor(urgency) };
-        (map[key] as any)._u = urgency;
+        map[key] = { count: 1, color };
       } else {
         existing.count += 1;
-        const prevU = (existing as any)._u as string;
-        if (order[urgency] < order[prevU]) {
-          existing.color = urgencyColor(urgency);
-          (existing as any)._u = urgency;
+        if ((PRIORITY[color] ?? 99) < (PRIORITY[existing.color] ?? 99)) {
+          existing.color = color;
         }
       }
+    };
+
+    activeTasks.forEach((t) => {
+      if (!t.due_date) return;
+      place(t.due_date, sectionColorForTask(t.due_date, t.status));
     });
-    // Add a green dot for any day that has at least one completed task,
-    // unless that day is already covered by an active-task urgency dot.
     completedTasks.forEach((t) => {
       const key = t.completed_at ? t.completed_at.slice(0, 10) : t.due_date;
       if (!key) return;
-      if (!map[key]) {
-        map[key] = { count: 1, color: '#8E8E93' };
-        (map[key] as any)._u = 'completed';
-      }
+      place(key, SECTION_COLORS.completed);
     });
     return map;
   }, [activeTasks, completedTasks]);

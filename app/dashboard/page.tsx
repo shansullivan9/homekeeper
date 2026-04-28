@@ -205,13 +205,13 @@ export default function DashboardPage() {
         {/* Due This Week — always visible */}
         <div>
           <p className="section-header">
-            <span className="inline-block w-2 h-2 rounded-full mr-1.5 -mb-px" style={{ backgroundColor: '#FF9F0A' }} />
+            <span className="inline-block w-2 h-2 rounded-full mr-1.5 -mb-px" style={{ backgroundColor: '#B3A369' }} />
             Due This Week ({dueThisWeek.length})
           </p>
           <div className="mx-4 ios-card overflow-hidden">
             {dueThisWeek.length > 0 ? (
               dueThisWeek.map((t) => (
-                <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#FF9F0A" />
+                <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#B3A369" />
               ))
             ) : (
               <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>

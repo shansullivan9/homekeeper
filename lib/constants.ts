@@ -43,6 +43,44 @@ export function urgencyColor(urgency: string): string {
   }
 }
 
+// Single source of truth for the dot color of a task across the whole app
+// (dashboard sections, calendar, task cards). Bucketing matches the
+// dashboard sections exactly so a task that lives in 'Later' on the
+// dashboard gets the same purple dot on the calendar.
+export const SECTION_COLORS = {
+  overdue: '#FF3B30',      // red
+  thisWeek: '#B3A369',     // Georgia Tech gold
+  thisMonth: '#34C759',    // green
+  upcoming: '#4B9CD3',     // Carolina Blue
+  later: '#592A8A',        // ECU Pirates purple
+  completed: '#8E8E93',    // muted grey
+};
+
+export function sectionColorForTask(
+  dueDate: string | null,
+  status?: string | null
+): string {
+  if (status === 'completed') return SECTION_COLORS.completed;
+  if (!dueDate) return SECTION_COLORS.later;
+
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const due = new Date(dueDate + 'T00:00:00');
+  const diffDays = Math.floor((due.getTime() - now.getTime()) / 86400000);
+
+  if (diffDays < 0) return SECTION_COLORS.overdue;
+  if (diffDays < 7) return SECTION_COLORS.thisWeek;
+
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  monthEnd.setHours(23, 59, 59, 999);
+  if (due <= monthEnd) return SECTION_COLORS.thisMonth;
+
+  const sixWeeksOut = new Date(now.getTime() + 42 * 86400000);
+  if (due < sixWeeksOut) return SECTION_COLORS.upcoming;
+
+  return SECTION_COLORS.later;
+}
+
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 }
