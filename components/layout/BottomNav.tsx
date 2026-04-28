@@ -8,7 +8,7 @@ const tabs = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
   { href: '/add', label: 'Add', icon: PlusCircle },
-  { href: '/history', label: 'History', icon: Clock },
+  { href: '/history', label: 'Task History', icon: Clock },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

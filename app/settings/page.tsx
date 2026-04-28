@@ -161,7 +161,7 @@ export default function SettingsPage() {
           <div className="mx-4 ios-card overflow-hidden">
             {[
               { label: 'Appliances & Systems', icon: Package, href: '/appliances' },
-              { label: 'Expense Summary', icon: Banknote, href: '/expenses' },
+              { label: 'Expenses', icon: Banknote, href: '/expenses' },
               { label: 'Home Timeline', icon: Clock3, href: '/timeline' },
               { label: 'Home Profile', icon: Home, href: '/home-profile' },
             ].map(({ label, icon: Icon, href }) => (
