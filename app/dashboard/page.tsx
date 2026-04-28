@@ -188,7 +188,7 @@ export default function DashboardPage() {
         {/* Overdue — always visible */}
         <div>
           <p className="section-header">
-            <span className="inline-block w-2 h-2 rounded-full bg-status-red mr-1.5 -mb-px" />
+            <span className="inline-block w-2 h-2 rounded-full bg-status-red mr-1.5" />
             Overdue ({overdue.length})
           </p>
           <div className="mx-4 ios-card overflow-hidden">
@@ -205,13 +205,13 @@ export default function DashboardPage() {
         {/* Due This Week — always visible */}
         <div>
           <p className="section-header">
-            <span className="inline-block w-2 h-2 rounded-full mr-1.5 -mb-px" style={{ backgroundColor: '#B3A369' }} />
+            <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#FF9F0A' }} />
             Due This Week ({dueThisWeek.length})
           </p>
           <div className="mx-4 ios-card overflow-hidden">
             {dueThisWeek.length > 0 ? (
               dueThisWeek.map((t) => (
-                <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#B3A369" />
+                <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#FF9F0A" />
               ))
             ) : (
               <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
@@ -222,7 +222,7 @@ export default function DashboardPage() {
         {/* Due This Month — always visible */}
         <div>
           <p className="section-header">
-            <span className="inline-block w-2 h-2 rounded-full bg-status-green mr-1.5 -mb-px" />
+            <span className="inline-block w-2 h-2 rounded-full bg-status-green mr-1.5" />
             Due This Month ({dueThisMonth.length})
           </p>
           <div className="mx-4 ios-card overflow-hidden">
@@ -239,7 +239,7 @@ export default function DashboardPage() {
         {/* Upcoming — always visible */}
         <div>
           <p className="section-header">
-            <span className="inline-block w-2 h-2 rounded-full mr-1.5 -mb-px" style={{ backgroundColor: '#4B9CD3' }} />
+            <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#4B9CD3' }} />
             Upcoming ({upcoming.length})
           </p>
           <div className="mx-4 ios-card overflow-hidden">
@@ -256,7 +256,7 @@ export default function DashboardPage() {
         {/* Later — always visible */}
         <div>
           <p className="section-header">
-            <span className="inline-block w-2 h-2 rounded-full mr-1.5 -mb-px" style={{ backgroundColor: '#592A8A' }} />
+            <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#592A8A' }} />
             Later ({later.length})
           </p>
           <div className="mx-4 ios-card overflow-hidden">
@@ -274,7 +274,7 @@ export default function DashboardPage() {
         {claimFilter === 'all' && (
           <div>
             <p className="section-header">
-              <span className="inline-block w-2 h-2 rounded-full mr-1.5 -mb-px" style={{ backgroundColor: '#8E8E93' }} />
+              <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#8E8E93' }} />
               Recently Completed ({recentlyCompleted.length})
             </p>
             <div className="mx-4 ios-card overflow-hidden">

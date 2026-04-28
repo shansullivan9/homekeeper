@@ -14,7 +14,7 @@ export default function HomeProfilePage() {
   const isNew = !home;
 
   const [form, setForm] = useState({
-    name: '', address: '', zip_code: '', state: '',
+    name: '', address: '', city: '', zip_code: '', state: '',
     year_built: '', square_footage: '', floors: '1',
     roof_type: '', roof_installed_year: '',
     exterior_type: '',
@@ -43,6 +43,7 @@ export default function HomeProfilePage() {
       setForm({
         name: home.name || '',
         address: home.address || '',
+        city: (home as any).city || '',
         zip_code: (home as any).zip_code || '',
         state: (home as any).state || '',
         year_built: home.year_built?.toString() || '',
@@ -87,6 +88,7 @@ export default function HomeProfilePage() {
     const payload = {
       name: form.name.trim(),
       address: form.address || null,
+      city: form.city.trim() || null,
       zip_code: form.zip_code.trim() || null,
       state: form.state.trim().toUpperCase() || null,
       year_built: form.year_built ? parseInt(form.year_built) : null,
@@ -173,6 +175,39 @@ export default function HomeProfilePage() {
     </button>
   );
 
+  const US_STATES: { code: string; name: string }[] = [
+    { code: 'AL', name: 'Alabama' }, { code: 'AK', name: 'Alaska' }, { code: 'AZ', name: 'Arizona' },
+    { code: 'AR', name: 'Arkansas' }, { code: 'CA', name: 'California' }, { code: 'CO', name: 'Colorado' },
+    { code: 'CT', name: 'Connecticut' }, { code: 'DE', name: 'Delaware' }, { code: 'DC', name: 'District of Columbia' },
+    { code: 'FL', name: 'Florida' }, { code: 'GA', name: 'Georgia' }, { code: 'HI', name: 'Hawaii' },
+    { code: 'ID', name: 'Idaho' }, { code: 'IL', name: 'Illinois' }, { code: 'IN', name: 'Indiana' },
+    { code: 'IA', name: 'Iowa' }, { code: 'KS', name: 'Kansas' }, { code: 'KY', name: 'Kentucky' },
+    { code: 'LA', name: 'Louisiana' }, { code: 'ME', name: 'Maine' }, { code: 'MD', name: 'Maryland' },
+    { code: 'MA', name: 'Massachusetts' }, { code: 'MI', name: 'Michigan' }, { code: 'MN', name: 'Minnesota' },
+    { code: 'MS', name: 'Mississippi' }, { code: 'MO', name: 'Missouri' }, { code: 'MT', name: 'Montana' },
+    { code: 'NE', name: 'Nebraska' }, { code: 'NV', name: 'Nevada' }, { code: 'NH', name: 'New Hampshire' },
+    { code: 'NJ', name: 'New Jersey' }, { code: 'NM', name: 'New Mexico' }, { code: 'NY', name: 'New York' },
+    { code: 'NC', name: 'North Carolina' }, { code: 'ND', name: 'North Dakota' }, { code: 'OH', name: 'Ohio' },
+    { code: 'OK', name: 'Oklahoma' }, { code: 'OR', name: 'Oregon' }, { code: 'PA', name: 'Pennsylvania' },
+    { code: 'RI', name: 'Rhode Island' }, { code: 'SC', name: 'South Carolina' }, { code: 'SD', name: 'South Dakota' },
+    { code: 'TN', name: 'Tennessee' }, { code: 'TX', name: 'Texas' }, { code: 'UT', name: 'Utah' },
+    { code: 'VT', name: 'Vermont' }, { code: 'VA', name: 'Virginia' }, { code: 'WA', name: 'Washington' },
+    { code: 'WV', name: 'West Virginia' }, { code: 'WI', name: 'Wisconsin' }, { code: 'WY', name: 'Wyoming' },
+  ];
+
+  const currentYear = new Date().getFullYear();
+  const yearBuiltOptions = (() => {
+    const arr: number[] = [];
+    for (let y = currentYear; y >= 1900; y--) arr.push(y);
+    return arr;
+  })();
+  const minComponentYear = form.year_built ? parseInt(form.year_built) : 1900;
+  const componentYearOptions = (() => {
+    const arr: number[] = [];
+    for (let y = currentYear; y >= minComponentYear; y--) arr.push(y);
+    return arr;
+  })();
+
   const SELECT_LABELS: Record<string, Record<string, string>> = {
     roof_type: { asphalt_shingle: 'Asphalt Shingle', metal: 'Metal', tile: 'Tile', slate: 'Slate', flat: 'Flat' },
     exterior_type: { vinyl: 'Vinyl Siding', brick: 'Brick', stucco: 'Stucco', wood: 'Wood', stone: 'Stone', fiber_cement: 'Fiber Cement' },
@@ -188,7 +223,7 @@ export default function HomeProfilePage() {
 
   const ViewRow = ({ label, value }: { label: string; value: string }) => (
     <div className="ios-list-item">
-      <span className="text-[15px] text-ink-secondary">{label}</span>
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary">{label}</span>
       <span className="text-[15px] font-medium text-right">{value}</span>
     </div>
   );
@@ -257,15 +292,16 @@ export default function HomeProfilePage() {
           <div>
             <p className="section-header">Property Basics</p>
             <div className="mx-4 ios-card overflow-hidden">
-              <ViewRow label="Home name" value={fmtText(form.name)} />
+              <ViewRow label="Home Name" value={fmtText(form.name)} />
               <ViewRow label="Address" value={fmtText(form.address)} />
-              <ViewRow label="ZIP" value={fmtText(form.zip_code)} />
+              <ViewRow label="City" value={fmtText(form.city)} />
               <ViewRow label="State" value={fmtText(form.state)} />
-              <ViewRow label="Year built" value={fmtText(form.year_built)} />
-              <ViewRow label="Sq. footage" value={fmtText(form.square_footage)} />
+              <ViewRow label="ZIP" value={fmtText(form.zip_code)} />
+              <ViewRow label="Year Built" value={fmtText(form.year_built)} />
+              <ViewRow label="Sq. Footage" value={fmtText(form.square_footage)} />
               <ViewRow label="Floors" value={fmtText(form.floors)} />
-              <ViewRow label="Roof type" value={fmtSelect('roof_type', form.roof_type)} />
-              <ViewRow label="Roof installed" value={fmtText(form.roof_installed_year)} />
+              <ViewRow label="Roof Type" value={fmtSelect('roof_type', form.roof_type)} />
+              <ViewRow label="Roof Installed" value={fmtText(form.roof_installed_year)} />
               <ViewRow label="Exterior" value={fmtSelect('exterior_type', form.exterior_type)} />
             </div>
           </div>
@@ -274,10 +310,10 @@ export default function HomeProfilePage() {
             <p className="section-header">Major Systems</p>
             <div className="mx-4 ios-card overflow-hidden">
               <ViewRow label="HVAC" value={fmtSelect('hvac_type', form.hvac_type)} />
-              <ViewRow label="HVAC units" value={fmtText(form.hvac_units)} />
-              <ViewRow label="HVAC year" value={fmtText(form.hvac_installed_year)} />
-              <ViewRow label="Water heater" value={fmtSelect('water_heater_type', form.water_heater_type)} />
-              <ViewRow label="Water heater year" value={fmtText(form.water_heater_installed_year)} />
+              <ViewRow label="HVAC Units" value={fmtText(form.hvac_units)} />
+              <ViewRow label="HVAC Year" value={fmtText(form.hvac_installed_year)} />
+              <ViewRow label="Water Heater" value={fmtSelect('water_heater_type', form.water_heater_type)} />
+              <ViewRow label="Water Heater Year" value={fmtText(form.water_heater_installed_year)} />
               <ViewRow label="Plumbing" value={fmtSelect('plumbing_type', form.plumbing_type)} />
               <ViewRow label="Dryer" value={fmtSelect('dryer_type', form.dryer_type)} />
             </div>
@@ -286,17 +322,17 @@ export default function HomeProfilePage() {
           <div>
             <p className="section-header">Features & Systems</p>
             <div className="mx-4 ios-card overflow-hidden">
-              <ViewRow label="🌧️ Irrigation System" value={fmtBool(form.has_irrigation)} />
+              <ViewRow label="📐 Attic" value={fmtBool(form.has_attic)} />
+              <ViewRow label="🏠 Basement" value={fmtBool(form.has_basement)} />
+              <ViewRow label="🕸️ Crawlspace" value={fmtBool(form.has_crawlspace)} />
               <ViewRow label="🪵 Deck" value={fmtBool(form.has_deck)} />
-              <ViewRow label="🏊 Pool" value={fmtBool(form.has_pool)} />
-              <ViewRow label="🚗 Garage" value={fmtBool(form.has_garage)} />
               <ViewRow label="🔥 Fireplace" value={fmtBool(form.has_fireplace)} />
+              <ViewRow label="🚗 Garage" value={fmtBool(form.has_garage)} />
+              <ViewRow label="🏘️ HOA" value={fmtBool(form.has_hoa)} />
+              <ViewRow label="🌧️ Irrigation System" value={fmtBool(form.has_irrigation)} />
+              <ViewRow label="🏊 Pool" value={fmtBool(form.has_pool)} />
               <ViewRow label="🚰 Septic System" value={fmtBool(form.has_septic)} />
               <ViewRow label="💧 Well Water" value={fmtBool(form.has_well_water)} />
-              <ViewRow label="🏠 Basement" value={fmtBool(form.has_basement)} />
-              <ViewRow label="📐 Attic" value={fmtBool(form.has_attic)} />
-              <ViewRow label="🕸️ Crawlspace" value={fmtBool(form.has_crawlspace)} />
-              <ViewRow label="🏘️ HOA" value={fmtBool(form.has_hoa)} />
             </div>
           </div>
 
@@ -340,40 +376,105 @@ export default function HomeProfilePage() {
           <p className="text-[13px] text-gray-500 mx-4 mb-2">ZIP and state help us tailor maintenance tasks to your climate and season.</p>
           <div className="mx-4 space-y-3">
             <div>
-              <label className="text-xs text-ink-secondary mb-1 block">Home name *</label>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">Home Name *</label>
               <input type="text" value={form.name} onChange={(e) => update('name', e.target.value)} className="ios-input" />
             </div>
             <div>
-              <label className="text-xs text-ink-secondary mb-1 block">Address</label>
-              <input type="text" value={form.address} onChange={(e) => update('address', e.target.value)} className="ios-input" />
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">Address</label>
+              <input
+                type="text"
+                value={form.address}
+                onChange={(e) => update('address', e.target.value)}
+                placeholder="Street address"
+                autoComplete="street-address"
+                className="ios-input"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">City</label>
+              <input
+                type="text"
+                value={form.city}
+                onChange={(e) => update('city', e.target.value)}
+                autoComplete="address-level2"
+                className="ios-input"
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-ink-secondary mb-1 block">ZIP code</label>
-                <input type="text" value={form.zip_code} onChange={(e) => update('zip_code', e.target.value)} maxLength={10} className="ios-input" />
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">State</label>
+                <select
+                  value={form.state}
+                  onChange={(e) => update('state', e.target.value)}
+                  autoComplete="address-level1"
+                  className="ios-input"
+                >
+                  <option value="">Select…</option>
+                  {US_STATES.map((s) => (
+                    <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="text-xs text-ink-secondary mb-1 block">State (e.g. NC)</label>
-                <input type="text" value={form.state} onChange={(e) => update('state', e.target.value.toUpperCase())} maxLength={2} className="ios-input" />
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">ZIP Code</label>
+                <input
+                  type="text"
+                  value={form.zip_code}
+                  onChange={(e) => update('zip_code', e.target.value)}
+                  maxLength={10}
+                  autoComplete="postal-code"
+                  className="ios-input"
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-ink-secondary mb-1 block">Year built</label>
-                <input type="number" value={form.year_built} onChange={(e) => update('year_built', e.target.value)} className="ios-input" />
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">Year Built</label>
+                <select
+                  value={form.year_built}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    update('year_built', v);
+                    // If a roof install year is older than the new year_built,
+                    // clear it so we never claim the roof predates the house.
+                    if (v && form.roof_installed_year && parseInt(form.roof_installed_year) < parseInt(v)) {
+                      update('roof_installed_year', '');
+                    }
+                    if (v && form.hvac_installed_year && parseInt(form.hvac_installed_year) < parseInt(v)) {
+                      update('hvac_installed_year', '');
+                    }
+                    if (v && form.water_heater_installed_year && parseInt(form.water_heater_installed_year) < parseInt(v)) {
+                      update('water_heater_installed_year', '');
+                    }
+                  }}
+                  className="ios-input"
+                >
+                  <option value="">Select…</option>
+                  {yearBuiltOptions.map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="text-xs text-ink-secondary mb-1 block">Sq. footage</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">Sq. Footage</label>
                 <input type="number" value={form.square_footage} onChange={(e) => update('square_footage', e.target.value)} className="ios-input" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-ink-secondary mb-1 block">Floors</label>
-                <input type="number" value={form.floors} onChange={(e) => update('floors', e.target.value)} className="ios-input" />
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">Floors</label>
+                <select
+                  value={form.floors}
+                  onChange={(e) => update('floors', e.target.value)}
+                  className="ios-input"
+                >
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="text-xs text-ink-secondary mb-1 block">Roof type</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">Roof Type</label>
                 <select value={form.roof_type} onChange={(e) => update('roof_type', e.target.value)} className="ios-input">
                   <option value="">Select…</option>
                   <option value="asphalt_shingle">Asphalt Shingle</option>
@@ -385,11 +486,25 @@ export default function HomeProfilePage() {
               </div>
             </div>
             <div>
-              <label className="text-xs text-ink-secondary mb-1 block">Roof installed year (if known)</label>
-              <input type="number" value={form.roof_installed_year} onChange={(e) => update('roof_installed_year', e.target.value)} className="ios-input" />
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">Roof Installed Year</label>
+              <select
+                value={form.roof_installed_year}
+                onChange={(e) => update('roof_installed_year', e.target.value)}
+                className="ios-input"
+              >
+                <option value="">Select…</option>
+                {componentYearOptions.map((y) => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+              {form.year_built && (
+                <p className="text-[11px] text-ink-tertiary mt-1">
+                  Can't predate Year Built ({form.year_built}).
+                </p>
+              )}
             </div>
             <div>
-              <label className="text-xs text-ink-secondary mb-1 block">Exterior type</label>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">Exterior Type</label>
               <select value={form.exterior_type} onChange={(e) => update('exterior_type', e.target.value)} className="ios-input">
                 <option value="">Select…</option>
                 <option value="vinyl">Vinyl Siding</option>
@@ -408,7 +523,7 @@ export default function HomeProfilePage() {
           <p className="text-[13px] text-gray-500 mx-4 mb-2">Install years are optional but make recommendations more accurate.</p>
           <div className="mx-4 space-y-3">
             <div>
-              <label className="text-xs text-ink-secondary mb-1 block">HVAC type</label>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">HVAC Type</label>
               <select value={form.hvac_type} onChange={(e) => update('hvac_type', e.target.value)} className="ios-input">
                 <option value="">Select…</option>
                 <option value="central_air">Central Air</option>
@@ -420,17 +535,30 @@ export default function HomeProfilePage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-ink-secondary mb-1 block"># HVAC units</label>
-                <input type="number" value={form.hvac_units} onChange={(e) => update('hvac_units', e.target.value)} className="ios-input" />
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block"># HVAC Units</label>
+                <select value={form.hvac_units} onChange={(e) => update('hvac_units', e.target.value)} className="ios-input">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="text-xs text-ink-secondary mb-1 block">HVAC year</label>
-                <input type="number" value={form.hvac_installed_year} onChange={(e) => update('hvac_installed_year', e.target.value)} className="ios-input" />
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">HVAC Year</label>
+                <select
+                  value={form.hvac_installed_year}
+                  onChange={(e) => update('hvac_installed_year', e.target.value)}
+                  className="ios-input"
+                >
+                  <option value="">Select…</option>
+                  {componentYearOptions.map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-ink-secondary mb-1 block">Water heater type</label>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">Water Heater Type</label>
                 <select value={form.water_heater_type} onChange={(e) => update('water_heater_type', e.target.value)} className="ios-input">
                   <option value="">Select…</option>
                   <option value="tank">Tank</option>
@@ -440,12 +568,21 @@ export default function HomeProfilePage() {
                 </select>
               </div>
               <div>
-                <label className="text-xs text-ink-secondary mb-1 block">Water heater year</label>
-                <input type="number" value={form.water_heater_installed_year} onChange={(e) => update('water_heater_installed_year', e.target.value)} className="ios-input" />
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">Water Heater Year</label>
+                <select
+                  value={form.water_heater_installed_year}
+                  onChange={(e) => update('water_heater_installed_year', e.target.value)}
+                  className="ios-input"
+                >
+                  <option value="">Select…</option>
+                  {componentYearOptions.map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
               </div>
             </div>
             <div>
-              <label className="text-xs text-ink-secondary mb-1 block">Plumbing type</label>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">Plumbing Type</label>
               <select value={form.plumbing_type} onChange={(e) => update('plumbing_type', e.target.value)} className="ios-input">
                 <option value="">Select…</option>
                 <option value="copper">Copper</option>
@@ -456,7 +593,7 @@ export default function HomeProfilePage() {
               </select>
             </div>
             <div>
-              <label className="text-xs text-ink-secondary mb-1 block">Dryer type</label>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">Dryer Type</label>
               <select value={form.dryer_type} onChange={(e) => update('dryer_type', e.target.value)} className="ios-input">
                 <option value="">Select…</option>
                 <option value="electric">Electric Dryer</option>
@@ -470,17 +607,17 @@ export default function HomeProfilePage() {
         <div>
           <p className="section-header">Features & Systems</p>
           <div className="mx-4 ios-card overflow-hidden">
-            <ToggleItem label="🌧️ Irrigation System" field="has_irrigation" />
+            <ToggleItem label="📐 Attic" field="has_attic" />
+            <ToggleItem label="🏠 Basement" field="has_basement" />
+            <ToggleItem label="🕸️ Crawlspace" field="has_crawlspace" />
             <ToggleItem label="🪵 Deck" field="has_deck" />
-            <ToggleItem label="🏊 Pool" field="has_pool" />
-            <ToggleItem label="🚗 Garage" field="has_garage" />
             <ToggleItem label="🔥 Fireplace" field="has_fireplace" />
+            <ToggleItem label="🚗 Garage" field="has_garage" />
+            <ToggleItem label="🏘️ HOA" field="has_hoa" />
+            <ToggleItem label="🌧️ Irrigation System" field="has_irrigation" />
+            <ToggleItem label="🏊 Pool" field="has_pool" />
             <ToggleItem label="🚰 Septic System" field="has_septic" />
             <ToggleItem label="💧 Well Water" field="has_well_water" />
-            <ToggleItem label="🏠 Basement" field="has_basement" />
-            <ToggleItem label="📐 Attic" field="has_attic" />
-            <ToggleItem label="🕸️ Crawlspace" field="has_crawlspace" />
-            <ToggleItem label="🏘️ HOA" field="has_hoa" />
           </div>
         </div>
 

@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase-browser';
 import { useStore } from '@/lib/store';
@@ -7,8 +7,94 @@ import { useAppInit } from '@/hooks/useAppInit';
 import PageHeader from '@/components/layout/PageHeader';
 import { RECURRENCE_LABELS, CATEGORY_ICONS } from '@/lib/constants';
 import { Recurrence, Priority, Task } from '@/lib/types';
-import { Trash2, FileText, ChevronRight } from 'lucide-react';
+import { Trash2, FileText, ChevronRight, Calendar as CalendarIcon, ChevronLeft } from 'lucide-react';
+import {
+  format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
+  eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday,
+  parseISO,
+} from 'date-fns';
 import toast from 'react-hot-toast';
+
+function InlineCalendar({
+  value,
+  onChange,
+  maxDate,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  maxDate?: string;
+}) {
+  const initial = value ? parseISO(value) : new Date();
+  const [month, setMonth] = useState(initial);
+
+  const days = useMemo(() => {
+    const monthStart = startOfMonth(month);
+    const monthEnd = endOfMonth(month);
+    return eachDayOfInterval({
+      start: startOfWeek(monthStart),
+      end: endOfWeek(monthEnd),
+    });
+  }, [month]);
+
+  const selected = value ? parseISO(value) : null;
+  const max = maxDate ? parseISO(maxDate) : null;
+  const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
+  return (
+    <div className="ios-card mt-2 p-3">
+      <div className="flex items-center justify-between mb-2">
+        <button
+          type="button"
+          onClick={() => setMonth(subMonths(month, 1))}
+          className="p-1.5 text-ink-secondary active:text-brand-500"
+        >
+          <ChevronLeft size={18} />
+        </button>
+        <span className="text-sm font-semibold">{format(month, 'MMMM yyyy')}</span>
+        <button
+          type="button"
+          onClick={() => setMonth(addMonths(month, 1))}
+          className="p-1.5 text-ink-secondary active:text-brand-500"
+        >
+          <ChevronRight size={18} />
+        </button>
+      </div>
+      <div className="grid grid-cols-7 mb-1">
+        {dayLabels.map((d, i) => (
+          <div key={i} className="text-center text-[10px] font-semibold text-ink-tertiary py-1">
+            {d}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-px">
+        {days.map((day) => {
+          const dateStr = format(day, 'yyyy-MM-dd');
+          const inMonth = isSameMonth(day, month);
+          const isSelected = selected && isSameDay(day, selected);
+          const today = isToday(day);
+          const disabled = max ? day > max : false;
+          return (
+            <button
+              key={dateStr}
+              type="button"
+              disabled={disabled}
+              onClick={() => onChange(dateStr)}
+              className={`relative flex items-center justify-center py-2 rounded-lg text-sm transition-colors ${
+                isSelected
+                  ? 'bg-brand-500 text-white font-semibold'
+                  : today
+                  ? 'bg-brand-50 text-brand-600 font-semibold'
+                  : 'active:bg-gray-100'
+              } ${!inMonth ? 'opacity-30' : ''} ${disabled ? 'opacity-30 cursor-not-allowed' : ''}`}
+            >
+              {format(day, 'd')}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function AddTaskForm() {
   const searchParams = useSearchParams();
@@ -90,6 +176,33 @@ function AddTaskForm() {
       if (popup && !popup.closed) popup.close();
       toast.error(err?.message || 'Could not open source document');
     }
+  };
+
+  const nextDueFromCompleted = (completedDate: string, rec: Recurrence): string | null => {
+    if (rec === 'one_time' || !completedDate) return null;
+    const base = new Date(completedDate + 'T00:00:00');
+    const addMonths = (d: Date, m: number) => {
+      const out = new Date(d);
+      out.setMonth(out.getMonth() + m);
+      return out;
+    };
+    let next: Date;
+    switch (rec) {
+      case 'weekly': next = new Date(base.getTime() + 7 * 86400000); break;
+      case 'bi_monthly': next = addMonths(base, 2); break;
+      case 'monthly': next = addMonths(base, 1); break;
+      case 'quarterly': next = addMonths(base, 3); break;
+      case 'bi_annual': next = addMonths(base, 6); break;
+      case 'yearly': next = addMonths(base, 12); break;
+      case 'custom': {
+        const days = recurrenceDays ? parseInt(recurrenceDays) : 0;
+        if (!days) return null;
+        next = new Date(base.getTime() + days * 86400000);
+        break;
+      }
+      default: return null;
+    }
+    return next.toISOString().slice(0, 10);
   };
 
   const handleSave = async () => {
@@ -179,6 +292,34 @@ function AddTaskForm() {
             completed_at: completedAtIso || new Date().toISOString(),
             cost: estimatedCost ? parseFloat(estimatedCost) : null,
           });
+
+          // Recurring task logged as already-done: create the next
+          // occurrence so it shows up in Future / Upcoming. Without
+          // this, the user just sees a one-off completed row and the
+          // recurrence is effectively dropped.
+          if (recurrence !== 'one_time') {
+            const baseDate = completedOn || new Date().toISOString().slice(0, 10);
+            const nextDue = nextDueFromCompleted(baseDate, recurrence);
+            if (nextDue) {
+              await supabase.from('tasks').insert({
+                home_id: home.id,
+                title: title.trim(),
+                category_id: categoryId || null,
+                due_date: nextDue,
+                recurrence,
+                recurrence_days: recurrence === 'custom' && recurrenceDays
+                  ? parseInt(recurrenceDays) : null,
+                notes: notes || null,
+                estimated_minutes: estimatedMinutes ? parseInt(estimatedMinutes) : null,
+                estimated_cost: estimatedCost ? parseFloat(estimatedCost) : null,
+                priority,
+                appliance_id: applianceId || null,
+                assigned_to: assignedTo || null,
+                created_by: user?.id,
+                status: 'pending',
+              } as any);
+            }
+          }
         }
         toast.success(isCompleted ? 'Logged completed task' : 'Task created');
       }
@@ -308,22 +449,40 @@ function AddTaskForm() {
         {isCompleted ? (
           <div>
             <label className="text-xs font-semibold text-ink-secondary uppercase tracking-wide mb-1.5 block">Completed On</label>
-            <input
-              type="date"
+            <div className="relative">
+              <CalendarIcon
+                size={18}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-500 pointer-events-none"
+              />
+              <input
+                type="date"
+                value={completedOn}
+                onChange={(e) => setCompletedOn(e.target.value)}
+                className="ios-input pl-10 cursor-pointer"
+              />
+            </div>
+            <InlineCalendar
               value={completedOn}
-              onChange={(e) => setCompletedOn(e.target.value)}
-              className="ios-input"
+              onChange={setCompletedOn}
+              maxDate={new Date().toISOString().slice(0, 10)}
             />
           </div>
         ) : (
           <div>
             <label className="text-xs font-semibold text-ink-secondary uppercase tracking-wide mb-1.5 block">Due Date</label>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="ios-input"
-            />
+            <div className="relative">
+              <CalendarIcon
+                size={18}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-500 pointer-events-none"
+              />
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="ios-input pl-10 cursor-pointer"
+              />
+            </div>
+            <InlineCalendar value={dueDate} onChange={setDueDate} />
           </div>
         )}
 

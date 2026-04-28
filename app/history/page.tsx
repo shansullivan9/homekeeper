@@ -10,11 +10,21 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 
 export default function HistoryPage() {
-  const { history, tasks, setHistory, setTasks } = useStore();
+  const { history, tasks, categories, setHistory, setTasks } = useStore();
   const supabase = createClient();
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  // Some history rows were written before category_name was being saved
+  // properly, so fall back to the linked task's category if available.
+  const categoryFor = (h: TaskHistory): string | null => {
+    if (h.category_name) return h.category_name;
+    if (!h.task_id) return null;
+    const linkedTask = tasks.find((t) => t.id === h.task_id);
+    if (!linkedTask?.category_id) return null;
+    return categories.find((c) => c.id === linkedTask.category_id)?.name || null;
+  };
 
   const handleUndo = async (h: TaskHistory) => {
     if (
@@ -180,9 +190,9 @@ export default function HistoryPage() {
                       {h.cost && (
                         <span className="text-xs font-semibold text-emerald-600">${h.cost}</span>
                       )}
-                      {h.category_name && (
+                      {categoryFor(h) && (
                         <span className="text-[10px] text-ink-tertiary bg-gray-50 px-2 py-0.5 rounded-full">
-                          {h.category_name}
+                          {categoryFor(h)}
                         </span>
                       )}
                     </div>
@@ -191,22 +201,22 @@ export default function HistoryPage() {
                     )}
                   </div>
                 </button>
-                <div className="flex items-center gap-1 flex-shrink-0">
+                <div className="flex items-center gap-2 flex-shrink-0">
                   <button
                     onClick={() => handleUndo(h)}
                     disabled={busyId === h.id}
                     title={h.task_id ? 'Mark as not completed' : 'Mark as not completed (recreates the task)'}
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-ink-tertiary active:bg-gray-100 disabled:opacity-50"
+                    className="w-8 h-8 rounded-full border-2 border-ink-tertiary text-ink-secondary flex items-center justify-center active:bg-gray-100 disabled:opacity-50 transition-all"
                   >
-                    <RotateCcw size={15} />
+                    <RotateCcw size={14} strokeWidth={2.5} />
                   </button>
                   <button
                     onClick={() => handleDelete(h)}
                     disabled={busyId === h.id}
                     title="Delete entry"
-                    className="w-8 h-8 rounded-full flex items-center justify-center text-ink-tertiary active:bg-red-50 active:text-status-red disabled:opacity-50"
+                    className="w-8 h-8 rounded-full border-2 border-status-red text-status-red flex items-center justify-center active:bg-status-red active:text-white disabled:opacity-50 transition-all"
                   >
-                    <Trash2 size={15} />
+                    <Trash2 size={14} />
                   </button>
                 </div>
               </div>

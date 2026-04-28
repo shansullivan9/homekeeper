@@ -56,8 +56,25 @@ input, textarea, select {
     @apply w-2.5 h-2.5 rounded-full flex-shrink-0;
   }
   .section-header {
-    @apply text-xs font-semibold uppercase text-ink-secondary tracking-wider px-4 pb-1.5 pt-5;
+    @apply text-xs font-semibold uppercase text-ink-secondary tracking-wider px-4 pb-1.5 pt-5 flex items-center;
   }
+}
+
+/* Strikethrough that always lands on the visual midline of the text,
+   regardless of font metrics. Works by drawing a 2px horizontal band
+   at exactly 50% via a linear-gradient background instead of relying
+   on the browser's text-decoration positioning. */
+.strike-middle {
+  background-image: linear-gradient(
+    to bottom,
+    transparent calc(50% - 1px),
+    currentColor calc(50% - 1px),
+    currentColor calc(50% + 1px),
+    transparent calc(50% + 1px)
+  );
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  text-decoration: none;
 }
 
 /* Smooth scroll for calendar */

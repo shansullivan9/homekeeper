@@ -135,14 +135,14 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
       onClick={() => router.push(`/add-task?edit=${task.id}`)}
       className="w-full text-left ios-list-item group"
     >
-      <div className="flex items-start gap-3 flex-1 min-w-0">
-        <div className="flex-shrink-0 mt-0.5">
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className="flex-shrink-0">
           <div className="urgency-dot" style={{ backgroundColor: color }} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="text-sm">{catIcon}</span>
-            <p className={`font-medium text-[15px] truncate ${task.status === 'completed' ? 'line-through text-ink-tertiary' : ''}`}>
+            <p className={`font-medium text-[15px] truncate ${task.status === 'completed' ? 'strike-middle text-ink-tertiary' : ''}`}>
               {task.title}
             </p>
           </div>
@@ -192,43 +192,45 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
         </div>
       </div>
 
-      <div className="flex items-center gap-2 flex-shrink-0">
-        <button
-          onClick={handleClaim}
-          title={isMine ? 'Unclaim' : isClaimed ? 'Take over' : 'Claim'}
-          className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${
-            isMine
-              ? 'bg-brand-50 border-brand-500 text-brand-600'
-              : 'border-brand-200 text-brand-500 active:bg-brand-50'
-          }`}
-        >
-          <UserPlus size={14} strokeWidth={2.5} />
-        </button>
+      <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+        {!isDone && (
+          <button
+            onClick={handleClaim}
+            title={isMine ? 'Unclaim' : isClaimed ? 'Take over' : 'Claim'}
+            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 transition-all ${
+              isMine
+                ? 'bg-brand-500 border-brand-500 text-white'
+                : 'border-brand-500 text-brand-500 active:bg-brand-50'
+            }`}
+          >
+            <UserPlus size={13} strokeWidth={2.5} />
+          </button>
+        )}
         {isDone ? (
           <button
             onClick={handleUncomplete}
             title="Mark as not completed"
-            className="w-8 h-8 rounded-full bg-status-green border-2 border-status-green text-white flex items-center justify-center active:opacity-80 transition-all"
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-status-green border-2 border-status-green text-white flex items-center justify-center active:opacity-80 transition-all"
           >
-            <Check size={14} strokeWidth={3} />
+            <Check size={13} strokeWidth={3} />
           </button>
         ) : (
           <button
             onClick={handleComplete}
             title="Mark complete"
-            className="w-8 h-8 rounded-full border-2 border-status-green text-status-green flex items-center justify-center active:bg-status-green active:text-white transition-all"
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-status-green text-status-green flex items-center justify-center active:bg-status-green active:text-white transition-all"
           >
-            <Check size={14} strokeWidth={3} />
+            <Check size={13} strokeWidth={3} />
           </button>
         )}
         <button
           onClick={handleDelete}
           title="Delete task"
-          className="w-8 h-8 rounded-full border-2 border-status-red text-status-red flex items-center justify-center active:bg-status-red active:text-white transition-all"
+          className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-status-red text-status-red flex items-center justify-center active:bg-status-red active:text-white transition-all"
         >
-          <Trash2 size={14} />
+          <Trash2 size={13} />
         </button>
-        <ChevronRight size={16} className="text-ink-tertiary" />
+        <ChevronRight size={16} className="text-ink-tertiary hidden sm:block" />
       </div>
     </button>
   );
