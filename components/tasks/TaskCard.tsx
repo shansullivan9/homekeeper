@@ -1,6 +1,6 @@
 'use client';
 import { Task } from '@/lib/types';
-import { getTaskUrgency, urgencyColor, sectionColorForTask, CATEGORY_ICONS, RECURRENCE_LABELS, formatCurrency } from '@/lib/constants';
+import { getTaskUrgency, urgencyColor, sectionColorForTask, CATEGORY_ICONS, RECURRENCE_LABELS, formatCurrency, emojiForTaskTitle } from '@/lib/constants';
 import { format, isToday, isTomorrow, isPast, parseISO } from 'date-fns';
 import { Check, ChevronRight, RotateCcw, UserPlus, User, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase-browser';
@@ -25,16 +25,21 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
   // matches its dashboard section everywhere (calendar, recently
   // completed, edit screens, etc.). Caller can still override.
   const color = sectionColor || sectionColorForTask(task.due_date, task.status);
-  // Tasks aren't always loaded with the categories relation joined, so
-  // fall back to looking up the category from the store by id. This
-  // makes every row show its real category emoji (HVAC = 🌡️, Plumbing
-  // = 💧, etc.) instead of the generic 📋 fallback.
+  // Pick the most specific emoji we can:
+  // 1. Match keywords in the task title (so "Pest Control" → 🐜, "Clean
+  //    Gutters" → 🍁, "Pressure Wash House" → 🚰).
+  // 2. Fall back to the task's category icon (HVAC → 🌡️, Plumbing → 💧).
+  // 3. Final fallback is the clipboard 📋.
   const taskCategory =
     task.categories ||
     (task.category_id ? categories.find((c) => c.id === task.category_id) : null);
-  const catIcon = taskCategory?.icon
-    ? (CATEGORY_ICONS[taskCategory.icon] || '🔧')
-    : '📋';
+  const titleEmoji = emojiForTaskTitle(task.title);
+  const catIcon =
+    titleEmoji
+      ? titleEmoji
+      : taskCategory?.icon
+      ? (CATEGORY_ICONS[taskCategory.icon] || '🔧')
+      : '📋';
 
   const assignee = (task as any).assigned_to
     ? members.find((m: any) => m.user_id === (task as any).assigned_to)

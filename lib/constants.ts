@@ -23,6 +23,67 @@ export const CATEGORY_ICONS: Record<string, string> = {
   flower2: '🌸', refrigerator: '🔧', receipt: '📄', hammer: '🔨', wrench: '🔩',
 };
 
+// Title-keyword → emoji map. We try these in order, longest/most-specific
+// first, so "pressure wash" beats "wash", "co detector" beats "detector",
+// and obvious nouns ("chimney", "gutter", "termite") get their own picture.
+// Falls through to the category icon if nothing matches.
+const TASK_ICON_RULES: { match: string[]; icon: string }[] = [
+  // Multi-word phrases first (more specific)
+  { match: ['pressure wash', 'power wash'], icon: '🚰' },
+  { match: ['co detector', 'carbon monoxide', 'smoke detector', 'smoke alarm'], icon: '🚨' },
+  { match: ['air filter', 'hvac filter', 'furnace filter'], icon: '🌬️' },
+  { match: ['water heater'], icon: '🚿' },
+  { match: ['dryer vent'], icon: '👕' },
+  { match: ['septic'], icon: '🚽' },
+  { match: ['weed', 'fertiliz', 'mulch'], icon: '🌱' },
+  // Single-word noun matches
+  { match: ['pest', 'termite', 'roach', 'rodent', 'ant', 'mice', 'mosquito', 'extermin'], icon: '🐜' },
+  { match: ['chimney'], icon: '🧱' },
+  { match: ['fireplace'], icon: '🔥' },
+  { match: ['gutter'], icon: '🍁' },
+  { match: ['roof'], icon: '🏚️' },
+  { match: ['leak', 'plumb', 'pipe', 'drain', 'faucet', 'sink'], icon: '💧' },
+  { match: ['toilet'], icon: '🚽' },
+  { match: ['hvac', 'furnace', 'air condition', 'a/c ', 'ac unit', 'thermostat'], icon: '🌡️' },
+  { match: ['heat pump', 'heating'], icon: '♨️' },
+  { match: ['vent'], icon: '🌬️' },
+  { match: ['landscap', 'lawn', 'mow', 'grass', 'garden', 'tree', 'shrub', 'hedge', 'yard'], icon: '🌿' },
+  { match: ['paint'], icon: '🎨' },
+  { match: ['carpet', 'rug'], icon: '🧶' },
+  { match: ['window'], icon: '🪟' },
+  { match: ['door', 'lock'], icon: '🚪' },
+  { match: ['garage'], icon: '🚗' },
+  { match: ['pool', 'spa', 'hot tub'], icon: '🏊' },
+  { match: ['deck', 'patio', 'fence'], icon: '🪵' },
+  { match: ['snow', 'ice', 'winteriz'], icon: '❄️' },
+  { match: ['leaf', 'leaves', 'rake'], icon: '🍁' },
+  { match: ['hoa', 'association'], icon: '🏘️' },
+  { match: ['bill', 'invoice', 'tax', 'mortgage', 'insurance', 'utility'], icon: '🧾' },
+  { match: ['dryer'], icon: '👕' },
+  { match: ['washer', 'laundry'], icon: '🧺' },
+  { match: ['dishwasher', 'dish'], icon: '🍽️' },
+  { match: ['oven', 'stove', 'range', 'burner'], icon: '🍳' },
+  { match: ['fridge', 'refrigerator', 'freezer'], icon: '🧊' },
+  { match: ['microwave'], icon: '♨️' },
+  { match: ['battery', 'batter'], icon: '🔋' },
+  { match: ['light', 'bulb', 'lamp'], icon: '💡' },
+  { match: ['electric', 'outlet', 'circuit', 'wiring', 'breaker'], icon: '⚡' },
+  { match: ['irrigation', 'sprinkler'], icon: '💦' },
+  { match: ['inspect', 'check'], icon: '🔍' },
+  { match: ['clean', 'wash', 'dust', 'vacuum', 'mop', 'sweep'], icon: '🧹' },
+  { match: ['water'], icon: '💧' },
+  { match: ['filter'], icon: '🌬️' },
+];
+
+export function emojiForTaskTitle(title: string | null | undefined): string | null {
+  if (!title) return null;
+  const t = title.toLowerCase();
+  for (const rule of TASK_ICON_RULES) {
+    if (rule.match.some((kw) => t.includes(kw))) return rule.icon;
+  }
+  return null;
+}
+
 export function getTaskUrgency(dueDate: string | null): 'overdue' | 'due_soon' | 'upcoming' | 'none' {
   if (!dueDate) return 'none';
   const now = new Date();
