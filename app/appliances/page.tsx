@@ -16,6 +16,7 @@ export default function AppliancesPage() {
   const searchParams = useSearchParams();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Appliance | null>(null);
+  const [editMode, setEditMode] = useState(true);
   const [manualDocId, setManualDocId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '', manufacturer: '', model_number: '', serial_number: '',
@@ -69,6 +70,7 @@ export default function AppliancesPage() {
     setManualDocId(null);
     setEditing(null);
     setShowForm(false);
+    setEditMode(true);
   };
 
   const openEdit = (a: Appliance) => {
@@ -81,6 +83,7 @@ export default function AppliancesPage() {
     });
     setManualDocId(a.manual_document_id || null);
     setShowForm(true);
+    setEditMode(false);
   };
 
   // All documents linked to the appliance currently being edited.
@@ -199,11 +202,20 @@ export default function AppliancesPage() {
     return (
       <div>
         <PageHeader
-          title={editing ? 'Edit Appliance' : 'Add Appliance'}
+          title={editing ? 'Appliance' : 'Add Appliance'}
           back
           onBack={resetForm}
           rightAction={
-            <button onClick={resetForm} className="text-brand-500"><X size={22} /></button>
+            editing ? (
+              <button
+                onClick={() => setEditMode((v) => !v)}
+                className="text-brand-500 text-sm font-semibold"
+              >
+                {editMode ? 'Done' : 'Edit'}
+              </button>
+            ) : (
+              <button onClick={resetForm} className="text-brand-500"><X size={22} /></button>
+            )
           }
         />
         <div className="px-4 py-4 space-y-3">
@@ -262,49 +274,51 @@ export default function AppliancesPage() {
 
           <div>
             <label className="text-xs text-ink-secondary mb-1 block">Appliance name *</label>
-            <input type="text" value={form.name} onChange={(e) => u('name', e.target.value)} className="ios-input" autoFocus />
+            <input type="text" value={form.name} onChange={(e) => u('name', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-100 disabled:bg-transparent" autoFocus />
           </div>
           <div>
             <label className="text-xs text-ink-secondary mb-1 block">Manufacturer</label>
-            <input type="text" value={form.manufacturer} onChange={(e) => u('manufacturer', e.target.value)} className="ios-input" />
+            <input type="text" value={form.manufacturer} onChange={(e) => u('manufacturer', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-100 disabled:bg-transparent" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-ink-secondary mb-1 block">Model #</label>
-              <input type="text" value={form.model_number} onChange={(e) => u('model_number', e.target.value)} className="ios-input" />
+              <input type="text" value={form.model_number} onChange={(e) => u('model_number', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-100 disabled:bg-transparent" />
             </div>
             <div>
               <label className="text-xs text-ink-secondary mb-1 block">Serial #</label>
-              <input type="text" value={form.serial_number} onChange={(e) => u('serial_number', e.target.value)} className="ios-input" />
+              <input type="text" value={form.serial_number} onChange={(e) => u('serial_number', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-100 disabled:bg-transparent" />
             </div>
           </div>
           <div>
             <label className="text-xs text-ink-secondary mb-1 block">Category</label>
-            <input type="text" value={form.category} onChange={(e) => u('category', e.target.value)} className="ios-input" />
+            <input type="text" value={form.category} onChange={(e) => u('category', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-100 disabled:bg-transparent" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-ink-secondary mb-1 block">Installed</label>
-              <input type="date" value={form.installation_date} onChange={(e) => u('installation_date', e.target.value)} className="ios-input" />
+              <input type="date" value={form.installation_date} onChange={(e) => u('installation_date', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-100 disabled:bg-transparent" />
             </div>
             <div>
               <label className="text-xs text-ink-secondary mb-1 block">Warranty Expires</label>
-              <input type="date" value={form.warranty_expiration} onChange={(e) => u('warranty_expiration', e.target.value)} className="ios-input" />
+              <input type="date" value={form.warranty_expiration} onChange={(e) => u('warranty_expiration', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-100 disabled:bg-transparent" />
             </div>
           </div>
           <div>
             <label className="text-xs text-ink-secondary mb-1 block">Purchase price ($)</label>
-            <input type="number" step="0.01" value={form.purchase_price} onChange={(e) => u('purchase_price', e.target.value)} className="ios-input" />
+            <input type="number" step="0.01" value={form.purchase_price} onChange={(e) => u('purchase_price', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-100 disabled:bg-transparent" />
           </div>
           <div>
             <label className="text-xs text-ink-secondary mb-1 block">Notes</label>
-            <textarea value={form.notes} onChange={(e) => u('notes', e.target.value)} rows={3} className="ios-input resize-none" />
+            <textarea value={form.notes} onChange={(e) => u('notes', e.target.value)} rows={3} disabled={!!editing && !editMode} className="ios-input resize-none disabled:opacity-100 disabled:bg-transparent" />
           </div>
 
-          <button onClick={handleSave} disabled={!form.name.trim()} className="ios-button">
-            {editing ? 'Update' : 'Add Appliance'}
-          </button>
-          {editing && (
+          {(!editing || editMode) && (
+            <button onClick={handleSave} disabled={!form.name.trim()} className="ios-button">
+              {editing ? 'Update' : 'Add Appliance'}
+            </button>
+          )}
+          {editing && editMode && (
             <button onClick={handleDelete} className="w-full py-3 text-status-red font-semibold text-sm">
               Delete Appliance
             </button>

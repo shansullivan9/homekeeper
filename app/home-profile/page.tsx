@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import PageHeader from '@/components/layout/PageHeader';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { ChevronRight, ExternalLink } from 'lucide-react';
 
 export default function HomeProfilePage() {
   const { home, user, setHome } = useStore();
@@ -27,6 +28,11 @@ export default function HomeProfilePage() {
     has_basement: false, has_attic: false, has_crawlspace: false, has_hoa: false,
   });
   const [saving, setSaving] = useState(false);
+  const [editMode, setEditMode] = useState(isNew);
+
+  useEffect(() => {
+    setEditMode(isNew);
+  }, [isNew]);
 
   useEffect(() => {
     if (home) {
@@ -167,10 +173,135 @@ export default function HomeProfilePage() {
     </button>
   );
 
+  const SELECT_LABELS: Record<string, Record<string, string>> = {
+    roof_type: { asphalt_shingle: 'Asphalt Shingle', metal: 'Metal', tile: 'Tile', slate: 'Slate', flat: 'Flat' },
+    exterior_type: { vinyl: 'Vinyl Siding', brick: 'Brick', stucco: 'Stucco', wood: 'Wood', stone: 'Stone', fiber_cement: 'Fiber Cement' },
+    hvac_type: { central_air: 'Central Air', heat_pump: 'Heat Pump', window_units: 'Window Units', mini_split: 'Mini Split', radiant: 'Radiant' },
+    water_heater_type: { tank: 'Tank', tankless: 'Tankless', heat_pump: 'Heat Pump', solar: 'Solar' },
+    plumbing_type: { copper: 'Copper', pex: 'PEX', pvc: 'PVC', galvanized: 'Galvanized', mixed: 'Mixed' },
+    dryer_type: { electric: 'Electric Dryer', gas: 'Gas Dryer', none: 'No Dryer' },
+  };
+  const fmtSelect = (field: string, value: string) =>
+    SELECT_LABELS[field]?.[value] || value || '—';
+  const fmtText = (v: any) => (v === '' || v == null ? '—' : String(v));
+  const fmtBool = (v: boolean) => (v ? 'Yes' : 'No');
+
+  const ViewRow = ({ label, value }: { label: string; value: string }) => (
+    <div className="ios-list-item">
+      <span className="text-[15px] text-ink-secondary">{label}</span>
+      <span className="text-[15px] font-medium text-right">{value}</span>
+    </div>
+  );
+
+  const fullAddress = [form.address, form.state, form.zip_code]
+    .filter((s) => s && s.trim())
+    .join(', ');
+  const encodedAddress = encodeURIComponent(fullAddress);
+  const externalLinks = fullAddress
+    ? [
+        { name: 'Zillow', url: `https://www.zillow.com/homes/${encodedAddress}_rb/`, color: 'text-[#006AFF]' },
+        { name: 'Redfin', url: `https://www.google.com/search?q=${encodedAddress}+site%3Aredfin.com`, color: 'text-[#A02021]' },
+        { name: 'Realtor.com', url: `https://www.realtor.com/realestateandhomes-search/${encodedAddress}`, color: 'text-[#BA0C2F]' },
+        { name: 'Google Maps', url: `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`, color: 'text-[#4285F4]' },
+      ]
+    : [];
+
   return (
     <div>
-      <PageHeader title={isNew ? 'Set Up Your Home' : 'Home Profile'} back={!isNew} />
+      <PageHeader
+        title={isNew ? 'Set Up Your Home' : 'Home Profile'}
+        back={!isNew}
+        rightAction={
+          !isNew ? (
+            <button
+              onClick={() => setEditMode((v) => !v)}
+              className="text-brand-500 text-sm font-semibold"
+            >
+              {editMode ? 'Done' : 'Edit'}
+            </button>
+          ) : undefined
+        }
+      />
 
+      {!editMode && !isNew && (
+        <div className="py-4 space-y-5">
+          <div>
+            <p className="section-header">Property Basics</p>
+            <div className="mx-4 ios-card overflow-hidden">
+              <ViewRow label="Home name" value={fmtText(form.name)} />
+              <ViewRow label="Address" value={fmtText(form.address)} />
+              <ViewRow label="ZIP" value={fmtText(form.zip_code)} />
+              <ViewRow label="State" value={fmtText(form.state)} />
+              <ViewRow label="Year built" value={fmtText(form.year_built)} />
+              <ViewRow label="Sq. footage" value={fmtText(form.square_footage)} />
+              <ViewRow label="Floors" value={fmtText(form.floors)} />
+              <ViewRow label="Roof type" value={fmtSelect('roof_type', form.roof_type)} />
+              <ViewRow label="Roof installed" value={fmtText(form.roof_installed_year)} />
+              <ViewRow label="Exterior" value={fmtSelect('exterior_type', form.exterior_type)} />
+            </div>
+          </div>
+
+          <div>
+            <p className="section-header">Major Systems</p>
+            <div className="mx-4 ios-card overflow-hidden">
+              <ViewRow label="HVAC" value={fmtSelect('hvac_type', form.hvac_type)} />
+              <ViewRow label="HVAC units" value={fmtText(form.hvac_units)} />
+              <ViewRow label="HVAC year" value={fmtText(form.hvac_installed_year)} />
+              <ViewRow label="Water heater" value={fmtSelect('water_heater_type', form.water_heater_type)} />
+              <ViewRow label="Water heater year" value={fmtText(form.water_heater_installed_year)} />
+              <ViewRow label="Plumbing" value={fmtSelect('plumbing_type', form.plumbing_type)} />
+              <ViewRow label="Dryer" value={fmtSelect('dryer_type', form.dryer_type)} />
+            </div>
+          </div>
+
+          <div>
+            <p className="section-header">Features & Systems</p>
+            <div className="mx-4 ios-card overflow-hidden">
+              <ViewRow label="🌧️ Irrigation System" value={fmtBool(form.has_irrigation)} />
+              <ViewRow label="🪵 Deck" value={fmtBool(form.has_deck)} />
+              <ViewRow label="🏊 Pool" value={fmtBool(form.has_pool)} />
+              <ViewRow label="🚗 Garage" value={fmtBool(form.has_garage)} />
+              <ViewRow label="🔥 Fireplace" value={fmtBool(form.has_fireplace)} />
+              <ViewRow label="🚰 Septic System" value={fmtBool(form.has_septic)} />
+              <ViewRow label="💧 Well Water" value={fmtBool(form.has_well_water)} />
+              <ViewRow label="🏠 Basement" value={fmtBool(form.has_basement)} />
+              <ViewRow label="📐 Attic" value={fmtBool(form.has_attic)} />
+              <ViewRow label="🕸️ Crawlspace" value={fmtBool(form.has_crawlspace)} />
+              <ViewRow label="🏘️ HOA" value={fmtBool(form.has_hoa)} />
+            </div>
+          </div>
+
+          {externalLinks.length > 0 && (
+            <div>
+              <p className="section-header">Public Listings</p>
+              <p className="text-[13px] text-gray-500 mx-4 mb-2">
+                Quick lookup of this address on real estate sites and maps.
+              </p>
+              <div className="mx-4 ios-card overflow-hidden">
+                {externalLinks.map((link) => (
+                  <a
+                    key={link.name}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ios-list-item"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center ${link.color}`}>
+                        <ExternalLink size={16} />
+                      </div>
+                      <span className="text-[15px] font-medium">{link.name}</span>
+                    </div>
+                    <ChevronRight size={16} className="text-ink-tertiary" />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {(editMode || isNew) && (
       <div className="py-4 space-y-5">
         <div>
           <p className="section-header">Property Basics</p>
@@ -327,6 +458,7 @@ export default function HomeProfilePage() {
           </button>
         </div>
       </div>
+      )}
     </div>
   );
 }
