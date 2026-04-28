@@ -83,21 +83,22 @@ export default function AppliancesPage() {
     setShowForm(true);
   };
 
-  const linkedManual = manualDocId
-    ? documents.find((d) => d.id === manualDocId) || null
-    : null;
-
-  const openManual = async () => {
-    if (!linkedManual) return;
-    const { data, error } = await supabase.storage
-      .from('documents')
-      .createSignedUrl(linkedManual.file_path, 60 * 5);
-    if (error || !data) {
-      toast.error('Could not open manual');
-      return;
+  // All documents linked to the appliance currently being edited.
+  // Includes both the original source manual (manual_document_id) and any
+  // docs that point at this appliance via appliance_id.
+  const linkedDocuments = (() => {
+    if (!editing && !manualDocId) return [];
+    const ids = new Set<string>();
+    if (manualDocId) ids.add(manualDocId);
+    if (editing) {
+      for (const d of documents) {
+        if ((d as any).appliance_id === editing.id) ids.add(d.id);
+      }
     }
-    window.open(data.signedUrl, '_blank');
-  };
+    return Array.from(ids)
+      .map((id) => documents.find((d) => d.id === id))
+      .filter(Boolean) as typeof documents;
+  })();
 
   const handleSave = async () => {
     if (!form.name.trim() || !home) return;
@@ -129,6 +130,14 @@ export default function AppliancesPage() {
           .from('appliances').insert(payload).select().single();
         if (error) throw error;
         setAppliances([...appliances, data]);
+        // If this appliance was created from a source document, link the
+        // document back to it so the doc shows up under the appliance.
+        if (manualDocId) {
+          await supabase
+            .from('documents')
+            .update({ appliance_id: (data as any).id, updated_at: new Date().toISOString() })
+            .eq('id', manualDocId);
+        }
         toast.success('Appliance added');
       }
       resetForm();
@@ -171,20 +180,34 @@ export default function AppliancesPage() {
           }
         />
         <div className="px-4 py-4 space-y-3">
-          {linkedManual && (
-            <button
-              onClick={openManual}
-              className="ios-card flex items-center gap-3 p-3 active:bg-gray-50 w-full text-left"
-            >
-              <div className="w-9 h-9 rounded-lg bg-sky-50 text-sky-500 flex items-center justify-center flex-shrink-0">
-                <FileText size={18} />
+          {linkedDocuments.length > 0 && (
+            <div>
+              <p className="text-xs text-ink-secondary mb-1 block">
+                Linked documents
+              </p>
+              <div className="ios-card overflow-hidden">
+                {linkedDocuments.map((d) => (
+                  <button
+                    key={d.id}
+                    onClick={() => router.push(`/documents?edit=${d.id}`)}
+                    className="ios-list-item w-full"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0 text-left">
+                      <div className="w-9 h-9 rounded-lg bg-sky-50 text-sky-500 flex items-center justify-center flex-shrink-0">
+                        <FileText size={18} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-medium truncate">{d.title}</p>
+                        <p className="text-xs text-ink-tertiary truncate">
+                          {d.category || 'Uncategorized'}
+                        </p>
+                      </div>
+                    </div>
+                    <ChevronRight size={16} className="text-ink-tertiary flex-shrink-0" />
+                  </button>
+                ))}
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-ink-secondary">Linked manual</p>
-                <p className="text-[14px] font-medium truncate">{linkedManual.title}</p>
-              </div>
-              <ChevronRight size={16} className="text-ink-tertiary" />
-            </button>
+            </div>
           )}
 
           <div>
