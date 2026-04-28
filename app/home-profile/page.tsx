@@ -1,11 +1,69 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase-browser';
 import { useStore } from '@/lib/store';
 import PageHeader from '@/components/layout/PageHeader';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, ChevronDown } from 'lucide-react';
+
+// Native <select> always shows the option's full text once chosen, so we
+// build a small custom dropdown: closed state shows just the 2-letter
+// code (e.g. "NC"), open state lists "NC — North Carolina" for every
+// option so users can still find their state by name.
+function StateDropdown({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  options: { code: string; name: string }[];
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="ios-input flex items-center justify-between text-left"
+      >
+        <span className={value ? '' : 'text-ink-tertiary'}>
+          {value || 'Select…'}
+        </span>
+        <ChevronDown size={16} className="text-ink-tertiary" />
+      </button>
+      {open && (
+        <div className="absolute z-30 mt-1 left-0 right-0 ios-card max-h-64 overflow-auto">
+          {options.map((s) => (
+            <button
+              key={s.code}
+              type="button"
+              onClick={() => { onChange(s.code); setOpen(false); }}
+              className={`w-full text-left px-4 py-2.5 text-[15px] active:bg-gray-50 ${
+                value === s.code ? 'bg-brand-50 text-brand-600 font-semibold' : ''
+              }`}
+            >
+              <span className="font-mono">{s.code}</span>
+              <span className="text-ink-secondary"> — {s.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function HomeProfilePage() {
   const { home, user, setHome } = useStore();
@@ -403,17 +461,11 @@ export default function HomeProfilePage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">State</label>
-                <select
+                <StateDropdown
                   value={form.state}
-                  onChange={(e) => update('state', e.target.value)}
-                  autoComplete="address-level1"
-                  className="ios-input"
-                >
-                  <option value="">Select…</option>
-                  {US_STATES.map((s) => (
-                    <option key={s.code} value={s.code}>{s.code} — {s.name}</option>
-                  ))}
-                </select>
+                  onChange={(v) => update('state', v)}
+                  options={US_STATES}
+                />
               </div>
               <div>
                 <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">ZIP Code</label>
@@ -497,11 +549,6 @@ export default function HomeProfilePage() {
                   <option key={y} value={y}>{y}</option>
                 ))}
               </select>
-              {form.year_built && (
-                <p className="text-[11px] text-ink-tertiary mt-1">
-                  Can't predate Year Built ({form.year_built}).
-                </p>
-              )}
             </div>
             <div>
               <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">Exterior Type</label>
