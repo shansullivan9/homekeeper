@@ -838,14 +838,25 @@ export default function DocumentsPage() {
   };
 
   const handleOpen = async (d: Document) => {
-    const { data, error } = await supabase.storage
-      .from('documents')
-      .createSignedUrl(d.file_path, 60 * 5);
-    if (error || !data) {
-      toast.error('Could not open file');
-      return;
+    // Open the popup synchronously while we still have the user-gesture
+    // context — mobile browsers (Safari especially) block window.open after
+    // an await. We navigate the popup once we have the signed URL.
+    const popup = typeof window !== 'undefined' ? window.open('', '_blank') : null;
+    try {
+      const { data, error } = await supabase.storage
+        .from('documents')
+        .createSignedUrl(d.file_path, 60 * 5);
+      if (error || !data) throw new Error('Could not open file');
+      if (popup && !popup.closed) {
+        popup.location.href = data.signedUrl;
+      } else {
+        // Popup blocked (mobile) — fall back to navigating the current tab.
+        window.location.href = data.signedUrl;
+      }
+    } catch (err: any) {
+      if (popup && !popup.closed) popup.close();
+      toast.error(err?.message || 'Could not open file');
     }
-    window.open(data.signedUrl, '_blank');
   };
 
   const u = (key: keyof typeof form, val: string) =>

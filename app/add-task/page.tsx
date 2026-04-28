@@ -64,14 +64,21 @@ function AddTaskForm() {
 
   const openSource = async () => {
     if (!linkedSource) return;
-    const { data, error } = await supabase.storage
-      .from('documents')
-      .createSignedUrl(linkedSource.file_path, 60 * 5);
-    if (error || !data) {
-      toast.error('Could not open source document');
-      return;
+    const popup = typeof window !== 'undefined' ? window.open('', '_blank') : null;
+    try {
+      const { data, error } = await supabase.storage
+        .from('documents')
+        .createSignedUrl(linkedSource.file_path, 60 * 5);
+      if (error || !data) throw new Error('Could not open source document');
+      if (popup && !popup.closed) {
+        popup.location.href = data.signedUrl;
+      } else {
+        window.location.href = data.signedUrl;
+      }
+    } catch (err: any) {
+      if (popup && !popup.closed) popup.close();
+      toast.error(err?.message || 'Could not open source document');
     }
-    window.open(data.signedUrl, '_blank');
   };
 
   const handleSave = async () => {
