@@ -54,7 +54,7 @@ export default function CalendarPage() {
       const key = t.completed_at ? t.completed_at.slice(0, 10) : t.due_date;
       if (!key) return;
       if (!map[key]) {
-        map[key] = { count: 1, color: '#34C759' };
+        map[key] = { count: 1, color: '#8E8E93' };
         (map[key] as any)._u = 'completed';
       }
     });
