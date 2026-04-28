@@ -92,10 +92,15 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
     const { error } = await supabase.from('tasks').delete().eq('id', task.id);
     if (error) {
       toast.error('Failed to delete');
-    } else {
-      toast.success('Task deleted');
-      onComplete?.();
+      return;
     }
+    // Drop matching history rows from local state. The DB cascade does the
+    // server side; this just keeps the UI snappy without waiting for refetch.
+    const store = useStore.getState();
+    store.setTasks(store.tasks.filter((t) => t.id !== task.id));
+    store.setHistory(store.history.filter((h) => h.task_id !== task.id));
+    toast.success('Task deleted');
+    onComplete?.();
   };
 
   const assigneeLabel = assignee
