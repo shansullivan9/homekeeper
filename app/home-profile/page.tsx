@@ -286,11 +286,13 @@ export default function HomeProfilePage() {
     </div>
   );
 
-  const fullAddress = [form.address, form.state, form.zip_code]
+  const fullAddress = [form.address, form.city, form.state, form.zip_code]
     .filter((s) => s && s.trim())
     .join(', ');
   const encodedAddress = encodeURIComponent(fullAddress);
-  const zip = form.zip_code?.trim();
+  // Only direct address-aware links: each one accepts the full address
+  // as a query parameter and lands the user on this exact property
+  // (rather than a ZIP-level results page like Redfin/Realtor.com do).
   const externalLinks = fullAddress
     ? [
         {
@@ -299,23 +301,29 @@ export default function HomeProfilePage() {
           domain: 'zillow.com',
         },
         {
-          name: 'Redfin',
-          url: zip
-            ? `https://www.redfin.com/zipcode/${zip}`
-            : `https://www.redfin.com/`,
-          domain: 'redfin.com',
-        },
-        {
-          name: 'Realtor.com',
-          url: zip
-            ? `https://www.realtor.com/realestateandhomes-search/${zip}`
-            : `https://www.realtor.com/`,
-          domain: 'realtor.com',
-        },
-        {
           name: 'Google Maps',
           url: `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`,
           domain: 'maps.google.com',
+        },
+        {
+          name: 'Apple Maps',
+          url: `https://maps.apple.com/?q=${encodedAddress}`,
+          domain: 'maps.apple.com',
+        },
+        {
+          name: 'Waze',
+          url: `https://www.waze.com/ul?q=${encodedAddress}`,
+          domain: 'waze.com',
+        },
+        {
+          name: 'Bing Maps',
+          url: `https://www.bing.com/maps?q=${encodedAddress}`,
+          domain: 'bing.com',
+        },
+        {
+          name: 'OpenStreetMap',
+          url: `https://www.openstreetmap.org/search?query=${encodedAddress}`,
+          domain: 'openstreetmap.org',
         },
       ]
     : [];
@@ -347,6 +355,37 @@ export default function HomeProfilePage() {
 
       {!editMode && !isNew && (
         <div className="py-4 space-y-5">
+          {externalLinks.length > 0 && (
+            <div>
+              <p className="section-header">Open Address In…</p>
+              <p className="text-[13px] text-ink-tertiary mx-4 mb-2.5">
+                Direct links to this exact address — opens in a new tab.
+              </p>
+              <div className="mx-4 grid grid-cols-2 gap-3">
+                {externalLinks.map((link) => (
+                  <a
+                    key={link.name}
+                    href={link.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ios-card p-3 flex flex-col items-center text-center gap-2 active:shadow-card-hover transition-shadow"
+                  >
+                    <img
+                      src={`https://www.google.com/s2/favicons?domain=${link.domain}&sz=128`}
+                      alt=""
+                      className="w-10 h-10 rounded-lg"
+                      loading="lazy"
+                    />
+                    <span className="text-[13px] font-semibold leading-tight">
+                      {link.name}
+                    </span>
+                    <ExternalLink size={11} className="text-ink-tertiary" />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
             <p className="section-header">Property Basics</p>
             <div className="mx-4 ios-card overflow-hidden">
@@ -394,36 +433,6 @@ export default function HomeProfilePage() {
             </div>
           </div>
 
-          {externalLinks.length > 0 && (
-            <div>
-              <p className="section-header">Public Listings</p>
-              <p className="text-[13px] text-gray-500 mx-4 mb-2">
-                Quick lookup of this address on real estate sites and maps.
-              </p>
-              <div className="mx-4 ios-card overflow-hidden">
-                {externalLinks.map((link) => (
-                  <a
-                    key={link.name}
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="ios-list-item"
-                  >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <img
-                        src={`https://www.google.com/s2/favicons?domain=${link.domain}&sz=64`}
-                        alt=""
-                        className="w-7 h-7 rounded-md flex-shrink-0"
-                        loading="lazy"
-                      />
-                      <span className="text-[15px] font-medium truncate">{link.name}</span>
-                    </div>
-                    <ExternalLink size={14} className="text-ink-tertiary flex-shrink-0" />
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
