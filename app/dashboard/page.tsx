@@ -155,7 +155,7 @@ export default function DashboardPage() {
                   : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(spentThisYear)}
               </div>
               <div className="text-[10px] text-ink-secondary font-medium mt-0.5 leading-tight">
-                Spent on Tasks<br /><span className="text-ink-tertiary">{currentYear}</span>
+                Spent<br /><span className="text-ink-tertiary">{currentYear}</span>
               </div>
             </button>
           </div>
