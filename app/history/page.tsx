@@ -142,7 +142,7 @@ export default function HistoryPage() {
 
   return (
     <div>
-      <PageHeader title="History" subtitle={`${history.length} completed tasks`} />
+      <PageHeader title="Task History" subtitle={`${history.length} completed tasks`} />
 
       <div className="px-4 pt-3 pb-2">
         <div className="relative">

@@ -167,7 +167,7 @@ export default function DashboardPage() {
               {[
                 { label: 'Appliances & Systems', icon: Package, href: '/appliances', color: 'text-purple-500' },
                 { label: 'Documents', icon: FileText, href: '/documents', color: 'text-sky-500' },
-                { label: 'Expense Summary', icon: Banknote, href: '/expenses', color: 'text-emerald-500' },
+                { label: 'Expenses', icon: Banknote, href: '/expenses', color: 'text-emerald-500' },
                 { label: 'Home Profile', icon: HomeIcon, href: '/home-profile', color: 'text-brand-500' },
                 { label: 'Home Timeline', icon: Clock3, href: '/timeline', color: 'text-amber-500' },
               ].map(({ label, icon: Icon, href, color }) => (

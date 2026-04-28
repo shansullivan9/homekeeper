@@ -18,14 +18,14 @@ import QuickAddMenu from '@/components/layout/QuickAddMenu';
 const primaryTabs = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/calendar', label: 'Calendar', icon: Calendar },
-  { href: '/history', label: 'History', icon: Clock },
+  { href: '/history', label: 'Task History', icon: Clock },
 ];
 
 const secondaryTabs = [
   { href: '/documents', label: 'Documents', icon: FileText },
   { href: '/appliances', label: 'Appliances', icon: Package },
   { href: '/expenses', label: 'Expenses', icon: Banknote },
-  { href: '/timeline', label: 'Timeline', icon: Clock3 },
+  { href: '/timeline', label: 'Home Timeline', icon: Clock3 },
   { href: '/home-profile', label: 'Home Profile', icon: HomeIcon },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];

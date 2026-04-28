@@ -135,12 +135,17 @@ export default function CalendarPage() {
                   {format(day, 'd')}
                 </span>
                 {count > 0 && (
-                  <div
-                    className="w-1.5 h-1.5 rounded-full mt-0.5"
-                    style={{
-                      backgroundColor: isSelected ? 'rgba(255,255,255,0.85)' : dotColor,
-                    }}
-                  />
+                  <div className="flex gap-0.5 mt-0.5">
+                    {Array.from({ length: Math.min(count, 3) }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="w-1 h-1 rounded-full"
+                        style={{
+                          backgroundColor: isSelected ? 'rgba(255,255,255,0.85)' : dotColor,
+                        }}
+                      />
+                    ))}
+                  </div>
                 )}
               </button>
             );
