@@ -100,6 +100,32 @@ export default function AppliancesPage() {
       .filter(Boolean) as typeof documents;
   })();
 
+  const attachableDocuments = editing
+    ? documents.filter(
+        (d: any) => d.appliance_id !== editing.id && d.id !== manualDocId
+      )
+    : [];
+
+  const attachDocument = async (docId: string) => {
+    if (!editing || !docId) return;
+    const { error } = await supabase
+      .from('documents')
+      .update({ appliance_id: editing.id, updated_at: new Date().toISOString() })
+      .eq('id', docId);
+    if (error) {
+      toast.error('Could not link document');
+      return;
+    }
+    // Update Zustand store so the form re-renders with the new link.
+    const { setDocuments } = useStore.getState();
+    setDocuments(
+      useStore.getState().documents.map((d: any) =>
+        d.id === docId ? { ...d, appliance_id: editing.id } : d
+      )
+    );
+    toast.success('Document linked');
+  };
+
   const handleSave = async () => {
     if (!form.name.trim() || !home) return;
 
@@ -180,33 +206,56 @@ export default function AppliancesPage() {
           }
         />
         <div className="px-4 py-4 space-y-3">
-          {linkedDocuments.length > 0 && (
+          {editing && (
             <div>
               <p className="text-xs text-ink-secondary mb-1 block">
                 Linked documents
               </p>
               <div className="ios-card overflow-hidden">
-                {linkedDocuments.map((d) => (
-                  <button
-                    key={d.id}
-                    onClick={() => router.push(`/documents?edit=${d.id}`)}
-                    className="ios-list-item w-full"
-                  >
-                    <div className="flex items-center gap-3 flex-1 min-w-0 text-left">
-                      <div className="w-9 h-9 rounded-lg bg-sky-50 text-sky-500 flex items-center justify-center flex-shrink-0">
-                        <FileText size={18} />
+                {linkedDocuments.length > 0 ? (
+                  linkedDocuments.map((d) => (
+                    <button
+                      key={d.id}
+                      onClick={() => router.push(`/documents?edit=${d.id}`)}
+                      className="ios-list-item w-full"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0 text-left">
+                        <div className="w-9 h-9 rounded-lg bg-sky-50 text-sky-500 flex items-center justify-center flex-shrink-0">
+                          <FileText size={18} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[14px] font-medium truncate">{d.title}</p>
+                          <p className="text-xs text-ink-tertiary truncate">
+                            {d.category || 'Uncategorized'}
+                          </p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[14px] font-medium truncate">{d.title}</p>
-                        <p className="text-xs text-ink-tertiary truncate">
-                          {d.category || 'Uncategorized'}
-                        </p>
-                      </div>
-                    </div>
-                    <ChevronRight size={16} className="text-ink-tertiary flex-shrink-0" />
-                  </button>
-                ))}
+                      <ChevronRight size={16} className="text-ink-tertiary flex-shrink-0" />
+                    </button>
+                  ))
+                ) : (
+                  <div className="px-4 py-3.5 text-sm text-ink-tertiary">
+                    No documents linked yet.
+                  </div>
+                )}
               </div>
+              {attachableDocuments.length > 0 && (
+                <select
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value) attachDocument(e.target.value);
+                  }}
+                  className="ios-input mt-2"
+                >
+                  <option value="">Attach a document…</option>
+                  {attachableDocuments.map((d: any) => (
+                    <option key={d.id} value={d.id}>
+                      {d.title}
+                      {d.category ? ` · ${d.category}` : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
           )}
 
