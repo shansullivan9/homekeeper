@@ -25,8 +25,11 @@ export default function HistoryPage() {
       return;
     setBusyId(h.id);
     try {
+      let revivedTask: any = null;
+
       if (h.task_id) {
-        const { error } = await supabase
+        // Underlying task still exists — flip it back to pending.
+        const { data, error } = await supabase
           .from('tasks')
           .update({
             status: 'pending',
@@ -34,9 +37,33 @@ export default function HistoryPage() {
             completed_by: null,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', h.task_id);
+          .eq('id', h.task_id)
+          .select()
+          .single();
         if (error) throw error;
+        revivedTask = data;
+      } else {
+        // Original task was deleted; recreate one so the user has
+        // something to act on. Fall back to defaults for fields the
+        // history row doesn't carry.
+        const { data, error } = await supabase
+          .from('tasks')
+          .insert({
+            home_id: h.home_id,
+            title: h.title,
+            notes: h.notes,
+            estimated_cost: h.cost,
+            estimated_minutes: h.duration_minutes,
+            recurrence: 'one_time',
+            priority: 'medium',
+            status: 'pending',
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        revivedTask = data;
       }
+
       const { error: hErr } = await supabase
         .from('task_history')
         .delete()
@@ -52,6 +79,8 @@ export default function HistoryPage() {
               : t
           )
         );
+      } else if (revivedTask) {
+        setTasks([revivedTask, ...tasks]);
       }
       toast.success('Marked as not completed');
     } catch (err: any) {
@@ -166,16 +195,14 @@ export default function HistoryPage() {
                   </div>
                 </button>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  {h.task_id && (
-                    <button
-                      onClick={() => handleUndo(h)}
-                      disabled={busyId === h.id}
-                      title="Mark as not completed"
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-ink-tertiary active:bg-gray-100 disabled:opacity-50"
-                    >
-                      <RotateCcw size={15} />
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleUndo(h)}
+                    disabled={busyId === h.id}
+                    title={h.task_id ? 'Mark as not completed' : 'Mark as not completed (recreates the task)'}
+                    className="w-8 h-8 rounded-full flex items-center justify-center text-ink-tertiary active:bg-gray-100 disabled:opacity-50"
+                  >
+                    <RotateCcw size={15} />
+                  </button>
                   <button
                     onClick={() => handleDelete(h)}
                     disabled={busyId === h.id}

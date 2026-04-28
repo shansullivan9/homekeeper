@@ -20,7 +20,10 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
   const router = useRouter();
   const supabase = createClient();
   const urgency = getTaskUrgency(task.due_date);
-  const color = sectionColor || urgencyColor(urgency);
+  const isDone = task.status === 'completed';
+  // Completed tasks always show a muted grey accent unless an explicit
+  // section color is provided, so they don't look like "overdue" red.
+  const color = sectionColor || (isDone ? '#8E8E93' : urgencyColor(urgency));
   const catIcon = task.categories?.icon ? (CATEGORY_ICONS[task.categories.icon] || '🔧') : '📋';
 
   const assignee = (task as any).assigned_to
@@ -127,11 +130,20 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
           )}
           {!compact && (
             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-              {task.due_date && (
+              {isDone && task.completed_at ? (
+                <span className="text-xs text-ink-tertiary">
+                  Completed {format(
+                    parseISO(task.completed_at),
+                    parseISO(task.completed_at).getFullYear() === new Date().getFullYear()
+                      ? 'MMM d'
+                      : 'MMM d, yyyy'
+                  )}
+                </span>
+              ) : task.due_date ? (
                 <span className="text-xs" style={{ color }}>
                   {formatDueDate(task.due_date)}
                 </span>
-              )}
+              ) : null}
               {task.recurrence !== 'one_time' && (
                 <span className="flex items-center gap-0.5 text-xs text-ink-tertiary">
                   <RotateCcw size={10} />
@@ -153,23 +165,14 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
       </div>
 
       <div className="flex items-center gap-2 flex-shrink-0">
-        {!compact && (
-          <button
-            onClick={handleDelete}
-            title="Delete task"
-            className="w-8 h-8 rounded-full flex items-center justify-center text-ink-tertiary active:bg-red-50 active:text-status-red transition-all"
-          >
-            <Trash2 size={14} />
-          </button>
-        )}
         {task.status !== 'completed' && !compact && (
           <button
             onClick={handleClaim}
             title={isMine ? 'Unclaim' : isClaimed ? 'Take over' : 'Claim'}
-            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
+            className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${
               isMine
-                ? 'bg-brand-50 text-brand-600 border-2 border-brand-500'
-                : 'border-2 border-gray-200 text-ink-tertiary active:bg-gray-100'
+                ? 'bg-brand-50 border-brand-500 text-brand-600'
+                : 'border-brand-200 text-brand-500 active:bg-brand-50'
             }`}
           >
             <UserPlus size={14} strokeWidth={2.5} />
@@ -179,9 +182,18 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
           <button
             onClick={handleComplete}
             title="Mark complete"
-            className="w-8 h-8 rounded-full border-2 border-gray-200 flex items-center justify-center active:bg-status-green active:border-status-green active:text-white transition-all"
+            className="w-8 h-8 rounded-full border-2 border-status-green text-status-green flex items-center justify-center active:bg-status-green active:text-white transition-all"
           >
             <Check size={14} strokeWidth={3} />
+          </button>
+        )}
+        {!compact && (
+          <button
+            onClick={handleDelete}
+            title="Delete task"
+            className="w-8 h-8 rounded-full border-2 border-status-red text-status-red flex items-center justify-center active:bg-status-red active:text-white transition-all"
+          >
+            <Trash2 size={14} />
           </button>
         )}
         <ChevronRight size={16} className="text-ink-tertiary" />
