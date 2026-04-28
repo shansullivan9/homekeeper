@@ -11,17 +11,50 @@ export default function SuggestionBanner() {
   const supabase = createClient();
 
   const suggestions = useMemo(() => {
+    // Stop-words that don't carry meaning when comparing task titles
+    // ("Annual HVAC Service" should match "Bi-Annual HVAC Service" via
+    // "hvac"+"service", not be defeated by both having "annual").
+    const STOP = new Set([
+      'the', 'and', 'for', 'with', 'from', 'this', 'that', 'your',
+      'have', 'will', 'check', 'inspect', 'service', 'maintenance',
+      'replace', 'change', 'clean', 'test', 'annual', 'monthly',
+      'yearly', 'quarterly', 'every',
+    ]);
+    const keywords = (title: string): Set<string> => {
+      const out = new Set<string>();
+      for (const w of title.toLowerCase().split(/\W+/)) {
+        if (w.length >= 4 && !STOP.has(w)) out.add(w);
+      }
+      return out;
+    };
+    const overlaps = (a: Set<string>, b: Set<string>) => {
+      for (const w of a) if (b.has(w)) return true;
+      return false;
+    };
+
+    const realTasks = tasks.filter(
+      (t) => !t.is_suggestion && t.status !== 'skipped'
+    );
     const realTitles = new Set(
-      tasks
-        .filter((t) => !t.is_suggestion && t.status !== 'skipped')
-        .map((t) => t.title.trim().toLowerCase())
+      realTasks.map((t) => t.title.trim().toLowerCase())
     );
-    return tasks.filter(
-      (t) =>
-        t.is_suggestion &&
-        t.status === 'pending' &&
-        !realTitles.has(t.title.trim().toLowerCase())
-    );
+
+    return tasks.filter((t) => {
+      if (!t.is_suggestion || t.status !== 'pending') return false;
+      // Exact title match → already covered.
+      if (realTitles.has(t.title.trim().toLowerCase())) return false;
+      // Same-category keyword overlap → user already has a task for this
+      // (e.g. "Replace Air Filters" makes "Change HVAC Filter" redundant
+      // because both are HVAC-category and share "filter").
+      const sKw = keywords(t.title);
+      if (sKw.size === 0) return true;
+      const dup = realTasks.some(
+        (other) =>
+          (!t.category_id || other.category_id === t.category_id) &&
+          overlaps(sKw, keywords(other.title))
+      );
+      return !dup;
+    });
   }, [tasks]);
 
   if (suggestions.length === 0) return null;

@@ -322,9 +322,19 @@ function AddTaskForm() {
           }
         }
         toast.success(isCompleted ? 'Logged completed task' : 'Task created');
+        await loadData();
+        // Stay on the page in view mode by re-opening the freshly
+        // created task in its own edit URL.
+        if (inserted) {
+          router.replace(`/add-task?edit=${(inserted as any).id}`);
+          setEditMode(false);
+        } else {
+          router.push('/dashboard');
+        }
+        return;
       }
       await loadData();
-      router.push('/dashboard');
+      setEditMode(false);
     } catch (err: any) {
       toast.error(err.message || 'Failed to save');
     } finally {

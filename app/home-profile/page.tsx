@@ -198,7 +198,7 @@ export default function HomeProfilePage() {
         await supabase.rpc('generate_suggestions', { p_home_id: newHome.id });
 
         toast.success('Home created! Check your dashboard for suggested tasks.');
-        router.push('/dashboard');
+        setEditMode(false);
       } else {
         const { data, error } = await supabase
           .from('homes')
@@ -212,7 +212,7 @@ export default function HomeProfilePage() {
         await supabase.rpc('generate_suggestions', { p_home_id: home!.id });
 
         toast.success('Home profile updated');
-        router.push('/dashboard');
+        setEditMode(false);
       }
     } catch (err: any) {
       toast.error(err.message || 'Failed to save');
