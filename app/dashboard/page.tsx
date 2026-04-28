@@ -77,9 +77,15 @@ export default function DashboardPage() {
     [tasks, recentlyCompletedCutoff]
   );
 
-  const totalSpending = useMemo(() =>
-    history.reduce((sum, h) => sum + (h.cost || 0), 0),
-    [history]
+  const currentYear = now.getFullYear();
+  const historyThisYear = useMemo(
+    () => history.filter((h) => new Date(h.completed_at).getFullYear() === currentYear),
+    [history, currentYear]
+  );
+  const completedThisYear = historyThisYear.length;
+  const spentThisYear = useMemo(
+    () => historyThisYear.reduce((sum, h) => sum + (h.cost || 0), 0),
+    [historyThisYear]
   );
 
   const unclaimedCount = useMemo(() => activeTasks.filter((t: any) => !t.assigned_to).length, [activeTasks]);
@@ -131,25 +137,25 @@ export default function DashboardPage() {
         {claimFilter === 'all' && (
           <div className="grid grid-cols-3 gap-3 px-4 pt-4 pb-2">
             <button onClick={() => router.push('/history')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
-              <div className="text-2xl font-bold text-brand-600">{history.length}</div>
+              <div className="text-2xl font-bold text-brand-600">{completedThisYear}</div>
               <div className="text-[10px] text-ink-secondary font-medium mt-0.5 leading-tight">
-                Tasks Completed<br /><span className="text-ink-tertiary">All-time</span>
+                Tasks Completed<br /><span className="text-ink-tertiary">{currentYear}</span>
               </div>
             </button>
             <button onClick={() => router.push('/settings')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
               <div className="text-2xl font-bold text-purple-600">{members.length}</div>
               <div className="text-[10px] text-ink-secondary font-medium mt-0.5 leading-tight">
-                Household<br /><span className="text-ink-tertiary">{members.length === 1 ? 'Member' : 'Members'}</span>
+                HomeKeeper<br /><span className="text-ink-tertiary">{members.length === 1 ? 'Member' : 'Members'}</span>
               </div>
             </button>
             <button onClick={() => router.push('/expenses')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
               <div className="text-2xl font-bold text-emerald-600">
-                {totalSpending >= 10000
-                  ? `$${(totalSpending / 1000).toFixed(1)}k`
-                  : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(totalSpending)}
+                {spentThisYear >= 10000
+                  ? `$${(spentThisYear / 1000).toFixed(1)}k`
+                  : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(spentThisYear)}
               </div>
               <div className="text-[10px] text-ink-secondary font-medium mt-0.5 leading-tight">
-                Spent on Tasks<br /><span className="text-ink-tertiary">All-time</span>
+                Spent on Tasks<br /><span className="text-ink-tertiary">{currentYear}</span>
               </div>
             </button>
           </div>
