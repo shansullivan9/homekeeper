@@ -212,9 +212,13 @@ export default function AppliancesPage() {
                   if (editMode) await handleSave();
                   else setEditMode(true);
                 }}
-                className="text-brand-500 text-sm font-semibold"
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                  editMode
+                    ? 'bg-brand-500 text-white active:bg-brand-600'
+                    : 'bg-brand-50 text-brand-600 active:bg-brand-100 border border-brand-200'
+                }`}
               >
-                {editMode ? 'Done' : 'Edit'}
+                {editMode ? 'Save' : '✏️ Edit'}
               </button>
             ) : (
               <button onClick={resetForm} className="text-brand-500"><X size={22} /></button>

@@ -929,9 +929,13 @@ export default function DocumentsPage() {
                   }
                 }}
                 disabled={uploading}
-                className="text-brand-500 text-sm font-semibold disabled:opacity-50"
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors disabled:opacity-50 ${
+                  editMode
+                    ? 'bg-brand-500 text-white active:bg-brand-600'
+                    : 'bg-brand-50 text-brand-600 active:bg-brand-100 border border-brand-200'
+                }`}
               >
-                {uploading ? 'Saving…' : editMode ? 'Done' : 'Edit'}
+                {editMode ? (uploading ? 'Saving…' : 'Save') : '✏️ Edit'}
               </button>
             ) : (
               <button onClick={resetForm} className="text-brand-500">
