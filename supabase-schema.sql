@@ -401,8 +401,10 @@ BEGIN
   IF v_task.recurrence != 'one_time' THEN
     v_next_date := CASE v_task.recurrence
       WHEN 'weekly' THEN COALESCE(v_task.due_date, CURRENT_DATE) + INTERVAL '7 days'
+      WHEN 'bi_monthly' THEN COALESCE(v_task.due_date, CURRENT_DATE) + INTERVAL '2 months'
       WHEN 'monthly' THEN COALESCE(v_task.due_date, CURRENT_DATE) + INTERVAL '1 month'
       WHEN 'quarterly' THEN COALESCE(v_task.due_date, CURRENT_DATE) + INTERVAL '3 months'
+      WHEN 'bi_annual' THEN COALESCE(v_task.due_date, CURRENT_DATE) + INTERVAL '6 months'
       WHEN 'yearly' THEN COALESCE(v_task.due_date, CURRENT_DATE) + INTERVAL '1 year'
       WHEN 'custom' THEN COALESCE(v_task.due_date, CURRENT_DATE) + (v_task.recurrence_days || ' days')::INTERVAL
       ELSE NULL

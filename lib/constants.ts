@@ -49,7 +49,7 @@ export function urgencyColor(urgency: string): string {
 // dashboard gets the same purple dot on the calendar.
 export const SECTION_COLORS = {
   overdue: '#FF3B30',      // red
-  thisWeek: '#B3A369',     // Georgia Tech gold
+  thisWeek: '#FF9F0A',     // orange
   thisMonth: '#34C759',    // green
   upcoming: '#4B9CD3',     // Carolina Blue
   later: '#592A8A',        // ECU Pirates purple

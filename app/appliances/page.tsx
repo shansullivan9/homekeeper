@@ -360,10 +360,11 @@ export default function AppliancesPage() {
                 <button key={a.id} onClick={() => openEdit(a)} className="ios-list-item w-full">
                   <div className="flex-1 min-w-0">
                     <p className="text-[15px] font-medium truncate">{a.name}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      {a.manufacturer && <span className="text-xs text-ink-secondary">{a.manufacturer}</span>}
-                      {a.location && <span className="text-xs text-ink-tertiary">· {a.location}</span>}
-                    </div>
+                    {a.location && (
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs text-ink-tertiary">{a.location}</span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     {ws && (
