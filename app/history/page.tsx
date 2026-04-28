@@ -8,6 +8,7 @@ import { format, parseISO } from 'date-fns';
 import { CheckCircle2, Search, RotateCcw, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { formatCurrency } from '@/lib/constants';
 
 export default function HistoryPage() {
   const { history, tasks, categories, setHistory, setTasks } = useStore();
@@ -188,7 +189,7 @@ export default function HistoryPage() {
                         {format(parseISO(h.completed_at), 'MMM d, h:mm a')}
                       </span>
                       {h.cost && (
-                        <span className="text-xs font-semibold text-emerald-600">${h.cost}</span>
+                        <span className="text-xs font-semibold text-emerald-600">{formatCurrency(h.cost)}</span>
                       )}
                       {categoryFor(h) && (
                         <span className="text-[10px] text-ink-tertiary bg-gray-50 px-2 py-0.5 rounded-full">

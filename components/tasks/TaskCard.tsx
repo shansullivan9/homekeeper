@@ -1,6 +1,6 @@
 'use client';
 import { Task } from '@/lib/types';
-import { getTaskUrgency, urgencyColor, sectionColorForTask, CATEGORY_ICONS, RECURRENCE_LABELS } from '@/lib/constants';
+import { getTaskUrgency, urgencyColor, sectionColorForTask, CATEGORY_ICONS, RECURRENCE_LABELS, formatCurrency } from '@/lib/constants';
 import { format, isToday, isTomorrow, isPast, parseISO } from 'date-fns';
 import { Check, ChevronRight, RotateCcw, UserPlus, User, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase-browser';
@@ -179,7 +179,7 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
                 </span>
               )}
               {task.estimated_cost && (
-                <span className="text-xs text-ink-tertiary">${task.estimated_cost}</span>
+                <span className="text-xs text-ink-tertiary">{formatCurrency(task.estimated_cost)}</span>
               )}
               {isClaimed && (
                 <span className={`flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded-full ${isMine ? 'bg-brand-50 text-brand-600' : 'bg-gray-100 text-ink-secondary'}`}>

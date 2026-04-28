@@ -82,5 +82,13 @@ export function sectionColorForTask(
 }
 
 export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+  // Drop the cents when the value is whole, otherwise keep two decimals.
+  // Always include the thousands separator ($323,000 not $323000).
+  const opts: Intl.NumberFormatOptions = {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
+    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
+  };
+  return new Intl.NumberFormat('en-US', opts).format(amount);
 }
