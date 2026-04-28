@@ -54,7 +54,13 @@ function AddTaskForm() {
         setEstimatedCost(task.estimated_cost?.toString() || '');
         setPriority(task.priority);
         setApplianceId(task.appliance_id || '');
-        setAssignedTo((task as any).assigned_to || '');
+        // For completed tasks that were never claimed, default the Owner
+        // display to whoever completed it so it doesn't say 'Unassigned'.
+        const effectiveOwner =
+          (task as any).assigned_to ||
+          (task.status === 'completed' ? task.completed_by : null) ||
+          '';
+        setAssignedTo(effectiveOwner);
         setSourceDocumentId(task.source_document_id || null);
         const done = task.status === 'completed';
         setIsCompleted(done);
