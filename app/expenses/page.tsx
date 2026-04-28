@@ -101,13 +101,15 @@ export default function ExpensesPage() {
 
       <div className="py-4">
         {/* Year Selector */}
-        <div className="flex gap-2 px-4 mb-4 overflow-x-auto smooth-scroll">
+        <div className="flex gap-2 px-4 mb-4 overflow-x-auto no-scrollbar smooth-scroll">
           {years.map((y) => (
             <button
               key={y}
               onClick={() => setYear(y)}
               className={`px-4 py-2 rounded-ios text-sm font-semibold whitespace-nowrap transition-colors ${
-                year === y ? 'bg-brand-500 text-white' : 'bg-white text-ink-secondary shadow-card'
+                year === y
+                  ? 'bg-brand-500 text-white'
+                  : 'bg-white text-ink-secondary shadow-card md:hover:bg-gray-50'
               }`}
             >
               {y}
@@ -116,12 +118,13 @@ export default function ExpensesPage() {
         </div>
 
         {/* Total */}
-        <div className="mx-4 ios-card p-5 text-center mb-4">
+        <div className="mx-4 ios-card p-5 md:p-7 text-center mb-4">
           <p className="text-xs text-ink-secondary uppercase tracking-wide font-semibold mb-1">Total Spent in {year}</p>
-          <p className="text-3xl font-bold text-ink-primary">{formatCurrency(yearData.total)}</p>
+          <p className="text-3xl md:text-4xl font-bold text-ink-primary">{formatCurrency(yearData.total)}</p>
           <p className="text-xs text-ink-tertiary mt-1">{yearData.items.length} expenses logged</p>
         </div>
 
+        <div className="md:grid md:grid-cols-2 md:gap-6">
         {/* By Category */}
         {yearData.byCategory.length > 0 ? (
           <div>
@@ -186,6 +189,7 @@ export default function ExpensesPage() {
             </div>
           </div>
         )}
+        </div>
       </div>
 
       {editing && (

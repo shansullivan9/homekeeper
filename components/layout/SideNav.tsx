@@ -43,10 +43,11 @@ export default function SideNav() {
       <button
         key={tab.href}
         onClick={() => router.push(tab.href)}
+        aria-current={active ? 'page' : undefined}
         className={`flex items-center gap-3 px-3 py-2 rounded-ios text-[14px] font-medium transition-colors ${
           active
             ? 'bg-brand-50 text-brand-600'
-            : 'text-ink-secondary hover:bg-gray-50 active:bg-gray-100'
+            : 'text-ink-secondary hover:bg-gray-50 hover:text-ink-primary'
         }`}
       >
         <Icon size={18} strokeWidth={active ? 2.2 : 1.7} />
@@ -57,18 +58,21 @@ export default function SideNav() {
 
   return (
     <aside className="hidden md:flex fixed left-0 top-0 bottom-0 w-60 bg-white border-r border-gray-200/70 flex-col z-40">
-      <div className="px-5 py-6 flex items-center gap-2 border-b border-gray-100">
+      <button
+        onClick={() => router.push('/dashboard')}
+        className="px-5 py-5 flex items-center gap-2 border-b border-gray-100 text-left hover:bg-gray-50/50 transition-colors"
+      >
         <span className="text-2xl">🏠</span>
         <div>
           <p className="text-[15px] font-bold leading-tight">HomeKeeper</p>
           <p className="text-[11px] text-ink-tertiary leading-tight">Maintenance, made simple</p>
         </div>
-      </div>
+      </button>
 
       <div className="px-3 py-4">
         <button
           onClick={() => setMenuOpen(true)}
-          className="w-full flex items-center gap-2 justify-center bg-brand-500 text-white rounded-ios py-2.5 text-[14px] font-semibold shadow-md shadow-brand-500/20 active:bg-brand-600 hover:bg-brand-600 transition-colors"
+          className="w-full flex items-center gap-2 justify-center bg-brand-500 text-white rounded-ios py-2.5 text-[14px] font-semibold shadow-md shadow-brand-500/20 hover:bg-brand-600 transition-colors"
         >
           <PlusCircle size={18} strokeWidth={2.2} />
           New

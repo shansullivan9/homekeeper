@@ -63,7 +63,7 @@ export default function QuickAddMenu({
               <button
                 key={item.path}
                 onClick={() => go(item.path)}
-                className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-gray-50"
+                className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-gray-50 md:hover:bg-gray-50 transition-colors"
               >
                 <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${item.tone}`}>
                   <Icon size={18} />

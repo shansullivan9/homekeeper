@@ -16,7 +16,7 @@ interface TaskCardProps {
 }
 
 export default function TaskCard({ task, compact, onComplete, sectionColor }: TaskCardProps) {
-  const { user, members } = useStore();
+  const { user, members, categories } = useStore();
   const router = useRouter();
   const supabase = createClient();
   const urgency = getTaskUrgency(task.due_date);
@@ -25,7 +25,16 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
   // matches its dashboard section everywhere (calendar, recently
   // completed, edit screens, etc.). Caller can still override.
   const color = sectionColor || sectionColorForTask(task.due_date, task.status);
-  const catIcon = task.categories?.icon ? (CATEGORY_ICONS[task.categories.icon] || '🔧') : '📋';
+  // Tasks aren't always loaded with the categories relation joined, so
+  // fall back to looking up the category from the store by id. This
+  // makes every row show its real category emoji (HVAC = 🌡️, Plumbing
+  // = 💧, etc.) instead of the generic 📋 fallback.
+  const taskCategory =
+    task.categories ||
+    (task.category_id ? categories.find((c) => c.id === task.category_id) : null);
+  const catIcon = taskCategory?.icon
+    ? (CATEGORY_ICONS[taskCategory.icon] || '🔧')
+    : '📋';
 
   const assignee = (task as any).assigned_to
     ? members.find((m: any) => m.user_id === (task as any).assigned_to)
@@ -46,6 +55,7 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
     e.stopPropagation();
     e.preventDefault();
     if (!user) return;
+    if (!confirm(`Mark "${task.title}" as completed?`)) return;
 
     const { error } = await supabase.rpc('complete_task', {
       p_task_id: task.id,
@@ -67,6 +77,12 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
     e.stopPropagation();
     e.preventDefault();
     if (!user) return;
+    const claimMsg = isMine
+      ? `Unclaim "${task.title}"?`
+      : isClaimed
+      ? `Take over "${task.title}" from ${assigneeLabel || 'the current owner'}?`
+      : `Claim "${task.title}"?`;
+    if (!confirm(claimMsg)) return;
 
     const { data, error } = await supabase.rpc('toggle_task_claim', {
       p_task_id: task.id,

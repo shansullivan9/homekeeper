@@ -75,6 +75,7 @@ export default function SuggestionBanner() {
   };
 
   const dismissSuggestion = async (task: Task) => {
+    if (!confirm(`Dismiss the suggestion "${task.title}"?`)) return;
     const { error } = await supabase.from('tasks').delete().eq('id', task.id);
     if (!error) removeTask(task.id);
   };

@@ -113,21 +113,27 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   if (error) {
     return (
-      <div style={{ padding: 40, textAlign: 'center' }}>
-        <h2>Error</h2>
-        <p style={{ color: 'red' }}>{error}</p>
-        <button onClick={() => window.location.href = '/auth'} style={{ marginTop: 20, padding: '10px 20px' }}>
-          Back to Login
-        </button>
+      <div className="min-h-screen flex items-center justify-center px-6 bg-surface-secondary">
+        <div className="ios-card max-w-sm w-full p-6 text-center">
+          <div className="text-4xl mb-2">⚠️</div>
+          <h2 className="text-lg font-semibold text-ink-primary mb-1">Something went wrong</h2>
+          <p className="text-sm text-status-red mb-4">{error}</p>
+          <button
+            onClick={() => (window.location.href = '/auth')}
+            className="ios-button"
+          >
+            Back to Login
+          </button>
+        </div>
       </div>
     );
   }
 
   if (!ready) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
-        <div style={{ fontSize: 32 }}>🏠</div>
-        <p style={{ color: '#888', marginTop: 8 }}>Loading...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-surface-secondary">
+        <div className="text-3xl animate-pulse">🏠</div>
+        <p className="text-ink-tertiary text-sm mt-2">Loading…</p>
       </div>
     );
   }
@@ -135,11 +141,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-surface-secondary">
       <SideNav />
-      <div className="md:pl-60">
-        <div className="md:max-w-3xl md:mx-auto md:px-2">
+      <main className="md:pl-60">
+        <div className="md:max-w-5xl md:mx-auto md:px-6 lg:px-10">
           {children}
         </div>
-      </div>
+      </main>
       <BottomNav />
     </div>
   );
