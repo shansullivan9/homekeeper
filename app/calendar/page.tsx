@@ -18,6 +18,7 @@ export default function CalendarPage() {
   const { loadData } = useAppInit();
 
   const activeTasks = tasks.filter((t) => t.status !== 'completed' && t.status !== 'skipped' && !t.is_suggestion);
+  const completedTasks = tasks.filter((t) => t.status === 'completed' && !t.is_suggestion);
 
   const calendarDays = useMemo(() => {
     const monthStart = startOfMonth(currentMonth);
@@ -47,13 +48,28 @@ export default function CalendarPage() {
         }
       }
     });
+    // Add a green dot for any day that has at least one completed task,
+    // unless that day is already covered by an active-task urgency dot.
+    completedTasks.forEach((t) => {
+      const key = t.completed_at ? t.completed_at.slice(0, 10) : t.due_date;
+      if (!key) return;
+      if (!map[key]) {
+        map[key] = { count: 1, color: '#34C759' };
+        (map[key] as any)._u = 'completed';
+      }
+    });
     return map;
-  }, [activeTasks]);
+  }, [activeTasks, completedTasks]);
 
   const selectedTasks = useMemo(() => {
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    return activeTasks.filter((t) => t.due_date === dateStr);
-  }, [selectedDate, activeTasks]);
+    const active = activeTasks.filter((t) => t.due_date === dateStr);
+    const completed = completedTasks.filter((t) => {
+      const key = t.completed_at ? t.completed_at.slice(0, 10) : t.due_date;
+      return key === dateStr;
+    });
+    return [...active, ...completed];
+  }, [selectedDate, activeTasks, completedTasks]);
 
   const days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
