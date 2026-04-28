@@ -2,7 +2,7 @@
 import { Task } from '@/lib/types';
 import { getTaskUrgency, urgencyColor, CATEGORY_ICONS, RECURRENCE_LABELS } from '@/lib/constants';
 import { format, isToday, isTomorrow, isPast, parseISO } from 'date-fns';
-import { Check, ChevronRight, RotateCcw, UserPlus, User } from 'lucide-react';
+import { Check, ChevronRight, RotateCcw, UserPlus, User, Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase-browser';
 import { useStore } from '@/lib/store';
 import toast from 'react-hot-toast';
@@ -82,6 +82,19 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
     }
   };
 
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!confirm(`Delete "${task.title}"?`)) return;
+    const { error } = await supabase.from('tasks').delete().eq('id', task.id);
+    if (error) {
+      toast.error('Failed to delete');
+    } else {
+      toast.success('Task deleted');
+      onComplete?.();
+    }
+  };
+
   const assigneeLabel = assignee
     ? (assignee as any).display_name || (assignee as any).email?.split('@')[0] || 'Someone'
     : null;
@@ -140,6 +153,15 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
       </div>
 
       <div className="flex items-center gap-2 flex-shrink-0">
+        {!compact && (
+          <button
+            onClick={handleDelete}
+            title="Delete task"
+            className="w-8 h-8 rounded-full flex items-center justify-center text-ink-tertiary active:bg-red-50 active:text-status-red transition-all"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
         {task.status !== 'completed' && !compact && (
           <button
             onClick={handleClaim}

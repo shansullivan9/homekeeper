@@ -240,9 +240,13 @@ export default function HomeProfilePage() {
                 else setEditMode(true);
               }}
               disabled={saving}
-              className="text-brand-500 text-sm font-semibold disabled:opacity-50"
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors disabled:opacity-50 ${
+                editMode
+                  ? 'bg-brand-500 text-white active:bg-brand-600'
+                  : 'bg-brand-50 text-brand-600 active:bg-brand-100 border border-brand-200'
+              }`}
             >
-              {saving ? 'Saving…' : editMode ? 'Done' : 'Edit'}
+              {editMode ? (saving ? 'Saving…' : 'Save') : '✏️ Edit'}
             </button>
           ) : undefined
         }

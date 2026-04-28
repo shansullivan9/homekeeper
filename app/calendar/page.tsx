@@ -67,7 +67,19 @@ export default function CalendarPage() {
           <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 text-ink-secondary active:text-brand-500">
             <ChevronLeft size={22} />
           </button>
-          <h2 className="text-base font-bold">{format(currentMonth, 'MMMM yyyy')}</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-bold">{format(currentMonth, 'MMMM yyyy')}</h2>
+            <button
+              onClick={() => {
+                const now = new Date();
+                setCurrentMonth(now);
+                setSelectedDate(now);
+              }}
+              className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-brand-50 text-brand-600 border border-brand-200 active:bg-brand-100"
+            >
+              Today
+            </button>
+          </div>
           <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 text-ink-secondary active:text-brand-500">
             <ChevronRight size={22} />
           </button>
