@@ -72,6 +72,7 @@ export default function DocumentsPage() {
   const [showForm, setShowForm] = useState(false);
 
   const [editing, setEditing] = useState<Document | null>(null);
+  const [editMode, setEditMode] = useState(true);
   const [filter, setFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -674,6 +675,7 @@ export default function DocumentsPage() {
     setFiles([]);
     setEditing(null);
     setShowForm(false);
+    setEditMode(true);
   };
 
   const openEdit = (d: Document) => {
@@ -686,6 +688,7 @@ export default function DocumentsPage() {
     });
     setFiles([]);
     setShowForm(true);
+    setEditMode(false);
   };
 
   useEffect(() => {
@@ -912,13 +915,22 @@ export default function DocumentsPage() {
     return (
       <div>
         <PageHeader
-          title={editing ? 'Edit Document' : 'Upload Document'}
+          title={editing ? 'Document' : 'Upload Document'}
           back
           onBack={resetForm}
           rightAction={
-            <button onClick={resetForm} className="text-brand-500">
-              <X size={22} />
-            </button>
+            editing ? (
+              <button
+                onClick={() => setEditMode((v) => !v)}
+                className="text-brand-500 text-sm font-semibold"
+              >
+                {editMode ? 'Done' : 'Edit'}
+              </button>
+            ) : (
+              <button onClick={resetForm} className="text-brand-500">
+                <X size={22} />
+              </button>
+            )
           }
         />
         <div className="px-4 py-4 space-y-3">
@@ -983,7 +995,8 @@ export default function DocumentsPage() {
                 type="text"
                 value={form.title}
                 onChange={(e) => u('title', e.target.value)}
-                className="ios-input"
+                disabled={!!editing && !editMode}
+                className="ios-input disabled:opacity-100 disabled:bg-transparent"
               />
             </div>
           )}
@@ -993,7 +1006,8 @@ export default function DocumentsPage() {
             <select
               value={form.category}
               onChange={(e) => u('category', e.target.value)}
-              className="ios-input"
+              disabled={!!editing && !editMode}
+              className="ios-input disabled:opacity-100 disabled:bg-transparent"
             >
               <option value="">Uncategorized</option>
               {CATEGORIES.map((c) => (
@@ -1014,11 +1028,13 @@ export default function DocumentsPage() {
                 value={form.notes}
                 onChange={(e) => u('notes', e.target.value)}
                 rows={3}
-                className="ios-input resize-none"
+                disabled={!!editing && !editMode}
+                className="ios-input resize-none disabled:opacity-100 disabled:bg-transparent"
               />
             </div>
           )}
 
+          {(!editing || editMode) && (
           <button
             onClick={handleSave}
             disabled={
@@ -1036,6 +1052,7 @@ export default function DocumentsPage() {
               ? `Upload ${files.length} files`
               : 'Upload'}
           </button>
+          )}
           {editing && (() => {
             const selectedAppliance = form.appliance_id
               ? appliances.find((a: any) => a.id === form.appliance_id)

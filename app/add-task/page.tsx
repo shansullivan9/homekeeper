@@ -33,6 +33,11 @@ function AddTaskForm() {
   const [applianceId, setApplianceId] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
   const [saving, setSaving] = useState(false);
+  const [editMode, setEditMode] = useState(true);
+
+  useEffect(() => {
+    setEditMode(!editId);
+  }, [editId]);
 
   // Load existing task for editing
   useEffect(() => {
@@ -199,13 +204,23 @@ function AddTaskForm() {
   return (
     <div>
       <PageHeader
-        title={editId ? 'Edit Task' : 'New Task'}
+        title={editId ? 'Task' : 'New Task'}
         back
         rightAction={
           editId ? (
-            <button onClick={handleDelete} className="text-status-red p-1">
-              <Trash2 size={20} />
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setEditMode((v) => !v)}
+                className="text-brand-500 text-sm font-semibold"
+              >
+                {editMode ? 'Done' : 'Edit'}
+              </button>
+              {editMode && (
+                <button onClick={handleDelete} className="text-status-red p-1">
+                  <Trash2 size={20} />
+                </button>
+              )}
+            </div>
           ) : null
         }
       />
@@ -226,6 +241,11 @@ function AddTaskForm() {
             <ChevronRight size={16} className="text-ink-tertiary" />
           </button>
         )}
+
+        <fieldset
+          disabled={!!editId && !editMode}
+          className="m-0 p-0 border-0 min-w-0 space-y-4 disabled:opacity-100"
+        >
 
         {/* Title */}
         <div>
@@ -437,10 +457,14 @@ function AddTaskForm() {
           />
         </div>
 
+        </fieldset>
+
         {/* Save */}
-        <button onClick={handleSave} disabled={saving || !title.trim()} className="ios-button">
-          {saving ? 'Saving...' : editId ? 'Update Task' : 'Create Task'}
-        </button>
+        {(!editId || editMode) && (
+          <button onClick={handleSave} disabled={saving || !title.trim()} className="ios-button">
+            {saving ? 'Saving...' : editId ? 'Update Task' : 'Create Task'}
+          </button>
+        )}
       </div>
     </div>
   );
