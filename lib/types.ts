@@ -138,6 +138,7 @@ export interface Document {
   file_size: number | null;
   notes: string | null;
   searchable_text: string | null;
+  appliance_id: string | null;
   uploaded_by: string | null;
   uploaded_at: string;
   created_at: string;

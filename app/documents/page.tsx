@@ -70,19 +70,13 @@ export default function DocumentsPage() {
   const searchParams = useSearchParams();
   const [showForm, setShowForm] = useState(false);
 
-  useEffect(() => {
-    if (searchParams.get('new') === '1') {
-      setShowForm(true);
-      router.replace('/documents');
-    }
-  }, [searchParams, router]);
   const [editing, setEditing] = useState<Document | null>(null);
   const [filter, setFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [uploading, setUploading] = useState(false);
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
-  const [form, setForm] = useState({ title: '', category: '', notes: '' });
+  const [form, setForm] = useState({ title: '', category: '', notes: '', appliance_id: '' });
 
   // Run classify on each uploaded document. If the user didn't pick a
   // category in the form, use the classifier's pick. Always store the
@@ -256,7 +250,13 @@ export default function DocumentsPage() {
           })
           .select()
           .single();
-        if (app) newAppliances.push(app);
+        if (app) {
+          newAppliances.push(app);
+          await supabase
+            .from('documents')
+            .update({ appliance_id: (app as any).id, updated_at: new Date().toISOString() })
+            .eq('id', doc.id);
+        }
       } catch {
         // skip on error; keep going
       }
@@ -669,7 +669,7 @@ export default function DocumentsPage() {
   };
 
   const resetForm = () => {
-    setForm({ title: '', category: '', notes: '' });
+    setForm({ title: '', category: '', notes: '', appliance_id: '' });
     setFiles([]);
     setEditing(null);
     setShowForm(false);
@@ -677,10 +677,31 @@ export default function DocumentsPage() {
 
   const openEdit = (d: Document) => {
     setEditing(d);
-    setForm({ title: d.title, category: d.category || '', notes: d.notes || '' });
+    setForm({
+      title: d.title,
+      category: d.category || '',
+      notes: d.notes || '',
+      appliance_id: d.appliance_id || '',
+    });
     setFiles([]);
     setShowForm(true);
   };
+
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      setShowForm(true);
+      router.replace('/documents');
+      return;
+    }
+    const editId = searchParams.get('edit');
+    if (editId) {
+      const target = documents.find((d) => d.id === editId);
+      if (target) {
+        openEdit(target);
+        router.replace('/documents');
+      }
+    }
+  }, [searchParams, router, documents]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = Array.from(e.target.files || []);
@@ -704,6 +725,7 @@ export default function DocumentsPage() {
           title: form.title.trim() || editing.file_name,
           category: form.category || null,
           notes: form.notes || null,
+          appliance_id: form.appliance_id || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', editing.id)
@@ -1001,7 +1023,33 @@ export default function DocumentsPage() {
               ? `Upload ${files.length} files`
               : 'Upload'}
           </button>
-          {editing && (() => {
+          {editing && appliances.length > 0 && (
+            <div>
+              <label className="text-xs text-ink-secondary mb-1 block">Linked appliance</label>
+              <select
+                value={form.appliance_id}
+                onChange={(e) => u('appliance_id', e.target.value)}
+                className="ios-input"
+              >
+                <option value="">None</option>
+                {appliances.map((a: any) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+              {form.appliance_id && (
+                <button
+                  onClick={() => router.push(`/appliances?edit=${form.appliance_id}`)}
+                  className="text-xs text-brand-500 mt-1 font-semibold"
+                >
+                  Open this appliance →
+                </button>
+              )}
+            </div>
+          )}
+
+          {editing && false && (() => {
             const linked = appliances.filter(
               (a: any) => a.manual_document_id === editing.id
             );
