@@ -235,10 +235,14 @@ export default function HomeProfilePage() {
         rightAction={
           !isNew ? (
             <button
-              onClick={() => setEditMode((v) => !v)}
-              className="text-brand-500 text-sm font-semibold"
+              onClick={async () => {
+                if (editMode) await handleSave();
+                else setEditMode(true);
+              }}
+              disabled={saving}
+              className="text-brand-500 text-sm font-semibold disabled:opacity-50"
             >
-              {editMode ? 'Done' : 'Edit'}
+              {saving ? 'Saving…' : editMode ? 'Done' : 'Edit'}
             </button>
           ) : undefined
         }

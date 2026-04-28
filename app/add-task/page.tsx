@@ -210,10 +210,14 @@ function AddTaskForm() {
           editId ? (
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setEditMode((v) => !v)}
-                className="text-brand-500 text-sm font-semibold"
+                onClick={async () => {
+                  if (editMode) await handleSave();
+                  else setEditMode(true);
+                }}
+                disabled={saving}
+                className="text-brand-500 text-sm font-semibold disabled:opacity-50"
               >
-                {editMode ? 'Done' : 'Edit'}
+                {saving ? 'Saving…' : editMode ? 'Done' : 'Edit'}
               </button>
               {editMode && (
                 <button onClick={handleDelete} className="text-status-red p-1">

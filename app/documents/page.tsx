@@ -921,10 +921,17 @@ export default function DocumentsPage() {
           rightAction={
             editing ? (
               <button
-                onClick={() => setEditMode((v) => !v)}
-                className="text-brand-500 text-sm font-semibold"
+                onClick={async () => {
+                  if (editMode) {
+                    await handleSave();
+                  } else {
+                    setEditMode(true);
+                  }
+                }}
+                disabled={uploading}
+                className="text-brand-500 text-sm font-semibold disabled:opacity-50"
               >
-                {editMode ? 'Done' : 'Edit'}
+                {uploading ? 'Saving…' : editMode ? 'Done' : 'Edit'}
               </button>
             ) : (
               <button onClick={resetForm} className="text-brand-500">
@@ -996,7 +1003,7 @@ export default function DocumentsPage() {
                 value={form.title}
                 onChange={(e) => u('title', e.target.value)}
                 disabled={!!editing && !editMode}
-                className="ios-input disabled:opacity-100 disabled:bg-transparent"
+                className="ios-input disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
           )}
@@ -1007,7 +1014,7 @@ export default function DocumentsPage() {
               value={form.category}
               onChange={(e) => u('category', e.target.value)}
               disabled={!!editing && !editMode}
-              className="ios-input disabled:opacity-100 disabled:bg-transparent"
+              className="ios-input disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <option value="">Uncategorized</option>
               {CATEGORIES.map((c) => (
@@ -1029,7 +1036,7 @@ export default function DocumentsPage() {
                 onChange={(e) => u('notes', e.target.value)}
                 rows={3}
                 disabled={!!editing && !editMode}
-                className="ios-input resize-none disabled:opacity-100 disabled:bg-transparent"
+                className="ios-input resize-none disabled:opacity-60 disabled:cursor-not-allowed"
               />
             </div>
           )}

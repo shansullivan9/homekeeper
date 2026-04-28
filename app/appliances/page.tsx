@@ -208,7 +208,10 @@ export default function AppliancesPage() {
           rightAction={
             editing ? (
               <button
-                onClick={() => setEditMode((v) => !v)}
+                onClick={async () => {
+                  if (editMode) await handleSave();
+                  else setEditMode(true);
+                }}
                 className="text-brand-500 text-sm font-semibold"
               >
                 {editMode ? 'Done' : 'Edit'}
@@ -274,43 +277,43 @@ export default function AppliancesPage() {
 
           <div>
             <label className="text-xs text-ink-secondary mb-1 block">Appliance name *</label>
-            <input type="text" value={form.name} onChange={(e) => u('name', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-100 disabled:bg-transparent" autoFocus />
+            <input type="text" value={form.name} onChange={(e) => u('name', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-60 disabled:cursor-not-allowed" autoFocus />
           </div>
           <div>
             <label className="text-xs text-ink-secondary mb-1 block">Manufacturer</label>
-            <input type="text" value={form.manufacturer} onChange={(e) => u('manufacturer', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-100 disabled:bg-transparent" />
+            <input type="text" value={form.manufacturer} onChange={(e) => u('manufacturer', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-60 disabled:cursor-not-allowed" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-ink-secondary mb-1 block">Model #</label>
-              <input type="text" value={form.model_number} onChange={(e) => u('model_number', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-100 disabled:bg-transparent" />
+              <input type="text" value={form.model_number} onChange={(e) => u('model_number', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-60 disabled:cursor-not-allowed" />
             </div>
             <div>
               <label className="text-xs text-ink-secondary mb-1 block">Serial #</label>
-              <input type="text" value={form.serial_number} onChange={(e) => u('serial_number', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-100 disabled:bg-transparent" />
+              <input type="text" value={form.serial_number} onChange={(e) => u('serial_number', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-60 disabled:cursor-not-allowed" />
             </div>
           </div>
           <div>
             <label className="text-xs text-ink-secondary mb-1 block">Category</label>
-            <input type="text" value={form.category} onChange={(e) => u('category', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-100 disabled:bg-transparent" />
+            <input type="text" value={form.category} onChange={(e) => u('category', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-60 disabled:cursor-not-allowed" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-ink-secondary mb-1 block">Installed</label>
-              <input type="date" value={form.installation_date} onChange={(e) => u('installation_date', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-100 disabled:bg-transparent" />
+              <input type="date" value={form.installation_date} onChange={(e) => u('installation_date', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-60 disabled:cursor-not-allowed" />
             </div>
             <div>
               <label className="text-xs text-ink-secondary mb-1 block">Warranty Expires</label>
-              <input type="date" value={form.warranty_expiration} onChange={(e) => u('warranty_expiration', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-100 disabled:bg-transparent" />
+              <input type="date" value={form.warranty_expiration} onChange={(e) => u('warranty_expiration', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-60 disabled:cursor-not-allowed" />
             </div>
           </div>
           <div>
             <label className="text-xs text-ink-secondary mb-1 block">Purchase price ($)</label>
-            <input type="number" step="0.01" value={form.purchase_price} onChange={(e) => u('purchase_price', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-100 disabled:bg-transparent" />
+            <input type="number" step="0.01" value={form.purchase_price} onChange={(e) => u('purchase_price', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-60 disabled:cursor-not-allowed" />
           </div>
           <div>
             <label className="text-xs text-ink-secondary mb-1 block">Notes</label>
-            <textarea value={form.notes} onChange={(e) => u('notes', e.target.value)} rows={3} disabled={!!editing && !editMode} className="ios-input resize-none disabled:opacity-100 disabled:bg-transparent" />
+            <textarea value={form.notes} onChange={(e) => u('notes', e.target.value)} rows={3} disabled={!!editing && !editMode} className="ios-input resize-none disabled:opacity-60 disabled:cursor-not-allowed" />
           </div>
 
           {(!editing || editMode) && (
