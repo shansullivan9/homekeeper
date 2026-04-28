@@ -61,6 +61,7 @@ export default function SettingsPage() {
   };
 
   const handleSignOut = async () => {
+    if (!confirm('Sign out of HomeKeeper?')) return;
     await supabase.auth.signOut();
     router.push('/auth');
   };
@@ -69,7 +70,7 @@ export default function SettingsPage() {
     <div>
       <PageHeader title="Settings" />
 
-      <div className="py-4 space-y-5">
+      <div className="py-4 space-y-5 md:max-w-2xl">
         {/* Profile */}
         <div className="mx-4 ios-card overflow-hidden">
           <div className="px-4 py-4 flex items-center gap-3">

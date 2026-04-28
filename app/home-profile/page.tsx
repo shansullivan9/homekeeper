@@ -354,7 +354,7 @@ export default function HomeProfilePage() {
       />
 
       {!editMode && !isNew && (
-        <div className="py-4 space-y-5">
+        <div className="py-4 space-y-5 md:max-w-3xl">
           {externalLinks.length > 0 && (
             <div>
               <p className="section-header">Open Address In…</p>
@@ -437,7 +437,7 @@ export default function HomeProfilePage() {
       )}
 
       {(editMode || isNew) && (
-      <div className="py-4 space-y-5">
+      <div className="py-4 space-y-5 md:max-w-3xl">
         <div>
           <p className="section-header">Property Basics</p>
           <p className="text-[13px] text-gray-500 mx-4 mb-2">ZIP and state help us tailor maintenance tasks to your climate and season.</p>

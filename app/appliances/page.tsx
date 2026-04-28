@@ -177,6 +177,7 @@ export default function AppliancesPage() {
 
   const handleDelete = async () => {
     if (!editing) return;
+    if (!confirm(`Delete "${editing.name}"? This cannot be undone.`)) return;
     const { error } = await supabase.from('appliances').delete().eq('id', editing.id);
     if (error) {
       toast.error('Failed to delete');

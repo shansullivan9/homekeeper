@@ -155,7 +155,7 @@ export default function HistoryPage() {
     <div>
       <PageHeader title="Task History" subtitle={`${history.length} completed tasks`} />
 
-      <div className="px-4 pt-3 pb-2">
+      <div className="px-4 pt-3 pb-2 md:max-w-md">
         <div className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary" />
           <input

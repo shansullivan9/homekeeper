@@ -31,32 +31,59 @@ body {
   }
 }
 
+/* On mobile we use 16px to prevent iOS Safari from auto-zooming when the
+   field is focused; on desktop the form-control sizes can come down to
+   the design's native 14-15px without that constraint. */
 input, textarea, select {
-  font-size: 16px !important; /* Prevent iOS zoom on focus */
+  font-size: 16px;
+}
+@media (min-width: 768px) {
+  input, textarea, select {
+    font-size: 14px;
+  }
 }
 
-/* iOS-style card */
+/* Reusable focus ring for keyboard nav (mouse users won't see it). */
+:focus-visible {
+  outline: 2px solid #0c93e7;
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* iOS-style components */
 @layer components {
   .ios-card {
     @apply bg-white rounded-ios-lg shadow-card;
   }
   .ios-list-item {
-    @apply flex items-center justify-between px-4 py-3.5 border-b border-gray-100 last:border-b-0 active:bg-gray-50 transition-colors;
+    @apply flex items-center justify-between px-4 py-3.5 border-b border-gray-100 last:border-b-0
+           active:bg-gray-50 md:hover:bg-gray-50 transition-colors;
   }
   .ios-input {
-    @apply w-full px-4 py-3 bg-surface-secondary rounded-ios text-base text-ink-primary placeholder:text-ink-tertiary outline-none focus:ring-2 focus:ring-brand-400/30;
+    @apply w-full px-4 py-3 bg-surface-secondary rounded-ios text-base text-ink-primary
+           placeholder:text-ink-tertiary outline-none transition-shadow
+           focus:ring-2 focus:ring-brand-400/40 focus:bg-white;
   }
   .ios-button {
-    @apply w-full py-3.5 rounded-ios font-semibold text-base text-white bg-brand-500 active:bg-brand-600 transition-colors disabled:opacity-50;
+    @apply w-full py-3.5 rounded-ios font-semibold text-base text-white bg-brand-500
+           active:bg-brand-600 md:hover:bg-brand-600 transition-colors
+           disabled:opacity-50 disabled:cursor-not-allowed;
   }
   .ios-button-secondary {
-    @apply w-full py-3.5 rounded-ios font-semibold text-base text-brand-500 bg-brand-50 active:bg-brand-100 transition-colors;
+    @apply w-full py-3.5 rounded-ios font-semibold text-base text-brand-500 bg-brand-50
+           active:bg-brand-100 md:hover:bg-brand-100 transition-colors;
   }
   .urgency-dot {
     @apply w-2.5 h-2.5 rounded-full flex-shrink-0;
   }
   .section-header {
-    @apply text-xs font-semibold uppercase text-ink-secondary tracking-wider px-4 pb-1.5 pt-5 flex items-center;
+    @apply text-xs font-semibold uppercase text-ink-secondary tracking-wider
+           px-4 pb-1.5 pt-5 flex items-center;
+  }
+  /* Tappable card primitive for the dashboard tile + grid layouts. */
+  .tap-card {
+    @apply bg-white rounded-ios-lg shadow-card transition-all
+           active:shadow-card-hover md:hover:shadow-card-hover md:hover:-translate-y-0.5;
   }
 }
 
@@ -77,27 +104,31 @@ input, textarea, select {
   text-decoration: none;
 }
 
-/* Smooth scroll for calendar */
 .smooth-scroll {
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
 }
 
-/* Animation */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+
+/* Animations */
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-
-.animate-slide-up {
-  animation: slideUp 0.3s ease-out;
-}
+.animate-slide-up { animation: slideUp 0.3s ease-out; }
 
 @keyframes fadeIn {
   from { opacity: 0; }
-  to { opacity: 1; }
+  to   { opacity: 1; }
 }
+.animate-fade-in { animation: fadeIn 0.2s ease-out; }
 
-.animate-fade-in {
-  animation: fadeIn 0.2s ease-out;
+/* Honor user motion preferences. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }

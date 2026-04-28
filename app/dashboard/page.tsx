@@ -136,25 +136,25 @@ export default function DashboardPage() {
         {/* Quick Stats — only on the unfiltered view */}
         {claimFilter === 'all' && (
           <div className="grid grid-cols-3 gap-3 px-4 pt-4 pb-2">
-            <button onClick={() => router.push('/history')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
-              <div className="text-2xl font-bold text-brand-600">{completedThisYear}</div>
-              <div className="text-[10px] text-ink-secondary font-medium mt-0.5 leading-tight">
+            <button onClick={() => router.push('/history')} className="tap-card p-3 md:p-4 text-center">
+              <div className="text-2xl md:text-3xl font-bold text-brand-600">{completedThisYear}</div>
+              <div className="text-[10px] md:text-xs text-ink-secondary font-medium mt-0.5 leading-tight">
                 Tasks Completed<br /><span className="text-ink-tertiary">{currentYear}</span>
               </div>
             </button>
-            <button onClick={() => router.push('/settings')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
-              <div className="text-2xl font-bold text-purple-600">{members.length}</div>
-              <div className="text-[10px] text-ink-secondary font-medium mt-0.5 leading-tight">
+            <button onClick={() => router.push('/settings')} className="tap-card p-3 md:p-4 text-center">
+              <div className="text-2xl md:text-3xl font-bold text-purple-600">{members.length}</div>
+              <div className="text-[10px] md:text-xs text-ink-secondary font-medium mt-0.5 leading-tight">
                 HomeKeeper<br /><span className="text-ink-tertiary">{members.length === 1 ? 'Member' : 'Members'}</span>
               </div>
             </button>
-            <button onClick={() => router.push('/expenses')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
-              <div className="text-2xl font-bold text-emerald-600">
+            <button onClick={() => router.push('/expenses')} className="tap-card p-3 md:p-4 text-center">
+              <div className="text-2xl md:text-3xl font-bold text-emerald-600">
                 {spentThisYear >= 10000
                   ? `$${(spentThisYear / 1000).toFixed(1)}k`
                   : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(spentThisYear)}
               </div>
-              <div className="text-[10px] text-ink-secondary font-medium mt-0.5 leading-tight">
+              <div className="text-[10px] md:text-xs text-ink-secondary font-medium mt-0.5 leading-tight">
                 Spent<br /><span className="text-ink-tertiary">{currentYear}</span>
               </div>
             </button>
@@ -199,109 +199,112 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Overdue — always visible */}
-        <div>
-          <p className="section-header">
-            <span className="inline-block w-2 h-2 rounded-full bg-status-red mr-1.5" />
-            Overdue ({overdue.length})
-          </p>
-          <div className="mx-4 ios-card overflow-hidden">
-            {overdue.length > 0 ? (
-              overdue.map((t) => (
-                <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#FF3B30" />
-              ))
-            ) : (
-              <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
-            )}
-          </div>
-        </div>
-
-        {/* Due This Week — always visible */}
-        <div>
-          <p className="section-header">
-            <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#FF9F0A' }} />
-            Due This Week ({dueThisWeek.length})
-          </p>
-          <div className="mx-4 ios-card overflow-hidden">
-            {dueThisWeek.length > 0 ? (
-              dueThisWeek.map((t) => (
-                <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#FF9F0A" />
-              ))
-            ) : (
-              <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
-            )}
-          </div>
-        </div>
-
-        {/* Due This Month — always visible */}
-        <div>
-          <p className="section-header">
-            <span className="inline-block w-2 h-2 rounded-full bg-status-green mr-1.5" />
-            Due This Month ({dueThisMonth.length})
-          </p>
-          <div className="mx-4 ios-card overflow-hidden">
-            {dueThisMonth.length > 0 ? (
-              dueThisMonth.map((t) => (
-                <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#34C759" />
-              ))
-            ) : (
-              <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
-            )}
-          </div>
-        </div>
-
-        {/* Upcoming — always visible */}
-        <div>
-          <p className="section-header">
-            <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#4B9CD3' }} />
-            Upcoming ({upcoming.length})
-          </p>
-          <div className="mx-4 ios-card overflow-hidden">
-            {upcoming.length > 0 ? (
-              upcoming.map((t) => (
-                <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#4B9CD3" />
-              ))
-            ) : (
-              <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
-            )}
-          </div>
-        </div>
-
-        {/* Later — always visible */}
-        <div>
-          <p className="section-header">
-            <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#592A8A' }} />
-            Later ({later.length})
-          </p>
-          <div className="mx-4 ios-card overflow-hidden">
-            {later.length > 0 ? (
-              later.map((t) => (
-                <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#592A8A" />
-              ))
-            ) : (
-              <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
-            )}
-          </div>
-        </div>
-
-        {/* Recently Completed — only on the unfiltered view */}
-        {claimFilter === 'all' && (
+        {/* Task buckets — single column on mobile, two columns on desktop */}
+        <div className="md:grid md:grid-cols-2 md:gap-x-4 md:px-0">
+          {/* Overdue */}
           <div>
             <p className="section-header">
-              <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#8E8E93' }} />
-              Recently Completed ({recentlyCompleted.length})
+              <span className="inline-block w-2 h-2 rounded-full bg-status-red mr-1.5" />
+              Overdue ({overdue.length})
             </p>
             <div className="mx-4 ios-card overflow-hidden">
-              {recentlyCompleted.length > 0 ? (
-                recentlyCompleted.map((t) => (
-                  <TaskCard key={t.id} task={t} compact sectionColor="#8E8E93" />
+              {overdue.length > 0 ? (
+                overdue.map((t) => (
+                  <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#FF3B30" />
                 ))
               ) : (
                 <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
               )}
             </div>
           </div>
-        )}
+
+          {/* Due This Week */}
+          <div>
+            <p className="section-header">
+              <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#FF9F0A' }} />
+              Due This Week ({dueThisWeek.length})
+            </p>
+            <div className="mx-4 ios-card overflow-hidden">
+              {dueThisWeek.length > 0 ? (
+                dueThisWeek.map((t) => (
+                  <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#FF9F0A" />
+                ))
+              ) : (
+                <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
+              )}
+            </div>
+          </div>
+
+          {/* Due This Month */}
+          <div>
+            <p className="section-header">
+              <span className="inline-block w-2 h-2 rounded-full bg-status-green mr-1.5" />
+              Due This Month ({dueThisMonth.length})
+            </p>
+            <div className="mx-4 ios-card overflow-hidden">
+              {dueThisMonth.length > 0 ? (
+                dueThisMonth.map((t) => (
+                  <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#34C759" />
+                ))
+              ) : (
+                <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
+              )}
+            </div>
+          </div>
+
+          {/* Upcoming */}
+          <div>
+            <p className="section-header">
+              <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#4B9CD3' }} />
+              Upcoming ({upcoming.length})
+            </p>
+            <div className="mx-4 ios-card overflow-hidden">
+              {upcoming.length > 0 ? (
+                upcoming.map((t) => (
+                  <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#4B9CD3" />
+                ))
+              ) : (
+                <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
+              )}
+            </div>
+          </div>
+
+          {/* Later */}
+          <div>
+            <p className="section-header">
+              <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#592A8A' }} />
+              Later ({later.length})
+            </p>
+            <div className="mx-4 ios-card overflow-hidden">
+              {later.length > 0 ? (
+                later.map((t) => (
+                  <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#592A8A" />
+                ))
+              ) : (
+                <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
+              )}
+            </div>
+          </div>
+
+          {/* Recently Completed — only on the unfiltered view */}
+          {claimFilter === 'all' && (
+            <div>
+              <p className="section-header">
+                <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#8E8E93' }} />
+                Recently Completed ({recentlyCompleted.length})
+              </p>
+              <div className="mx-4 ios-card overflow-hidden">
+                {recentlyCompleted.length > 0 ? (
+                  recentlyCompleted.map((t) => (
+                    <TaskCard key={t.id} task={t} compact sectionColor="#8E8E93" />
+                  ))
+                ) : (
+                  <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
