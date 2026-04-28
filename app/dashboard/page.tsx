@@ -256,13 +256,13 @@ export default function DashboardPage() {
         {/* Later — always visible */}
         <div>
           <p className="section-header">
-            <span className="inline-block w-2 h-2 rounded-full mr-1.5 -mb-px" style={{ backgroundColor: '#36ADF6' }} />
+            <span className="inline-block w-2 h-2 rounded-full mr-1.5 -mb-px" style={{ backgroundColor: '#592A8A' }} />
             Later ({later.length})
           </p>
           <div className="mx-4 ios-card overflow-hidden">
             {later.length > 0 ? (
               later.map((t) => (
-                <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#36ADF6" />
+                <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#592A8A" />
               ))
             ) : (
               <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
