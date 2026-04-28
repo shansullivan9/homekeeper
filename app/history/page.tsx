@@ -6,11 +6,13 @@ import { TaskHistory } from '@/lib/types';
 import PageHeader from '@/components/layout/PageHeader';
 import { format, parseISO } from 'date-fns';
 import { CheckCircle2, Search, RotateCcw, Trash2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 
 export default function HistoryPage() {
   const { history, tasks, setHistory, setTasks } = useStore();
   const supabase = createClient();
+  const router = useRouter();
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -132,7 +134,11 @@ export default function HistoryPage() {
           <div className="mx-4 ios-card overflow-hidden">
             {items.map((h) => (
               <div key={h.id} className="ios-list-item">
-                <div className="flex items-start gap-3 flex-1 min-w-0">
+                <button
+                  onClick={() => h.task_id && router.push(`/add-task?edit=${h.task_id}`)}
+                  disabled={!h.task_id}
+                  className="flex items-start gap-3 flex-1 min-w-0 text-left disabled:cursor-default"
+                >
                   <div className="flex-shrink-0 mt-0.5">
                     <CheckCircle2 size={18} className="text-status-green" />
                   </div>
@@ -158,7 +164,7 @@ export default function HistoryPage() {
                       <p className="text-xs text-ink-tertiary mt-1 line-clamp-2">{h.notes}</p>
                     )}
                   </div>
-                </div>
+                </button>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {h.task_id && (
                     <button
