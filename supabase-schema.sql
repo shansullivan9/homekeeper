@@ -404,9 +404,10 @@ BEGIN
   )
   RETURNING id INTO v_history_id;
 
-  -- Log to timeline
-  INSERT INTO public.timeline_events (home_id, event_type, title, description, cost, related_task_id, created_by)
-  VALUES (v_task.home_id, 'maintenance', v_task.title, COALESCE(p_notes, 'Completed'), p_cost, p_task_id, p_user_id);
+  -- Note: completed tasks intentionally do NOT log to timeline_events.
+  -- Task History (task_history table above) is the canonical record of
+  -- task completions. The Timeline is reserved for milestone events
+  -- (purchases, renovations, repairs) the user logs by hand.
 
   -- Auto-schedule next occurrence
   IF v_task.recurrence != 'one_time' THEN

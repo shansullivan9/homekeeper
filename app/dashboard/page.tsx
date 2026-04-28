@@ -132,17 +132,25 @@ export default function DashboardPage() {
           <div className="grid grid-cols-3 gap-3 px-4 pt-4 pb-2">
             <button onClick={() => router.push('/history')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
               <div className="text-2xl font-bold text-brand-600">{history.length}</div>
-              <div className="text-[10px] text-ink-secondary font-medium mt-0.5">Completed</div>
+              <div className="text-[10px] text-ink-secondary font-medium mt-0.5 leading-tight">
+                Tasks Completed<br /><span className="text-ink-tertiary">All-time</span>
+              </div>
             </button>
             <button onClick={() => router.push('/settings')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
               <div className="text-2xl font-bold text-purple-600">{members.length}</div>
-              <div className="text-[10px] text-ink-secondary font-medium mt-0.5">Members</div>
+              <div className="text-[10px] text-ink-secondary font-medium mt-0.5 leading-tight">
+                Household<br /><span className="text-ink-tertiary">{members.length === 1 ? 'Member' : 'Members'}</span>
+              </div>
             </button>
             <button onClick={() => router.push('/expenses')} className="ios-card p-3 text-center active:shadow-card-hover transition-shadow">
               <div className="text-2xl font-bold text-emerald-600">
-                ${totalSpending >= 1000 ? `${(totalSpending / 1000).toFixed(1)}k` : totalSpending.toFixed(0)}
+                {totalSpending >= 10000
+                  ? `$${(totalSpending / 1000).toFixed(1)}k`
+                  : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(totalSpending)}
               </div>
-              <div className="text-[10px] text-ink-secondary font-medium mt-0.5">Spent</div>
+              <div className="text-[10px] text-ink-secondary font-medium mt-0.5 leading-tight">
+                Spent on Tasks<br /><span className="text-ink-tertiary">All-time</span>
+              </div>
             </button>
           </div>
         )}

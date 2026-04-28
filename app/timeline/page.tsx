@@ -5,8 +5,9 @@ import { createClient } from '@/lib/supabase-browser';
 import PageHeader from '@/components/layout/PageHeader';
 import { TimelineEvent } from '@/lib/types';
 import { format, parseISO } from 'date-fns';
-import { Plus, X, Download, Wrench, RefreshCw, Hammer, PaintBucket, ShoppingBag, MoreHorizontal } from 'lucide-react';
+import { Plus, X, Download, Wrench, RefreshCw, Hammer, PaintBucket, ShoppingBag, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { formatCurrency } from '@/lib/constants';
 
 const EVENT_TYPES = [
   { value: 'maintenance', label: 'Maintenance', icon: Wrench, color: '#007AFF' },
@@ -17,18 +18,24 @@ const EVENT_TYPES = [
   { value: 'other', label: 'Other', icon: MoreHorizontal, color: '#8E8E93' },
 ];
 
+const blankForm = () => ({
+  title: '',
+  eventType: 'maintenance',
+  eventDate: format(new Date(), 'yyyy-MM-dd'),
+  description: '',
+  cost: '',
+});
+
 export default function TimelinePage() {
   const { home, user } = useStore();
   const supabase = createClient();
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState(blankForm());
 
-  const [title, setTitle] = useState('');
-  const [eventType, setEventType] = useState('maintenance');
-  const [eventDate, setEventDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [description, setDescription] = useState('');
-  const [cost, setCost] = useState('');
+  const update = (k: string, v: any) => setForm((f) => ({ ...f, [k]: v }));
 
   useEffect(() => {
     if (!home) return;
@@ -44,36 +51,97 @@ export default function TimelinePage() {
     load();
   }, [home]);
 
-  const handleAdd = async () => {
-    if (!title.trim() || !home) return;
-    const { data, error } = await supabase
-      .from('timeline_events')
-      .insert({
-        home_id: home.id,
-        event_type: eventType,
-        title: title.trim(),
-        description: description || null,
-        event_date: eventDate,
-        cost: cost ? parseFloat(cost) : null,
-        created_by: user?.id,
-      })
-      .select()
-      .single();
+  // Auto-completed tasks get logged as maintenance events with a
+  // related_task_id. Those belong on the Task History page, not here,
+  // so we filter them out of the timeline view.
+  const visibleEvents = events.filter((e) => !e.related_task_id);
 
-    if (error) {
-      toast.error('Failed to add event');
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setForm(blankForm());
+  };
+
+  const startNew = () => {
+    setEditingId(null);
+    setForm(blankForm());
+    setShowForm(true);
+  };
+
+  const startEdit = (ev: TimelineEvent) => {
+    setEditingId(ev.id);
+    setForm({
+      title: ev.title,
+      eventType: ev.event_type,
+      eventDate: ev.event_date,
+      description: ev.description || '',
+      cost: ev.cost?.toString() || '',
+    });
+    setShowForm(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.title.trim() || !home) return;
+    const payload = {
+      home_id: home.id,
+      event_type: form.eventType,
+      title: form.title.trim(),
+      description: form.description || null,
+      event_date: form.eventDate,
+      cost: form.cost ? parseFloat(form.cost) : null,
+      created_by: user?.id,
+    };
+
+    if (editingId) {
+      const { data, error } = await supabase
+        .from('timeline_events')
+        .update(payload as any)
+        .eq('id', editingId)
+        .select()
+        .single();
+      if (error) {
+        toast.error('Failed to save event');
+      } else {
+        setEvents(events.map((e) => (e.id === editingId ? data : e)));
+        closeForm();
+        toast.success('Event updated');
+      }
     } else {
-      setEvents([data, ...events]);
-      setTitle(''); setDescription(''); setCost('');
-      setShowForm(false);
-      toast.success('Event added');
+      const { data, error } = await supabase
+        .from('timeline_events')
+        .insert(payload as any)
+        .select()
+        .single();
+      if (error) {
+        toast.error('Failed to add event');
+      } else {
+        setEvents([data, ...events]);
+        closeForm();
+        toast.success('Event added');
+      }
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!editingId) return;
+    if (!confirm('Delete this event?')) return;
+    const { error } = await supabase
+      .from('timeline_events')
+      .delete()
+      .eq('id', editingId);
+    if (error) {
+      toast.error('Failed to delete');
+    } else {
+      setEvents(events.filter((e) => e.id !== editingId));
+      closeForm();
+      toast.success('Deleted');
     }
   };
 
   const exportTimeline = () => {
     const csv = [
       'Date,Type,Title,Description,Cost',
-      ...events.map((e) =>
+      ...visibleEvents.map((e) =>
         `"${e.event_date}","${e.event_type}","${e.title}","${e.description || ''}","${e.cost || ''}"`
       ),
     ].join('\n');
@@ -88,9 +156,8 @@ export default function TimelinePage() {
     toast.success('Timeline exported');
   };
 
-  // Group events by year
   const grouped: Record<string, TimelineEvent[]> = {};
-  events.forEach((e) => {
+  visibleEvents.forEach((e) => {
     const yr = parseISO(e.event_date).getFullYear().toString();
     if (!grouped[yr]) grouped[yr] = [];
     grouped[yr].push(e);
@@ -100,46 +167,78 @@ export default function TimelinePage() {
     <div>
       <PageHeader
         title="Home Timeline"
-        subtitle={`${events.length} events`}
+        subtitle={`${visibleEvents.length} event${visibleEvents.length === 1 ? '' : 's'}`}
         back
         rightAction={
           <div className="flex items-center gap-2">
-            {events.length > 0 && (
+            {visibleEvents.length > 0 && (
               <button onClick={exportTimeline} className="text-brand-500 p-1"><Download size={20} /></button>
             )}
-            <button onClick={() => setShowForm(true)} className="text-brand-500"><Plus size={24} /></button>
+            <button onClick={startNew} className="text-brand-500"><Plus size={24} /></button>
           </div>
         }
       />
 
-      {/* Add Form */}
+      {/* Add / Edit Form */}
       {showForm && (
         <div className="mx-4 mt-4 ios-card p-4 space-y-3 animate-slide-up">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-sm font-semibold">Add Event</span>
-            <button onClick={() => setShowForm(false)}><X size={18} className="text-ink-tertiary" /></button>
+            <span className="text-sm font-semibold">{editingId ? 'Edit Event' : 'Add Event'}</span>
+            <button onClick={closeForm}><X size={18} className="text-ink-tertiary" /></button>
           </div>
-          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Event title *" className="ios-input" autoFocus />
+          <input
+            type="text"
+            value={form.title}
+            onChange={(e) => update('title', e.target.value)}
+            placeholder="Event title *"
+            className="ios-input"
+            autoFocus
+          />
           <div className="flex flex-wrap gap-2">
             {EVENT_TYPES.map((t) => (
               <button
                 key={t.value}
-                onClick={() => setEventType(t.value)}
+                onClick={() => update('eventType', t.value)}
                 className={`px-3 py-1.5 rounded-ios text-xs font-medium transition-colors ${
-                  eventType === t.value ? 'text-white' : 'bg-surface-secondary text-ink-secondary'
+                  form.eventType === t.value ? 'text-white' : 'bg-surface-secondary text-ink-secondary'
                 }`}
-                style={eventType === t.value ? { backgroundColor: t.color } : {}}
+                style={form.eventType === t.value ? { backgroundColor: t.color } : {}}
               >
                 {t.label}
               </button>
             ))}
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} className="ios-input" />
-            <input type="number" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="Cost ($)" className="ios-input" />
+            <input
+              type="date"
+              value={form.eventDate}
+              onChange={(e) => update('eventDate', e.target.value)}
+              className="ios-input"
+            />
+            <input
+              type="number"
+              step="0.01"
+              value={form.cost}
+              onChange={(e) => update('cost', e.target.value)}
+              placeholder="Cost ($)"
+              className="ios-input"
+            />
           </div>
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description..." rows={2} className="ios-input resize-none" />
-          <button onClick={handleAdd} disabled={!title.trim()} className="ios-button">Add to Timeline</button>
+          <textarea
+            value={form.description}
+            onChange={(e) => update('description', e.target.value)}
+            placeholder="Description..."
+            rows={2}
+            className="ios-input resize-none"
+          />
+          <button onClick={handleSave} disabled={!form.title.trim()} className="ios-button">
+            {editingId ? 'Save Changes' : 'Add to Timeline'}
+          </button>
+          {editingId && (
+            <button onClick={handleDelete} className="w-full py-3 text-status-red font-semibold text-sm">
+              Delete Event
+            </button>
+          )}
         </div>
       )}
 
@@ -147,11 +246,11 @@ export default function TimelinePage() {
       <div className="py-4">
         {loading ? (
           <div className="text-center py-16 text-ink-tertiary text-sm">Loading...</div>
-        ) : events.length === 0 ? (
+        ) : visibleEvents.length === 0 ? (
           <div className="text-center py-16">
             <div className="text-4xl mb-3">📅</div>
             <p className="text-ink-secondary text-sm">No timeline events yet</p>
-            <p className="text-xs text-ink-tertiary mt-1">Events are auto-logged when tasks are completed</p>
+            <p className="text-xs text-ink-tertiary mt-1">Tap + to log a milestone (purchase, renovation, repair…)</p>
           </div>
         ) : (
           Object.entries(grouped).map(([yr, items]) => (
@@ -171,7 +270,10 @@ export default function TimelinePage() {
                         className="absolute left-[9px] top-1 w-3 h-3 rounded-full border-2 border-white"
                         style={{ backgroundColor: config.color }}
                       />
-                      <div className="ios-card p-3.5">
+                      <button
+                        onClick={() => startEdit(ev)}
+                        className="ios-card p-3.5 w-full text-left active:bg-gray-50 transition-colors"
+                      >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 mb-0.5">
@@ -183,12 +285,13 @@ export default function TimelinePage() {
                             <p className="text-sm font-semibold">{ev.title}</p>
                             {ev.description && <p className="text-xs text-ink-secondary mt-0.5">{ev.description}</p>}
                           </div>
-                          <div className="text-right flex-shrink-0">
+                          <div className="text-right flex-shrink-0 flex flex-col items-end gap-0.5">
                             <p className="text-xs text-ink-secondary">{format(parseISO(ev.event_date), 'MMM d')}</p>
-                            {ev.cost && <p className="text-xs font-semibold text-emerald-600">${ev.cost}</p>}
+                            {ev.cost != null && <p className="text-xs font-semibold text-emerald-600">{formatCurrency(ev.cost)}</p>}
+                            <Pencil size={12} className="text-ink-tertiary mt-0.5" />
                           </div>
                         </div>
-                      </div>
+                      </button>
                     </div>
                   );
                 })}
