@@ -59,6 +59,8 @@ export default function AppliancesPage() {
         serial_number: p.serial_number || '',
         category: p.category || '',
         notes: p.notes || '',
+        installation_date: p.installation_date || '',
+        warranty_expiration: p.warranty_expiration || '',
       }));
       if (p.manual_document_id) setManualDocId(p.manual_document_id);
       setShowForm(true);

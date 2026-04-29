@@ -264,6 +264,8 @@ export default function DocumentsPage() {
             serial_number: a.serial_number || null,
             category: a.category || null,
             notes: a.notes || null,
+            installation_date: a.installation_date || null,
+            warranty_expiration: a.warranty_expiration || null,
             manual_document_id: doc.id,
           })
           .select()
@@ -321,10 +323,14 @@ export default function DocumentsPage() {
       switch (recurrence) {
         case 'weekly':
           return format(addDays(d, 7), 'yyyy-MM-dd');
+        case 'bi_monthly':
+          return format(addMonths(d, 2), 'yyyy-MM-dd');
         case 'monthly':
           return format(addMonths(d, 1), 'yyyy-MM-dd');
         case 'quarterly':
           return format(addMonths(d, 3), 'yyyy-MM-dd');
+        case 'bi_annual':
+          return format(addMonths(d, 6), 'yyyy-MM-dd');
         case 'yearly':
           return format(addYears(d, 1), 'yyyy-MM-dd');
         default:
