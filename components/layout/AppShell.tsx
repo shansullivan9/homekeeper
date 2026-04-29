@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import { useRouter, usePathname } from 'next/navigation';
 import BottomNav from '@/components/layout/BottomNav';
 import SideNav from '@/components/layout/SideNav';
+import { useRealtimeHome } from '@/hooks/useRealtimeHome';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -13,6 +14,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
+
+  // Subscribe to Supabase Realtime once the home is loaded so changes
+  // from another device or housemate flow into the local store.
+  useRealtimeHome();
 
   useEffect(() => {
     async function init() {
@@ -34,15 +39,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           .maybeSingle();
         if (profile) store.setUser(profile);
 
-        // Load home membership
-        const { data: membership } = await supabase
+        // Load all of the user's home memberships and pick which home
+        // to display. Preference order:
+        //  1. The home_id stored in localStorage (last one the user
+        //     opened, or the one they explicitly switched to).
+        //  2. The first membership returned (legacy single-home users).
+        const { data: memberships } = await supabase
           .from('home_members')
           .select('*')
-          .eq('user_id', userId)
-          .limit(1)
-          .maybeSingle();
+          .eq('user_id', userId);
 
-        if (!membership) {
+        if (!memberships || memberships.length === 0) {
           if (pathname !== '/home-profile') {
             router.push('/home-profile');
           }
@@ -50,14 +57,25 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           return;
         }
 
+        const stored =
+          typeof window !== 'undefined'
+            ? window.localStorage.getItem('homekeeper.selectedHomeId')
+            : null;
+        const membership =
+          (stored && memberships.find((m: any) => m.home_id === stored)) ||
+          memberships[0];
+
         // Load home
         const { data: homeData } = await supabase
           .from('homes')
           .select('*')
-          .eq('id', membership.home_id)
+          .eq('id', (membership as any).home_id)
           .maybeSingle();
 
         if (homeData) store.setHome(homeData);
+        // Surface the rest of the user's memberships so the Settings
+        // home-switcher can list them with names.
+        store.setUserMemberships(memberships as any);
 
         // Load everything else in parallel
         const homeId = homeData?.id || membership.home_id;
