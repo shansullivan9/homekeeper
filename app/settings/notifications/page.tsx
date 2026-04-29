@@ -185,43 +185,28 @@ export default function NotificationsPage() {
         return;
       }
 
-      stage = 'registering service worker';
-      toast.loading('Step 2/4: registering service worker…', { id: 'push-step', duration: 6000 });
-      // iOS Safari's PWA context doesn't always auto-register the
-      // next-pwa SW, so navigator.serviceWorker.ready can hang forever.
-      // Get an existing registration if there is one, otherwise
-      // register /sw.js ourselves and wait for it to activate.
-      let reg = (await navigator.serviceWorker.getRegistration()) || null;
+      stage = 'finding service worker';
+      toast.loading('Step 2/4: finding service worker…', { id: 'push-step', duration: 6000 });
+      // iOS Safari's PWA can have transient SW activation issues. Use
+      // any registration that exists — pushManager lives on the
+      // registration, not on the worker — and only register a new
+      // one if none exists at all. We don't try to "activate" because
+      // pushManager.subscribe works as long as there's a registration.
+      const allRegs = await navigator.serviceWorker.getRegistrations();
+      let reg = allRegs[0] || null;
       if (!reg) {
-        reg = await withTimeout(
-          navigator.serviceWorker.register('/sw.js', { scope: '/' }),
-          10_000,
-          'serviceWorker.register'
-        );
+        try {
+          reg = await withTimeout(
+            navigator.serviceWorker.register('/sw.js', { scope: '/' }),
+            10_000,
+            'serviceWorker.register'
+          );
+        } catch (regErr: any) {
+          throw new Error('SW register failed: ' + (regErr?.message || regErr));
+        }
       }
-      // Wait for it to actually be active (installing → activated).
-      if (!reg.active) {
-        await withTimeout(
-          new Promise<void>((resolve, reject) => {
-            const sw = reg!.installing || reg!.waiting;
-            if (!sw) {
-              if (reg!.active) return resolve();
-              return reject(new Error('no installing/waiting/active worker on registration'));
-            }
-            const onChange = () => {
-              if (sw.state === 'activated') {
-                sw.removeEventListener('statechange', onChange);
-                resolve();
-              } else if (sw.state === 'redundant') {
-                sw.removeEventListener('statechange', onChange);
-                reject(new Error('worker became redundant'));
-              }
-            };
-            sw.addEventListener('statechange', onChange);
-          }),
-          10_000,
-          'serviceWorker activation'
-        );
+      if (!reg) {
+        throw new Error('no service worker registration available');
       }
 
       stage = 'subscribing to push';
