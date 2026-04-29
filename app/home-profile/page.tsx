@@ -282,8 +282,13 @@ export default function HomeProfilePage() {
     .join(', ');
   const encodedAddress = encodeURIComponent(fullAddress);
   // Only direct address-aware links: each one accepts the full address
-  // as a query parameter and lands the user on this exact property
-  // (rather than a ZIP-level results page like Redfin/Realtor.com do).
+  // as a query parameter and lands the user on this exact property.
+  // We tried Bing Maps and OpenStreetMap and dropped them — neither
+  // is useful enough to keep at the top of the screen. No other major
+  // real-estate site (Redfin, Realtor.com, Trulia, Movoto) supports a
+  // direct full-address URL — they all require pre-known city/listing
+  // slugs — so Zillow is the only realty link we can reliably make
+  // address-direct.
   const externalLinks = fullAddress
     ? [
         {
@@ -305,16 +310,6 @@ export default function HomeProfilePage() {
           name: 'Waze',
           url: `https://www.waze.com/ul?q=${encodedAddress}`,
           domain: 'waze.com',
-        },
-        {
-          name: 'Bing Maps',
-          url: `https://www.bing.com/maps?q=${encodedAddress}`,
-          domain: 'bing.com',
-        },
-        {
-          name: 'OpenStreetMap',
-          url: `https://www.openstreetmap.org/search?query=${encodedAddress}`,
-          domain: 'openstreetmap.org',
         },
       ]
     : [];
