@@ -74,9 +74,22 @@ export default function SuggestionBanner() {
   if (suggestions.length === 0) return null;
 
   const acceptSuggestion = async (task: Task) => {
+    // Defensive: a suggestion with recurrence='custom' must have
+    // recurrence_days. The generator always sets it, but if a future
+    // path ever produced a custom suggestion without one, accepting
+    // it would crash complete_task() down the line. Default to a
+    // safe yearly cadence in that edge case.
+    const patch: Record<string, any> = { is_suggestion: false };
+    if (
+      task.recurrence === 'custom' &&
+      (task.recurrence_days == null || task.recurrence_days <= 0)
+    ) {
+      patch.recurrence = 'yearly';
+      patch.recurrence_days = null;
+    }
     const { data, error } = await supabase
       .from('tasks')
-      .update({ is_suggestion: false })
+      .update(patch as any)
       .eq('id', task.id)
       .select('*, categories(*)')
       .single();

@@ -1,8 +1,9 @@
 'use client';
+import { useState } from 'react';
 import { Task } from '@/lib/types';
 import { getTaskUrgency, urgencyColor, sectionColorForTask, CATEGORY_ICONS, RECURRENCE_LABELS, formatCurrency, emojiForTaskTitle } from '@/lib/constants';
 import { format, isToday, isTomorrow, isPast, parseISO } from 'date-fns';
-import { Check, ChevronRight, RotateCcw, UserPlus, User, Trash2 } from 'lucide-react';
+import { Check, ChevronRight, RotateCcw, UserPlus, User, Trash2, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase-browser';
 import { useStore } from '@/lib/store';
 import toast from 'react-hot-toast';
@@ -56,39 +57,57 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
     return format(d, fmt);
   };
 
-  const handleComplete = async (e: React.MouseEvent) => {
+  // Inline "Log completion" sheet — replaces the bare confirm()
+  // dialog so users can override the actual cost / notes / minutes
+  // before logging. Useful when the estimate was wrong (DIY for free,
+  // pro charged more, etc.). Default values come from the task itself
+  // so one-tap completion is still possible: just hit Complete.
+  const [showCompleteSheet, setShowCompleteSheet] = useState(false);
+  const [completeCost, setCompleteCost] = useState('');
+  const [completeMinutes, setCompleteMinutes] = useState('');
+  const [completeNotes, setCompleteNotes] = useState('');
+  const [completing, setCompleting] = useState(false);
+
+  const openCompleteSheet = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     if (!user) return;
-    if (!confirm(`Mark "${task.title}" as completed?`)) return;
+    setCompleteCost(task.estimated_cost != null ? String(task.estimated_cost) : '');
+    setCompleteMinutes(task.estimated_minutes != null ? String(task.estimated_minutes) : '');
+    setCompleteNotes('');
+    setShowCompleteSheet(true);
+  };
 
+  const submitComplete = async () => {
+    if (!user) return;
+    setCompleting(true);
+    const cost = completeCost.trim() === '' ? null : parseFloat(completeCost);
+    const minutes = completeMinutes.trim() === '' ? null : parseInt(completeMinutes, 10);
     const { error } = await supabase.rpc('complete_task', {
       p_task_id: task.id,
       p_user_id: user.id,
-      p_notes: null,
-      p_cost: task.estimated_cost,
-      p_duration: task.estimated_minutes,
+      p_notes: completeNotes.trim() || null,
+      p_cost: cost != null && !isNaN(cost) ? cost : null,
+      p_duration: minutes != null && !isNaN(minutes) ? minutes : null,
     });
-
     if (error) {
+      setCompleting(false);
       toast.error('Failed to complete task');
-    } else {
-      // Optimistically flip the task to completed in the store so the
-      // dashboard re-buckets immediately. The full reload via
-      // onComplete() will reconcile any next-occurrence task created by
-      // the RPC.
-      const store = useStore.getState();
-      const completedAt = new Date().toISOString();
-      store.setTasks(
-        store.tasks.map((t) =>
-          t.id === task.id
-            ? ({ ...t, status: 'completed', completed_at: completedAt, completed_by: user.id } as any)
-            : t
-        )
-      );
-      toast.success('Task completed!');
-      onComplete?.();
+      return;
     }
+    const store = useStore.getState();
+    const completedAt = new Date().toISOString();
+    store.setTasks(
+      store.tasks.map((t) =>
+        t.id === task.id
+          ? ({ ...t, status: 'completed', completed_at: completedAt, completed_by: user.id } as any)
+          : t
+      )
+    );
+    setCompleting(false);
+    setShowCompleteSheet(false);
+    toast.success('Task completed!');
+    onComplete?.();
   };
 
   const handleClaim = async (e: React.MouseEvent) => {
@@ -184,6 +203,7 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
     : null;
 
   return (
+    <>
     <button
       onClick={() => router.push(`/add-task?edit=${task.id}`)}
       className="w-full text-left ios-list-item group"
@@ -269,7 +289,7 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
           </button>
         ) : (
           <button
-            onClick={handleComplete}
+            onClick={openCompleteSheet}
             title="Mark complete"
             className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-status-green text-status-green flex items-center justify-center active:bg-status-green active:text-white transition-all"
           >
@@ -286,5 +306,95 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
         <ChevronRight size={16} className="text-ink-tertiary hidden sm:block" />
       </div>
     </button>
+
+    {/* Complete-task sheet — opens when the user taps the green check
+        on a pending task. Pre-fills with the task's estimates so a
+        single tap of "Complete" still works for the common case. */}
+    {showCompleteSheet && (
+      <div
+        className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4 animate-fade-in"
+        onClick={() => !completing && setShowCompleteSheet(false)}
+      >
+        <div
+          className="bg-white rounded-ios-lg w-full max-w-md shadow-xl animate-slide-up"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <p className="text-[15px] font-semibold truncate">Log: {task.title}</p>
+            <button
+              onClick={() => setShowCompleteSheet(false)}
+              disabled={completing}
+              className="p-1 text-ink-tertiary"
+            >
+              <X size={20} />
+            </button>
+          </div>
+          <div className="px-4 py-3 space-y-3">
+            <p className="text-[12px] text-ink-secondary">
+              Override the cost or time if it differs from the estimate. Leave
+              blank to skip.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">
+                  Actual Cost ($)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={completeCost}
+                  onChange={(e) => setCompleteCost(e.target.value)}
+                  placeholder="0.00"
+                  className="ios-input"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">
+                  Actual Time (min)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  value={completeMinutes}
+                  onChange={(e) => setCompleteMinutes(e.target.value)}
+                  placeholder="30"
+                  className="ios-input"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">
+                Notes (optional)
+              </label>
+              <textarea
+                value={completeNotes}
+                onChange={(e) => setCompleteNotes(e.target.value)}
+                rows={2}
+                placeholder="Vendor, observations, follow-ups…"
+                className="ios-input resize-none"
+              />
+            </div>
+          </div>
+          <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex gap-2">
+            <button
+              onClick={() => setShowCompleteSheet(false)}
+              disabled={completing}
+              className="flex-1 py-2.5 rounded-ios bg-white border border-gray-200 text-sm font-semibold text-ink-secondary md:hover:bg-gray-50 active:bg-gray-50 transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={submitComplete}
+              disabled={completing}
+              className="flex-1 py-2.5 rounded-ios bg-status-green text-white text-sm font-semibold active:opacity-80 md:hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {completing ? 'Logging…' : 'Complete'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
