@@ -7,7 +7,7 @@ import SuggestionBanner from '@/components/dashboard/SuggestionBanner';
 import PageHeader from '@/components/layout/PageHeader';
 import { useRouter } from 'next/navigation';
 import { useAppInit } from '@/hooks/useAppInit';
-import { Home as HomeIcon, Users, ChevronRight, Package, Clock3, Banknote, FileText } from 'lucide-react';
+import { Home as HomeIcon, Users, ChevronRight, Package, Clock3, Banknote, FileText, BarChart3 } from 'lucide-react';
 
 type ClaimFilter = 'all' | 'unclaimed' | 'mine' | 'theirs';
 
@@ -237,6 +237,7 @@ export default function DashboardPage() {
                 { label: 'Expenses', icon: Banknote, href: '/expenses', color: 'text-emerald-500', count: null as number | null },
                 { label: 'Home Profile', icon: HomeIcon, href: '/home-profile', color: 'text-brand-500', count: null as number | null },
                 { label: 'Home Timeline', icon: Clock3, href: '/timeline', color: 'text-amber-500', count: null as number | null },
+                { label: 'Annual Report', icon: BarChart3, href: '/reports', color: 'text-rose-500', count: null as number | null },
               ].map(({ label, icon: Icon, href, color, count }) => (
                 <button key={href} onClick={() => router.push(href)} className="ios-list-item w-full">
                   <div className="flex items-center gap-3">
