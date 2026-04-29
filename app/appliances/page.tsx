@@ -20,7 +20,7 @@ const APPLIANCE_CATEGORIES = [
 ];
 
 export default function AppliancesPage() {
-  const { appliances, home, setAppliances, documents } = useStore();
+  const { appliances, home, setAppliances, documents, tasks } = useStore();
   const supabase = createClient();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -444,6 +444,79 @@ export default function AppliancesPage() {
             <label className="text-xs text-ink-secondary mb-1 block">Purchase price ($)</label>
             <input type="number" min="0" step="0.01" value={form.purchase_price} onChange={(e) => u('purchase_price', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-60 disabled:cursor-not-allowed" />
           </div>
+          {/* Linked tasks — every task with appliance_id == this one,
+              grouped into pending vs. completed and sorted by due date.
+              Tap a row to open the task edit screen. Read-only here;
+              this is just an at-a-glance "what's scheduled for this
+              appliance" view. */}
+          {editing && (() => {
+            const linked = tasks.filter((t: any) => t.appliance_id === editing.id);
+            if (linked.length === 0) return null;
+            const pending = linked
+              .filter((t: any) => t.status !== 'completed' && t.status !== 'skipped')
+              .sort((a: any, b: any) => (a.due_date || '').localeCompare(b.due_date || ''));
+            const done = linked
+              .filter((t: any) => t.status === 'completed')
+              .sort((a: any, b: any) =>
+                (b.completed_at || '').localeCompare(a.completed_at || '')
+              )
+              .slice(0, 5);
+            return (
+              <div>
+                <p className="text-xs text-ink-secondary mb-1 block">
+                  Linked tasks
+                </p>
+                <div className="ios-card overflow-hidden">
+                  {pending.length === 0 && done.length === 0 ? (
+                    <div className="px-4 py-3.5 text-sm text-ink-tertiary">
+                      No tasks linked yet.
+                    </div>
+                  ) : (
+                    <>
+                      {pending.map((t: any) => (
+                        <button
+                          key={t.id}
+                          onClick={() => router.push(`/add-task?edit=${t.id}`)}
+                          className="ios-list-item w-full"
+                        >
+                          <div className="flex-1 min-w-0 text-left">
+                            <p className="text-[14px] font-medium truncate">{t.title}</p>
+                            <p className="text-xs text-ink-tertiary truncate">
+                              {t.due_date
+                                ? `Due ${new Date(t.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                                : 'No due date'}
+                            </p>
+                          </div>
+                          <ChevronRight size={16} className="text-ink-tertiary flex-shrink-0" />
+                        </button>
+                      ))}
+                      {done.map((t: any) => (
+                        <button
+                          key={t.id}
+                          onClick={() => router.push(`/add-task?edit=${t.id}`)}
+                          className="ios-list-item w-full opacity-70"
+                        >
+                          <div className="flex-1 min-w-0 text-left">
+                            <p className="text-[14px] font-medium truncate strike-middle text-ink-tertiary">
+                              {t.title}
+                            </p>
+                            <p className="text-xs text-ink-tertiary truncate">
+                              Completed
+                              {t.completed_at
+                                ? ` ${new Date(t.completed_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                                : ''}
+                            </p>
+                          </div>
+                          <ChevronRight size={16} className="text-ink-tertiary flex-shrink-0" />
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
           <div>
             <label className="text-xs text-ink-secondary mb-1 block">Notes</label>
             <textarea value={form.notes} onChange={(e) => u('notes', e.target.value)} rows={3} disabled={!!editing && !editMode} className="ios-input resize-none disabled:opacity-60 disabled:cursor-not-allowed" />

@@ -707,10 +707,23 @@ function AddTaskForm() {
               className="ios-input"
             >
               <option value="">None</option>
-              {appliances.map((a) => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
+              {[...appliances]
+                .sort((a, b) =>
+                  (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
+                )
+                .map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
             </select>
+            {applianceId && editId && !editMode && (
+              <button
+                type="button"
+                onClick={() => router.push(`/appliances?edit=${applianceId}`)}
+                className="text-xs text-brand-500 mt-1.5 md:hover:underline"
+              >
+                Open this appliance →
+              </button>
+            )}
           </div>
         )}
 
