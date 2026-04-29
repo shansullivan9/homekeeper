@@ -153,9 +153,55 @@ export default function NotificationsPage() {
     save(merged);
   };
 
-  // Translate a URL-safe base64 VAPID key into a Uint8Array. Wrapped
-  // so any decoding glitch (bad chars, missing atob) returns null
-  // instead of throwing.
+  // Once permission is granted, silently make sure the subscription
+  // is registered with our backend. Re-runs on every visit so a
+  // browser-rotated endpoint or fresh device gets re-saved without
+  // the user having to do anything.
+  useEffect(() => {
+    if (pushPermission !== 'granted') return;
+    if (!user?.id) return;
+    let cancelled = false;
+    const ensureSubscribed = async () => {
+      try {
+        if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+        // Look at existing subscriptions across any registered SW.
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const r of regs) {
+          try {
+            const existing = await r.pushManager.getSubscription();
+            if (existing) {
+              // Make sure DB has it; upsert is idempotent.
+              if (!cancelled) {
+                await supabase
+                  .from('notification_preferences')
+                  .upsert(
+                    {
+                      user_id: user.id,
+                      push_subscription: existing.toJSON(),
+                      updated_at: new Date().toISOString(),
+                    } as any,
+                    { onConflict: 'user_id' } as any
+                  );
+              }
+              return;
+            }
+          } catch {
+            /* ignore individual reg failures */
+          }
+        }
+        // No existing subscription anywhere — kick off the subscribe
+        // flow without showing the staged toasts.
+        if (!cancelled) await subscribeToPush({ silent: true });
+      } catch (err) {
+        console.warn('background subscription check failed:', err);
+      }
+    };
+    ensureSubscribed();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pushPermission, user?.id]);
   const urlBase64ToUint8Array = (base64String: string): Uint8Array | null => {
     try {
       const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -174,13 +220,26 @@ export default function NotificationsPage() {
   // button click — no useEffect auto-fire — because iOS Safari
   // throws PushManager errors when the page isn't installed as a
   // PWA, and we don't want that to crash the whole page.
-  const subscribeToPush = async () => {
+  const subscribeToPush = async (opts: { silent?: boolean } = {}) => {
+    const silent = !!opts.silent;
+    const t = (msg: string, kind: 'loading' | 'success' | 'error') => {
+      if (silent) return;
+      if (kind === 'loading') toast.loading(msg, { id: 'push-step', duration: 6000 });
+      else if (kind === 'success') {
+        toast.dismiss('push-step');
+        toast.success(msg);
+      } else {
+        toast.dismiss('push-step');
+        toast.error(msg);
+      }
+    };
+
     if (!user?.id) {
-      toast.error('No user — please sign in again');
+      t('No user — please sign in again', 'error');
       return;
     }
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
-      toast.error('Service workers not supported in this browser');
+      t('Service workers not supported in this browser', 'error');
       return;
     }
     setSubscribing(true);
@@ -199,7 +258,7 @@ export default function NotificationsPage() {
     let stage = 'init';
     try {
       stage = 'fetching VAPID config';
-      toast.loading('Step 1/4: fetching VAPID config…', { id: 'push-step', duration: 4000 });
+      t('Step 1/4: fetching VAPID config…', 'loading');
       const cfgRes = await withTimeout(
         fetch('/api/push/config', { cache: 'no-store' }),
         10_000,
@@ -208,14 +267,13 @@ export default function NotificationsPage() {
       const cfg = await cfgRes.json().catch(() => ({}));
       const vapid = (cfg && cfg.vapidPublicKey) || '';
       if (!vapid || vapid === 'your_vapid_public_key') {
-        toast.dismiss('push-step');
-        toast.error('Server missing VAPID_PUBLIC_KEY env var');
+        t('Server missing VAPID_PUBLIC_KEY env var', 'error');
         setSubscribing(false);
         return;
       }
 
       stage = 'registering push service worker';
-      toast.loading('Step 2/4: registering push service worker…', { id: 'push-step', duration: 6000 });
+      t('Step 2/4: registering push service worker…', 'loading');
       // We register our OWN dedicated push-only SW at /push-sw.js with
       // its own scope (/push-sw/), separate from next-pwa's caching SW.
       // It's ~50 lines, calls skipWaiting + clients.claim, and avoids
@@ -260,7 +318,7 @@ export default function NotificationsPage() {
       }
 
       stage = 'subscribing to push';
-      toast.loading('Step 3/4: subscribing to push…', { id: 'push-step', duration: 8000 });
+      t('Step 3/4: subscribing to push…', 'loading');
       let sub: PushSubscription | null = null;
       try {
         sub = await reg.pushManager.getSubscription();
@@ -281,7 +339,7 @@ export default function NotificationsPage() {
       }
 
       stage = 'saving subscription';
-      toast.loading('Step 4/4: saving to your account…', { id: 'push-step', duration: 6000 });
+      t('Step 4/4: saving to your account…', 'loading');
       const { error: upsertErr } = await supabase
         .from('notification_preferences')
         .upsert(
@@ -294,12 +352,10 @@ export default function NotificationsPage() {
         );
       if (upsertErr) throw new Error('DB save failed: ' + upsertErr.message);
 
-      toast.dismiss('push-step');
-      toast.success('Push subscription saved!');
+      t('Push subscription saved!', 'success');
     } catch (err: any) {
-      toast.dismiss('push-step');
       const msg = (err && err.message) || String(err);
-      toast.error(`Failed at "${stage}": ${msg}`);
+      t(`Failed at "${stage}": ${msg}`, 'error');
       console.error('push subscribe failed at', stage, err);
     } finally {
       setSubscribing(false);
@@ -362,16 +418,6 @@ export default function NotificationsPage() {
                   className="text-brand-500 text-sm font-semibold disabled:opacity-50"
                 >
                   {subscribing ? 'Enabling…' : 'Enable'}
-                </button>
-              )}
-              {pushPermission === 'granted' && (
-                <button
-                  onClick={subscribeToPush}
-                  disabled={subscribing}
-                  className="text-brand-500 text-xs font-semibold disabled:opacity-50"
-                  title="Re-register this device for push"
-                >
-                  {subscribing ? '…' : 'Refresh'}
                 </button>
               )}
             </div>
