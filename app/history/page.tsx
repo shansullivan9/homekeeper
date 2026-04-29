@@ -247,11 +247,16 @@ export default function HistoryPage() {
       ))}
 
       {filtered.length === 0 && (
-        <div className="text-center py-16">
+        <div className="text-center py-16 px-8">
           <div className="text-4xl mb-3">📋</div>
           <p className="text-ink-secondary text-sm">
             {search ? 'No matching history found' : 'No completed tasks yet'}
           </p>
+          {!search && (
+            <p className="text-ink-tertiary text-xs mt-1">
+              Completing a task moves it here so you keep a maintenance log.
+            </p>
+          )}
         </div>
       )}
     </div>

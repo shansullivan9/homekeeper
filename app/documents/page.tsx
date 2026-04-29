@@ -1328,7 +1328,7 @@ export default function DocumentsPage() {
             </p>
             <button
               onClick={() => setShowForm(true)}
-              className="mt-4 text-brand-500 text-sm font-semibold"
+              className="mt-4 px-4 py-2 rounded-ios bg-brand-500 text-white text-sm font-semibold active:bg-brand-600 md:hover:bg-brand-600 transition-colors"
             >
               + Upload your first document
             </button>

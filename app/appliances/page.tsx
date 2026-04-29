@@ -482,10 +482,17 @@ export default function AppliancesPage() {
 
       <div className="py-2">
         {appliances.length === 0 ? (
-          <div className="text-center py-16">
+          <div className="text-center py-16 px-8">
             <Package size={40} className="mx-auto text-ink-tertiary mb-3" />
-            <p className="text-ink-secondary text-sm">No appliances registered</p>
-            <button onClick={() => setShowForm(true)} className="mt-3 text-brand-500 text-sm font-semibold">
+            <p className="text-ink-secondary text-sm">No appliances yet</p>
+            <p className="text-ink-tertiary text-xs mt-1">
+              Track HVAC, water heater, fridge, washer/dryer, and more.
+              Linking a manual auto-fills make and model.
+            </p>
+            <button
+              onClick={() => setShowForm(true)}
+              className="mt-4 px-4 py-2 rounded-ios bg-brand-500 text-white text-sm font-semibold active:bg-brand-600 md:hover:bg-brand-600 transition-colors"
+            >
               + Add your first appliance
             </button>
           </div>
