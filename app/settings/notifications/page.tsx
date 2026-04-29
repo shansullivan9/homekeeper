@@ -185,28 +185,49 @@ export default function NotificationsPage() {
         return;
       }
 
-      stage = 'finding service worker';
-      toast.loading('Step 2/4: finding service worker…', { id: 'push-step', duration: 6000 });
-      // iOS Safari's PWA can have transient SW activation issues. Use
-      // any registration that exists — pushManager lives on the
-      // registration, not on the worker — and only register a new
-      // one if none exists at all. We don't try to "activate" because
-      // pushManager.subscribe works as long as there's a registration.
-      const allRegs = await navigator.serviceWorker.getRegistrations();
-      let reg = allRegs[0] || null;
-      if (!reg) {
-        try {
-          reg = await withTimeout(
-            navigator.serviceWorker.register('/sw.js', { scope: '/' }),
-            10_000,
-            'serviceWorker.register'
-          );
-        } catch (regErr: any) {
-          throw new Error('SW register failed: ' + (regErr?.message || regErr));
+      stage = 'registering push service worker';
+      toast.loading('Step 2/4: registering push service worker…', { id: 'push-step', duration: 6000 });
+      // We register our OWN dedicated push-only SW at /push-sw.js with
+      // its own scope (/push-sw/), separate from next-pwa's caching SW.
+      // It's ~50 lines, calls skipWaiting + clients.claim, and avoids
+      // every iOS-Safari SW-activation gotcha that the bigger
+      // next-pwa worker has hit so far.
+      let reg = await navigator.serviceWorker.getRegistration('/push-sw/');
+      if (!reg || !reg.active) {
+        if (reg) {
+          try { await reg.unregister(); } catch { /* ignore */ }
         }
+        reg = await withTimeout(
+          navigator.serviceWorker.register('/push-sw.js', { scope: '/push-sw/' }),
+          10_000,
+          'push SW register'
+        );
       }
-      if (!reg) {
-        throw new Error('no service worker registration available');
+      // Wait for it to actually be active so pushManager.subscribe
+      // accepts it. skipWaiting + clients.claim in the SW make this
+      // typically resolve within a second.
+      if (!reg.active) {
+        await withTimeout(
+          new Promise<void>((resolve, reject) => {
+            const sw = reg!.installing || reg!.waiting;
+            if (!sw) return reg!.active ? resolve() : reject(new Error('no worker on registration'));
+            const onChange = () => {
+              if (sw.state === 'activated') {
+                sw.removeEventListener('statechange', onChange);
+                resolve();
+              } else if (sw.state === 'redundant') {
+                sw.removeEventListener('statechange', onChange);
+                reject(new Error('worker became redundant'));
+              }
+            };
+            sw.addEventListener('statechange', onChange);
+          }),
+          10_000,
+          'push SW activation'
+        );
+      }
+      if (!reg.active) {
+        throw new Error('push SW still not active after activation wait');
       }
 
       stage = 'subscribing to push';
