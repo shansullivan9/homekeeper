@@ -132,7 +132,23 @@ export default function HomeProfilePage() {
     }
   }, [home]);
 
-  const update = (key: string, value: any) => setForm((f) => ({ ...f, [key]: value }));
+  // Any user-driven change flips dirty so the back button can warn
+  // before discarding. handleSave resets it after a successful save.
+  const [dirty, setDirty] = useState(false);
+  const update = (key: string, value: any) => {
+    setForm((f) => ({ ...f, [key]: value }));
+    setDirty(true);
+  };
+
+  const confirmBack = () => {
+    if (!dirty || !editMode) {
+      router.back();
+      return;
+    }
+    if (confirm('Discard changes? Anything you edited will be lost.')) {
+      router.back();
+    }
+  };
 
   const handleSave = async () => {
     if (!form.name.trim()) {
@@ -190,6 +206,7 @@ export default function HomeProfilePage() {
 
         toast.success('Home created! Check your dashboard for suggested tasks.');
         setEditMode(false);
+        setDirty(false);
       } else {
         const { data, error } = await supabase
           .from('homes')
@@ -204,6 +221,7 @@ export default function HomeProfilePage() {
 
         toast.success('Home profile updated');
         setEditMode(false);
+        setDirty(false);
       }
     } catch (err: any) {
       toast.error(err.message || 'Failed to save');
@@ -319,6 +337,7 @@ export default function HomeProfilePage() {
       <PageHeader
         title={isNew ? 'Set Up Your Home' : 'Home Profile'}
         back={!isNew}
+        onBack={confirmBack}
         rightAction={
           !isNew ? (
             <button

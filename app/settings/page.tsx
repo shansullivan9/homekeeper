@@ -484,7 +484,28 @@ export default function SettingsPage() {
                 <Users size={16} className="text-ink-secondary" />
                 <span className="text-sm font-medium text-ink-secondary">Members</span>
               </div>
-              {members.map((m) => {
+              {[...members]
+                .sort((a, b) => {
+                  // Owners first, then alphabetical by display name
+                  // (the user's own row also bubbles up via owner sort
+                  // when they're the owner; otherwise lands by name).
+                  if (a.role === 'owner' && b.role !== 'owner') return -1;
+                  if (a.role !== 'owner' && b.role === 'owner') return 1;
+                  const aName =
+                    (a as any).display_name ||
+                    (a as any).profiles?.display_name ||
+                    (a as any).email ||
+                    (a as any).profiles?.email ||
+                    '';
+                  const bName =
+                    (b as any).display_name ||
+                    (b as any).profiles?.display_name ||
+                    (b as any).email ||
+                    (b as any).profiles?.email ||
+                    '';
+                  return aName.localeCompare(bName, undefined, { sensitivity: 'base' });
+                })
+                .map((m) => {
                 const anyM = m as any;
                 const name =
                   anyM.display_name ||

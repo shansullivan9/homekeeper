@@ -1016,8 +1016,15 @@ export default function DocumentsPage() {
   }, [documents, filter, search]);
 
   const activeChips = useMemo(() => {
-    const chips = ['all', ...Object.keys(categoryCounts).filter((k) => k !== 'all')];
-    return chips;
+    const others = Object.keys(categoryCounts)
+      .filter((k) => k !== 'all')
+      .sort((a, b) => {
+        // Push "Uncategorized" to the end; everything else alpha.
+        if (a === 'Uncategorized') return 1;
+        if (b === 'Uncategorized') return -1;
+        return a.localeCompare(b, undefined, { sensitivity: 'base' });
+      });
+    return ['all', ...others];
   }, [categoryCounts]);
 
   if (showForm) {

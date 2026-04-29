@@ -120,10 +120,45 @@ function AddTaskForm() {
   const [assignedTo, setAssignedTo] = useState('');
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(true);
+  const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
     setEditMode(!editId);
   }, [editId]);
+
+  // Anything the user typed counts as "dirty" — used by the back
+  // button to warn before silently discarding their work.
+  useEffect(() => {
+    if (!editMode && editId) {
+      // In view mode for an existing task; nothing to save.
+      setDirty(false);
+      return;
+    }
+    const hasContent =
+      title.trim() !== '' ||
+      notes.trim() !== '' ||
+      estimatedMinutes !== '' ||
+      estimatedCost !== '' ||
+      categoryId !== '' ||
+      assignedTo !== '' ||
+      applianceId !== '' ||
+      dueDate !== '' ||
+      completedOn !== '' ||
+      isCompleted ||
+      recurrence !== 'one_time' ||
+      priority !== 'medium';
+    setDirty(hasContent);
+  }, [title, notes, estimatedMinutes, estimatedCost, categoryId, assignedTo, applianceId, dueDate, completedOn, isCompleted, recurrence, priority, editMode, editId]);
+
+  const confirmBack = () => {
+    if (!dirty) {
+      router.back();
+      return;
+    }
+    if (confirm('Discard changes? Anything you typed will be lost.')) {
+      router.back();
+    }
+  };
 
   // Load existing task for editing
   useEffect(() => {
@@ -400,6 +435,7 @@ function AddTaskForm() {
       <PageHeader
         title={editId ? 'Task' : 'New Task'}
         back
+        onBack={confirmBack}
         rightAction={
           editId ? (
             <div className="flex items-center gap-3">
