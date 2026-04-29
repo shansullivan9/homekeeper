@@ -20,76 +20,113 @@ const DEFAULTS: Prefs = {
 
 const DAYS_OPTIONS = [0, 1, 2, 3, 5, 7, 14];
 
+type PushState = 'default' | 'granted' | 'denied' | 'unsupported';
+
 export default function NotificationsPage() {
-  const { user } = useStore();
+  const user = useStore((s) => s.user);
   const supabase = createClient();
   const [prefs, setPrefs] = useState<Prefs>(DEFAULTS);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [pushPermission, setPushPermission] = useState<NotificationPermission | 'unsupported'>('default');
+  const [pushPermission, setPushPermission] = useState<PushState>('default');
 
   useEffect(() => {
-    if (typeof Notification === 'undefined') {
+    try {
+      if (typeof window === 'undefined' || !('Notification' in window)) {
+        setPushPermission('unsupported');
+        return;
+      }
+      const perm = (window as any).Notification?.permission as PushState;
+      setPushPermission(perm || 'default');
+    } catch {
       setPushPermission('unsupported');
-    } else {
-      setPushPermission(Notification.permission);
     }
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
     const load = async () => {
-      if (!user) return;
-      const { data } = await supabase
-        .from('notification_preferences')
-        .select('remind_days_before, remind_on_due, remind_when_overdue')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      if (data) {
-        setPrefs({
-          remind_days_before: (data as any).remind_days_before ?? DEFAULTS.remind_days_before,
-          remind_on_due: (data as any).remind_on_due ?? DEFAULTS.remind_on_due,
-          remind_when_overdue: (data as any).remind_when_overdue ?? DEFAULTS.remind_when_overdue,
-        });
+      if (!user?.id) return;
+      try {
+        const { data } = await supabase
+          .from('notification_preferences')
+          .select('remind_days_before, remind_on_due, remind_when_overdue')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (cancelled) return;
+        if (data) {
+          const d = data as any;
+          setPrefs({
+            remind_days_before:
+              typeof d.remind_days_before === 'number'
+                ? d.remind_days_before
+                : DEFAULTS.remind_days_before,
+            remind_on_due:
+              typeof d.remind_on_due === 'boolean'
+                ? d.remind_on_due
+                : DEFAULTS.remind_on_due,
+            remind_when_overdue:
+              typeof d.remind_when_overdue === 'boolean'
+                ? d.remind_when_overdue
+                : DEFAULTS.remind_when_overdue,
+          });
+        }
+      } catch (err) {
+        // Table missing or RLS denied — fall back to defaults silently.
+        console.error('notification prefs load:', err);
       }
-      setLoaded(true);
+      if (!cancelled) setLoaded(true);
     };
     load();
-  }, [user, supabase]);
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, supabase]);
 
   const save = async (next: Prefs) => {
-    if (!user) return;
+    if (!user?.id) return;
     setSaving(true);
-    const { error } = await supabase
-      .from('notification_preferences')
-      .upsert(
-        { user_id: user.id, ...next, updated_at: new Date().toISOString() } as any,
-        { onConflict: 'user_id' } as any
-      );
-    setSaving(false);
-    if (error) {
-      toast.error('Could not save');
-    } else {
+    try {
+      const { error } = await supabase
+        .from('notification_preferences')
+        .upsert(
+          {
+            user_id: user.id,
+            remind_days_before: next.remind_days_before,
+            remind_on_due: next.remind_on_due,
+            remind_when_overdue: next.remind_when_overdue,
+            updated_at: new Date().toISOString(),
+          } as any,
+          { onConflict: 'user_id' } as any
+        );
+      if (error) throw error;
       toast.success('Saved');
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not save');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const update = <K extends keyof Prefs>(key: K, value: Prefs[K]) => {
-    const next = { ...prefs, [key]: value };
-    setPrefs(next);
-    save(next);
+  const updatePref = (next: Partial<Prefs>) => {
+    const merged = { ...prefs, ...next };
+    setPrefs(merged);
+    save(merged);
   };
 
   const requestPushPermission = async () => {
-    if (typeof Notification === 'undefined') {
-      toast.error('Notifications not supported in this browser');
-      return;
-    }
-    const result = await Notification.requestPermission();
-    setPushPermission(result);
-    if (result === 'granted') {
-      toast.success('Notifications enabled');
-    } else if (result === 'denied') {
-      toast.error('Notifications blocked — enable in your browser settings');
+    try {
+      if (typeof window === 'undefined' || !('Notification' in window)) {
+        toast.error('Notifications not supported in this browser');
+        return;
+      }
+      const result = await (window as any).Notification.requestPermission();
+      setPushPermission((result as PushState) || 'default');
+      if (result === 'granted') toast.success('Notifications enabled');
+      else if (result === 'denied')
+        toast.error('Notifications blocked — enable in your browser settings');
+    } catch {
+      toast.error('Notifications not supported');
     }
   };
 
@@ -118,7 +155,7 @@ export default function NotificationsPage() {
                   </p>
                 </div>
               </div>
-              {pushPermission !== 'granted' && pushPermission !== 'unsupported' && (
+              {pushPermission === 'default' && (
                 <button
                   onClick={requestPushPermission}
                   className="text-brand-500 text-sm font-semibold"
@@ -134,7 +171,6 @@ export default function NotificationsPage() {
         <div>
           <p className="section-header">Reminders</p>
           <div className="mx-4 ios-card overflow-hidden">
-            {/* Lead time */}
             <div className="px-4 py-3 border-b border-gray-100">
               <p className="text-[15px] font-medium">Remind me before due</p>
               <p className="text-xs text-ink-secondary mb-2">
@@ -144,7 +180,7 @@ export default function NotificationsPage() {
                 {DAYS_OPTIONS.map((d) => (
                   <button
                     key={d}
-                    onClick={() => update('remind_days_before', d)}
+                    onClick={() => updatePref({ remind_days_before: d })}
                     disabled={saving || !loaded}
                     className={`px-3 py-1.5 rounded-ios text-sm font-medium transition-colors ${
                       prefs.remind_days_before === d
@@ -158,33 +194,53 @@ export default function NotificationsPage() {
               </div>
             </div>
 
-            {/* Toggle: on due date */}
             <button
-              onClick={() => update('remind_on_due', !prefs.remind_on_due)}
+              onClick={() => updatePref({ remind_on_due: !prefs.remind_on_due })}
               disabled={saving || !loaded}
               className="ios-list-item w-full"
             >
               <div className="text-left">
                 <p className="text-[15px] font-medium">On the due date</p>
-                <p className="text-xs text-ink-secondary">A reminder the day a task is due.</p>
+                <p className="text-xs text-ink-secondary">
+                  A reminder the day a task is due.
+                </p>
               </div>
-              <div className={`w-12 h-7 rounded-full transition-colors relative ${prefs.remind_on_due ? 'bg-status-green' : 'bg-gray-200'}`}>
-                <div className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${prefs.remind_on_due ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              <div
+                className={`w-12 h-7 rounded-full transition-colors relative ${
+                  prefs.remind_on_due ? 'bg-status-green' : 'bg-gray-200'
+                }`}
+              >
+                <div
+                  className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${
+                    prefs.remind_on_due ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}
+                />
               </div>
             </button>
 
-            {/* Toggle: overdue */}
             <button
-              onClick={() => update('remind_when_overdue', !prefs.remind_when_overdue)}
+              onClick={() =>
+                updatePref({ remind_when_overdue: !prefs.remind_when_overdue })
+              }
               disabled={saving || !loaded}
               className="ios-list-item w-full"
             >
               <div className="text-left">
                 <p className="text-[15px] font-medium">When a task is overdue</p>
-                <p className="text-xs text-ink-secondary">Daily nudge until you complete it.</p>
+                <p className="text-xs text-ink-secondary">
+                  Daily nudge until you complete it.
+                </p>
               </div>
-              <div className={`w-12 h-7 rounded-full transition-colors relative ${prefs.remind_when_overdue ? 'bg-status-green' : 'bg-gray-200'}`}>
-                <div className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${prefs.remind_when_overdue ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              <div
+                className={`w-12 h-7 rounded-full transition-colors relative ${
+                  prefs.remind_when_overdue ? 'bg-status-green' : 'bg-gray-200'
+                }`}
+              >
+                <div
+                  className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${
+                    prefs.remind_when_overdue ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}
+                />
               </div>
             </button>
           </div>

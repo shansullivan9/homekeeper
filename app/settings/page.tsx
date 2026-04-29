@@ -57,6 +57,10 @@ export default function SettingsPage() {
   const [showJoin, setShowJoin] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [emailDraft, setEmailDraft] = useState('');
+  const [editingHomeName, setEditingHomeName] = useState(false);
+  const [homeNameDraft, setHomeNameDraft] = useState('');
   const [rotating, setRotating] = useState(false);
 
   const isOwner = members.find((m) => (m as any).user_id === user?.id)?.role === 'owner';
@@ -77,6 +81,47 @@ export default function SettingsPage() {
     if (data) setUser(data as any);
     toast.success('Name updated');
     setEditingName(false);
+  };
+
+  const saveEmail = async () => {
+    const next = emailDraft.trim();
+    if (!user || !next) return;
+    if (next === user.email) {
+      setEditingEmail(false);
+      return;
+    }
+    // Supabase auth requires email confirmation — both the old and
+    // new addresses get a "confirm change" email, after which the
+    // change takes effect.
+    const { error } = await supabase.auth.updateUser({ email: next });
+    if (error) {
+      toast.error(error.message || 'Could not update email');
+      return;
+    }
+    toast.success('Check both inboxes to confirm the change');
+    setEditingEmail(false);
+  };
+
+  const saveHomeName = async () => {
+    const next = homeNameDraft.trim();
+    if (!home || !next) return;
+    if (next === home.name) {
+      setEditingHomeName(false);
+      return;
+    }
+    const { data, error } = await supabase
+      .from('homes')
+      .update({ name: next, updated_at: new Date().toISOString() })
+      .eq('id', home.id)
+      .select()
+      .single();
+    if (error) {
+      toast.error('Could not rename home');
+      return;
+    }
+    if (data) setHome(data as any);
+    toast.success('Home renamed');
+    setEditingHomeName(false);
   };
 
   const copyInviteCode = () => {
@@ -234,34 +279,109 @@ export default function SettingsPage() {
       <div className="py-4 space-y-5 md:max-w-2xl">
         {/* Profile */}
         <div className="mx-4 ios-card overflow-hidden">
-          <div className="px-4 py-4 flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-brand-100 flex items-center justify-center">
-              <UserCircle2 size={28} className="text-brand-500" />
+          {/* Display name row */}
+          <div className="px-4 py-3.5 flex items-center gap-3 border-b border-gray-100">
+            <div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center flex-shrink-0">
+              <UserCircle2 size={24} className="text-brand-500" />
             </div>
             <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary">
+                Name
+              </p>
               {editingName ? (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 mt-1">
                   <input
                     value={nameDraft}
                     onChange={(e) => setNameDraft(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') saveName(); }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveName();
+                      if (e.key === 'Escape') setEditingName(false);
+                    }}
                     autoFocus
                     maxLength={60}
-                    className="ios-input py-1.5"
+                    className="ios-input py-1.5 flex-1"
                   />
-                  <button onClick={saveName} className="text-brand-500 text-sm font-semibold">Save</button>
-                  <button onClick={() => setEditingName(false)} className="text-ink-tertiary text-sm">Cancel</button>
                 </div>
               ) : (
-                <>
-                  <p className="font-semibold text-[15px] truncate">{user?.display_name || 'Add your name'}</p>
-                  <p className="text-xs text-ink-secondary truncate">{user?.email}</p>
-                </>
+                <p className="text-[15px] font-medium truncate">
+                  {user?.display_name || 'Add your name'}
+                </p>
               )}
             </div>
-            {!editingName && (
+            {editingName ? (
+              <>
+                <button onClick={saveName} className="text-brand-500 text-sm font-semibold">
+                  Save
+                </button>
+                <button
+                  onClick={() => setEditingName(false)}
+                  className="text-ink-tertiary text-sm"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
               <button
-                onClick={() => { setNameDraft(user?.display_name || ''); setEditingName(true); }}
+                onClick={() => {
+                  setNameDraft(user?.display_name || '');
+                  setEditingName(true);
+                }}
+                className="text-brand-500 text-sm font-medium"
+              >
+                Edit
+              </button>
+            )}
+          </div>
+
+          {/* Email row */}
+          <div className="px-4 py-3.5 flex items-center gap-3">
+            <div className="w-10 h-10 flex items-center justify-center flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary">
+                Email
+              </p>
+              {editingEmail ? (
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="email"
+                    value={emailDraft}
+                    onChange={(e) => setEmailDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveEmail();
+                      if (e.key === 'Escape') setEditingEmail(false);
+                    }}
+                    autoFocus
+                    autoComplete="email"
+                    className="ios-input py-1.5 flex-1"
+                  />
+                </div>
+              ) : (
+                <p className="text-[14px] text-ink-secondary truncate">{user?.email}</p>
+              )}
+              {editingEmail && (
+                <p className="text-[11px] text-ink-tertiary mt-1">
+                  We'll email both your old and new address to confirm.
+                </p>
+              )}
+            </div>
+            {editingEmail ? (
+              <>
+                <button onClick={saveEmail} className="text-brand-500 text-sm font-semibold">
+                  Save
+                </button>
+                <button
+                  onClick={() => setEditingEmail(false)}
+                  className="text-ink-tertiary text-sm"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => {
+                  setEmailDraft(user?.email || '');
+                  setEditingEmail(true);
+                }}
                 className="text-brand-500 text-sm font-medium"
               >
                 Edit
@@ -307,14 +427,56 @@ export default function SettingsPage() {
         <div>
           <p className="section-header">Household</p>
           <div className="mx-4 ios-card overflow-hidden">
-            {/* Home Name */}
+            {/* Home Name — inline edit; "More details" still routes
+                 to the full home profile for property-level fields. */}
             <div className="ios-list-item">
-              <div className="flex items-center gap-3">
-                <Home size={18} className="text-brand-500" />
-                <span className="text-[15px]">{home?.name || 'My Home'}</span>
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <Home size={18} className="text-brand-500 flex-shrink-0" />
+                {editingHomeName ? (
+                  <input
+                    value={homeNameDraft}
+                    onChange={(e) => setHomeNameDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveHomeName();
+                      if (e.key === 'Escape') setEditingHomeName(false);
+                    }}
+                    autoFocus
+                    maxLength={80}
+                    className="ios-input py-1.5 flex-1"
+                  />
+                ) : (
+                  <span className="text-[15px] truncate">{home?.name || 'My Home'}</span>
+                )}
               </div>
-              <button onClick={() => router.push('/home-profile')} className="text-brand-500 text-sm font-medium">Edit</button>
+              {editingHomeName ? (
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button onClick={saveHomeName} className="text-brand-500 text-sm font-semibold">Save</button>
+                  <button onClick={() => setEditingHomeName(false)} className="text-ink-tertiary text-sm">Cancel</button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setHomeNameDraft(home?.name || '');
+                    setEditingHomeName(true);
+                  }}
+                  className="text-brand-500 text-sm font-medium flex-shrink-0"
+                >
+                  Edit
+                </button>
+              )}
             </div>
+
+            {/* Property details — separate, clearly labeled */}
+            <button
+              onClick={() => router.push('/home-profile')}
+              className="ios-list-item w-full"
+            >
+              <div className="flex items-center gap-3">
+                <Home size={18} className="text-ink-secondary" />
+                <span className="text-[15px]">Property details</span>
+              </div>
+              <ChevronRight size={16} className="text-ink-tertiary" />
+            </button>
 
             {/* Members */}
             <div className="px-4 py-3 border-b border-gray-100">
