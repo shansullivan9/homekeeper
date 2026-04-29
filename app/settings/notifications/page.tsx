@@ -4,7 +4,7 @@ import { useStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase-browser';
 import PageHeader from '@/components/layout/PageHeader';
 import toast from 'react-hot-toast';
-import { Bell } from 'lucide-react';
+import { Bell, Check } from 'lucide-react';
 
 interface Prefs {
   remind_days_before: number;
@@ -391,9 +391,16 @@ export default function NotificationsPage() {
       <PageHeader title="Notifications" back />
 
       <div className="py-4 space-y-5 md:max-w-2xl">
-        {/* System permission */}
-        <div>
-          <p className="section-header">Browser Permission</p>
+        {/* Permission status — only loud when action is needed.
+            When granted, a slim confirmation pill is enough. */}
+        {pushPermission === 'granted' ? (
+          <div className="mx-4 flex items-center gap-2 text-xs text-ink-secondary">
+            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-status-green/10">
+              <Check size={12} className="text-status-green" strokeWidth={3} />
+            </span>
+            <span>Push enabled on this device</span>
+          </div>
+        ) : (
           <div className="mx-4 ios-card overflow-hidden">
             <div className="ios-list-item">
               <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -401,13 +408,11 @@ export default function NotificationsPage() {
                 <div className="flex-1 min-w-0">
                   <p className="text-[15px] font-medium">Push notifications</p>
                   <p className="text-xs text-ink-secondary">
-                    {pushPermission === 'granted'
-                      ? 'Allowed in this browser.'
-                      : pushPermission === 'denied'
-                      ? 'Blocked. Enable in your browser settings.'
+                    {pushPermission === 'denied'
+                      ? 'Blocked — enable in your browser settings.'
                       : pushPermission === 'unsupported'
                       ? "This browser doesn't support web notifications."
-                      : 'Not yet allowed.'}
+                      : 'Tap Enable to start receiving reminders.'}
                   </p>
                 </div>
               </div>
@@ -421,14 +426,14 @@ export default function NotificationsPage() {
                 </button>
               )}
             </div>
+            {pushPermission === 'unsupported' && (
+              <p className="text-[11px] text-ink-tertiary px-4 pb-3">
+                On iPhone, tap Share in Safari → Add to Home Screen, then
+                open the app from your home screen and try again.
+              </p>
+            )}
           </div>
-          {pushPermission === 'unsupported' && (
-            <p className="text-[11px] text-ink-tertiary mx-4 mt-2">
-              On iPhone, install the app first: tap Share in Safari → Add to
-              Home Screen, then open it from your home screen and try again.
-            </p>
-          )}
-        </div>
+        )}
 
         {/* Reminder rules */}
         <div>
@@ -437,11 +442,7 @@ export default function NotificationsPage() {
             {/* Time of day picker — runs in the user's local zone via
                 the function's timezone-aware dispatcher. */}
             <div className="px-4 py-3 border-b border-gray-100">
-              <p className="text-[15px] font-medium">When to send reminders</p>
-              <p className="text-xs text-ink-secondary mb-2">
-                What time of day. We'll deliver in your local time
-                ({prefs.timezone || detectTimezone()}).
-              </p>
+              <p className="text-[15px] font-medium mb-2">Time of day</p>
               <select
                 value={prefs.reminder_hour_local}
                 onChange={(e) =>
@@ -459,10 +460,7 @@ export default function NotificationsPage() {
             </div>
 
             <div className="px-4 py-3 border-b border-gray-100">
-              <p className="text-[15px] font-medium">Remind me before due</p>
-              <p className="text-xs text-ink-secondary mb-2">
-                How many days ahead of a task's due date.
-              </p>
+              <p className="text-[15px] font-medium mb-2">Days before due</p>
               <div className="flex flex-wrap gap-2">
                 {DAYS_OPTIONS.map((d) => (
                   <button
@@ -486,14 +484,11 @@ export default function NotificationsPage() {
               disabled={saving || !loaded}
               className="ios-list-item w-full"
             >
-              <div className="text-left">
-                <p className="text-[15px] font-medium">On the due date</p>
-                <p className="text-xs text-ink-secondary">
-                  A reminder the day a task is due.
-                </p>
-              </div>
+              <p className="text-[15px] font-medium text-left flex-1">
+                On the due date
+              </p>
               <div
-                className={`w-12 h-7 rounded-full transition-colors relative ${
+                className={`w-12 h-7 rounded-full transition-colors relative shrink-0 ${
                   prefs.remind_on_due ? 'bg-status-green' : 'bg-gray-200'
                 }`}
               >
@@ -512,14 +507,14 @@ export default function NotificationsPage() {
               disabled={saving || !loaded}
               className="ios-list-item w-full"
             >
-              <div className="text-left">
-                <p className="text-[15px] font-medium">When a task is overdue</p>
+              <div className="text-left flex-1">
+                <p className="text-[15px] font-medium">When overdue</p>
                 <p className="text-xs text-ink-secondary">
-                  Daily nudge until you complete it.
+                  Daily until you complete it.
                 </p>
               </div>
               <div
-                className={`w-12 h-7 rounded-full transition-colors relative ${
+                className={`w-12 h-7 rounded-full transition-colors relative shrink-0 ${
                   prefs.remind_when_overdue ? 'bg-status-green' : 'bg-gray-200'
                 }`}
               >
@@ -532,9 +527,8 @@ export default function NotificationsPage() {
             </button>
           </div>
           <p className="text-[11px] text-ink-tertiary mx-4 mt-2">
-            Preferences save automatically. Push delivery requires browser
-            permission. iPhone users must install the app to the Home Screen
-            first.
+            Delivered in your local time ({prefs.timezone || detectTimezone()}).
+            Changes save automatically.
           </p>
         </div>
       </div>
