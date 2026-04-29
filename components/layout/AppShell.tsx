@@ -77,6 +77,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         // home-switcher can list them with names.
         store.setUserMemberships(memberships as any);
 
+        // First-run redirect: any user who has a home but hasn't been
+        // through the welcome wizard yet gets sent there once. We use
+        // localStorage so the user doesn't see the wizard on every
+        // device, but that's fine — they can re-run by clearing the
+        // flag in the browser if they want.
+        if (
+          typeof window !== 'undefined' &&
+          !window.localStorage.getItem('homekeeper.welcomedAt') &&
+          pathname !== '/welcome' &&
+          pathname !== '/home-profile'
+        ) {
+          router.push('/welcome');
+        }
+
         // Load everything else in parallel
         const homeId = homeData?.id || membership.home_id;
         const results = await Promise.allSettled([

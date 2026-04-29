@@ -20,7 +20,7 @@ const APPLIANCE_CATEGORIES = [
 ];
 
 export default function AppliancesPage() {
-  const { appliances, home, setAppliances, documents, tasks } = useStore();
+  const { appliances, home, setAppliances, documents, tasks, history } = useStore();
   const supabase = createClient();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -59,6 +59,8 @@ export default function AppliancesPage() {
         serial_number: p.serial_number || '',
         category: p.category || '',
         notes: p.notes || '',
+        installation_date: p.installation_date || '',
+        warranty_expiration: p.warranty_expiration || '',
       }));
       if (p.manual_document_id) setManualDocId(p.manual_document_id);
       setShowForm(true);
@@ -512,6 +514,48 @@ export default function AppliancesPage() {
                       ))}
                     </>
                   )}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Photo gallery — every photo from a completed task linked
+              to this appliance. Read-only thumbnail wall; tap to open
+              the full image in a new tab. */}
+          {editing && (() => {
+            const linkedTaskIds = new Set(
+              tasks.filter((t: any) => t.appliance_id === editing.id).map((t) => t.id)
+            );
+            const photos: string[] = [];
+            for (const h of history) {
+              if (!h.photos || h.photos.length === 0) continue;
+              if (h.task_id && linkedTaskIds.has(h.task_id)) {
+                for (const u of h.photos) photos.push(u);
+              }
+            }
+            if (photos.length === 0) return null;
+            return (
+              <div>
+                <p className="text-xs text-ink-secondary mb-1 block">
+                  Photos ({photos.length})
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  {photos.map((url, i) => (
+                    <a
+                      key={`${url}-${i}`}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="aspect-square rounded-ios overflow-hidden bg-gray-100"
+                    >
+                      <img
+                        src={url}
+                        alt=""
+                        loading="lazy"
+                        className="w-full h-full object-cover"
+                      />
+                    </a>
+                  ))}
                 </div>
               </div>
             );

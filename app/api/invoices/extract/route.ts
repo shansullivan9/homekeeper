@@ -47,7 +47,7 @@ const SCHEMA = {
     },
     recurrence: {
       type: SchemaType.STRING,
-      description: 'How often this service recurs. One of: one_time, weekly, monthly, quarterly, yearly. Use yearly for things that are typically annual (termite inspection, HVAC tune-up, chimney sweep, roof inspection). Use one_time for one-off repairs or installations. Default to one_time when uncertain.',
+      description: 'How often this service recurs. One of: one_time, weekly, bi_monthly, monthly, quarterly, bi_annual, yearly. Pick yearly for things that are typically annual (termite inspection, HVAC tune-up, chimney sweep, roof inspection). bi_annual for "every 6 months" services (often pest control or HVAC seasonal service). bi_monthly = "every 2 months" (some pest control plans). one_time for one-off repairs or installations. Default to one_time when uncertain.',
     },
     notes: {
       type: SchemaType.STRING,
@@ -209,8 +209,10 @@ Never invent vendors or amounts.`;
   const allowedRecurrence = new Set([
     'one_time',
     'weekly',
+    'bi_monthly',
     'monthly',
     'quarterly',
+    'bi_annual',
     'yearly',
   ]);
   const rawRec = cleanStr(parsed.recurrence).toLowerCase();

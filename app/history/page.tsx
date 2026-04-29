@@ -220,6 +220,27 @@ export default function HistoryPage() {
                     {h.notes && (
                       <p className="text-xs text-ink-tertiary mt-1 line-clamp-2">{h.notes}</p>
                     )}
+                    {h.photos && h.photos.length > 0 && (
+                      <div className="flex gap-1.5 mt-2">
+                        {h.photos.slice(0, 4).map((url, i) => (
+                          <a
+                            key={i}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-12 h-12 rounded-md overflow-hidden bg-gray-100 flex-shrink-0"
+                          >
+                            <img
+                              src={url}
+                              alt=""
+                              loading="lazy"
+                              className="w-full h-full object-cover"
+                            />
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </button>
                 <div className="flex items-center gap-2 flex-shrink-0">

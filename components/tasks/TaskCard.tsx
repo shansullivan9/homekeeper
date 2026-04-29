@@ -66,6 +66,7 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
   const [completeCost, setCompleteCost] = useState('');
   const [completeMinutes, setCompleteMinutes] = useState('');
   const [completeNotes, setCompleteNotes] = useState('');
+  const [completePhotos, setCompletePhotos] = useState<File[]>([]);
   const [completing, setCompleting] = useState(false);
 
   const openCompleteSheet = (e: React.MouseEvent) => {
@@ -75,7 +76,28 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
     setCompleteCost(task.estimated_cost != null ? String(task.estimated_cost) : '');
     setCompleteMinutes(task.estimated_minutes != null ? String(task.estimated_minutes) : '');
     setCompleteNotes('');
+    setCompletePhotos([]);
     setShowCompleteSheet(true);
+  };
+
+  const uploadCompletionPhotos = async (homeId: string): Promise<string[]> => {
+    if (completePhotos.length === 0) return [];
+    const urls: string[] = [];
+    for (const f of completePhotos) {
+      const safeName = f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${homeId}/${task.id}/${Date.now()}-${safeName}`;
+      const { error } = await supabase.storage.from('photos').upload(path, f, {
+        contentType: f.type || 'image/jpeg',
+        upsert: false,
+      });
+      if (error) {
+        toast.error(`Photo ${f.name}: ${error.message}`);
+        continue;
+      }
+      const { data } = supabase.storage.from('photos').getPublicUrl(path);
+      if (data?.publicUrl) urls.push(data.publicUrl);
+    }
+    return urls;
   };
 
   const submitComplete = async () => {
@@ -83,7 +105,12 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
     setCompleting(true);
     const cost = completeCost.trim() === '' ? null : parseFloat(completeCost);
     const minutes = completeMinutes.trim() === '' ? null : parseInt(completeMinutes, 10);
-    const { error } = await supabase.rpc('complete_task', {
+
+    // Upload any photos first so we can write their URLs onto the
+    // history row right after complete_task creates it.
+    const photoUrls = await uploadCompletionPhotos(task.home_id);
+
+    const { data, error } = await supabase.rpc('complete_task', {
       p_task_id: task.id,
       p_user_id: user.id,
       p_notes: completeNotes.trim() || null,
@@ -95,6 +122,15 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
       toast.error('Failed to complete task');
       return;
     }
+    // Patch the freshly-created history row with the photo URLs.
+    const historyId = (data as any)?.history_id;
+    if (historyId && photoUrls.length > 0) {
+      await supabase
+        .from('task_history')
+        .update({ photos: photoUrls } as any)
+        .eq('id', historyId);
+    }
+
     const store = useStore.getState();
     const completedAt = new Date().toISOString();
     store.setTasks(
@@ -374,6 +410,25 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
                 placeholder="Vendor, observations, follow-ups…"
                 className="ios-input resize-none"
               />
+            </div>
+            {/* Photos — optional. Stored in the public 'photos' bucket
+                with the URLs written to task_history.photos. */}
+            <div>
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">
+                Photos (optional)
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => setCompletePhotos(Array.from(e.target.files || []))}
+                className="text-xs"
+              />
+              {completePhotos.length > 0 && (
+                <p className="text-[11px] text-ink-tertiary mt-1">
+                  {completePhotos.length} photo{completePhotos.length === 1 ? '' : 's'} ready to upload.
+                </p>
+              )}
             </div>
           </div>
           <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex gap-2">

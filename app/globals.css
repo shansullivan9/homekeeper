@@ -132,3 +132,24 @@ input, textarea, select {
     transition-duration: 0.001ms !important;
   }
 }
+
+/* Print styles — used by the Reports page so users can save the
+   year's maintenance log as a PDF. Hide app chrome, give cards a
+   simple border instead of shadow, drop the page background. */
+@media print {
+  body {
+    background: white !important;
+    padding: 0 !important;
+  }
+  nav, aside, header.sticky, .print\:hidden {
+    display: none !important;
+  }
+  .ios-card {
+    box-shadow: none !important;
+    border: 1px solid #e5e7eb !important;
+    page-break-inside: avoid;
+  }
+  a[href]::after {
+    content: '';
+  }
+}

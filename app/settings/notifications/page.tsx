@@ -114,6 +114,52 @@ export default function NotificationsPage() {
     save(merged);
   };
 
+  // Convert the URL-safe base64 VAPID key into a Uint8Array for the
+  // PushManager subscribe call.
+  const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
+    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const raw = atob(base64);
+    const out = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; ++i) out[i] = raw.charCodeAt(i);
+    return out;
+  };
+
+  const subscribeToPush = async () => {
+    if (!user?.id) return;
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+    const vapid = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    if (!vapid || vapid === 'your_vapid_public_key') {
+      // No VAPID key configured — silently skip the subscription so
+      // the browser permission still gets granted (the user may want
+      // local-only Notification API). The edge function won't have
+      // anything to send to until VAPID is set up.
+      return;
+    }
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(vapid),
+        });
+      }
+      await supabase
+        .from('notification_preferences')
+        .upsert(
+          {
+            user_id: user.id,
+            push_subscription: sub.toJSON(),
+            updated_at: new Date().toISOString(),
+          } as any,
+          { onConflict: 'user_id' } as any
+        );
+    } catch (err) {
+      console.error('push subscribe failed:', err);
+    }
+  };
+
   const requestPushPermission = async () => {
     try {
       if (typeof window === 'undefined' || !('Notification' in window)) {
@@ -122,13 +168,24 @@ export default function NotificationsPage() {
       }
       const result = await (window as any).Notification.requestPermission();
       setPushPermission((result as PushState) || 'default');
-      if (result === 'granted') toast.success('Notifications enabled');
-      else if (result === 'denied')
+      if (result === 'granted') {
+        toast.success('Notifications enabled');
+        subscribeToPush();
+      } else if (result === 'denied') {
         toast.error('Notifications blocked — enable in your browser settings');
+      }
     } catch {
       toast.error('Notifications not supported');
     }
   };
+
+  // If the user has already granted permission on a previous visit
+  // (e.g. they hit Enable last week), re-subscribe on mount so the
+  // server has an up-to-date push endpoint.
+  useEffect(() => {
+    if (pushPermission === 'granted') subscribeToPush();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pushPermission, user?.id]);
 
   return (
     <div>

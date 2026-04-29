@@ -49,6 +49,18 @@ const SCHEMA = {
       type: SchemaType.STRING,
       description: 'Optional short note (1 sentence) about anything notable, e.g. capacity, fuel type. Empty string if nothing notable.',
     },
+    installation_date: {
+      type: SchemaType.STRING,
+      description: 'Date the unit was installed in YYYY-MM-DD format, IF the document explicitly states an installation/setup/start-up date (e.g. an installer\'s rating-plate sticker, install paperwork, or a warranty-registration field). If only a year is given, return YYYY-01-01. Empty string if not present.',
+    },
+    purchase_date: {
+      type: SchemaType.STRING,
+      description: 'Date the unit was purchased in YYYY-MM-DD format if explicitly listed on a receipt, registration card, or warranty page. Empty string if absent.',
+    },
+    warranty_expiration: {
+      type: SchemaType.STRING,
+      description: 'Warranty end date in YYYY-MM-DD format if explicitly stated, OR computed by adding the stated warranty period (e.g. "5 years parts") to the purchase/installation date. Empty string if neither is determinable.',
+    },
   },
   required: [
     'is_appliance_manual',
@@ -59,6 +71,9 @@ const SCHEMA = {
     'serial_number',
     'category',
     'notes',
+    'installation_date',
+    'purchase_date',
+    'warranty_expiration',
   ],
 };
 
@@ -152,7 +167,12 @@ export async function POST(req: NextRequest) {
   const prompt = `You are extracting appliance details from a household appliance manual or appliance paperwork.
 Return strict JSON matching the schema. Use empty strings for unknown text fields.
 Set is_appliance_manual=false if the document is not actually an appliance manual or related paperwork.
-Look carefully for the serial number anywhere in the document — warranty registration pages, rating-plate photos, install records, stickers, packing slips, hand-written entries. If a serial number is present, return it exactly. If you cannot find one, return an empty string. Never invent or guess.`;
+
+SERIAL NUMBER: look carefully — warranty registration pages, rating-plate photos, install records, stickers, packing slips, hand-written entries. If a serial number is present, return it exactly. Never invent or guess.
+
+DATES: extract installation_date / purchase_date only when EXPLICITLY stated (installer's date stamp, dealer install plate, receipt, registration card). Compute warranty_expiration only when the document states the warranty period (e.g. "10 years parts, 5 years labor") AND a purchase or installation date is determinable. Otherwise leave date fields empty.
+
+CATEGORY: prefer one of "Refrigerator", "Dishwasher", "Washer", "Dryer", "Oven", "Range", "Microwave", "HVAC", "Furnace", "Heat Pump", "Air Conditioner", "Water Heater", "Garbage Disposal", "Fireplace", "Pool Equipment". Use a sensible alternative if none fit. Empty string if unknown.`;
 
   let result;
   try {
@@ -198,6 +218,10 @@ Look carefully for the serial number anywhere in the document — warranty regis
 
   const clean = (v: unknown) =>
     typeof v === 'string' && v.trim() ? v.trim() : '';
+  const cleanDate = (v: unknown) => {
+    const s = clean(v);
+    return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : '';
+  };
 
   return NextResponse.json({
     ok: true,
@@ -209,6 +233,9 @@ Look carefully for the serial number anywhere in the document — warranty regis
       serial_number: clean(parsed.serial_number),
       category: clean(parsed.category),
       notes: clean(parsed.notes),
+      installation_date: cleanDate(parsed.installation_date),
+      purchase_date: cleanDate(parsed.purchase_date),
+      warranty_expiration: cleanDate(parsed.warranty_expiration),
     },
     sourceDocumentId: (doc as any).id,
     sourceDocumentTitle: (doc as any).title,
