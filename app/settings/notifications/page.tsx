@@ -185,13 +185,44 @@ export default function NotificationsPage() {
         return;
       }
 
-      stage = 'waiting for service worker';
-      toast.loading('Step 2/4: waiting for service worker…', { id: 'push-step', duration: 6000 });
-      const reg = await withTimeout(
-        navigator.serviceWorker.ready,
-        8_000,
-        'service worker ready'
-      );
+      stage = 'registering service worker';
+      toast.loading('Step 2/4: registering service worker…', { id: 'push-step', duration: 6000 });
+      // iOS Safari's PWA context doesn't always auto-register the
+      // next-pwa SW, so navigator.serviceWorker.ready can hang forever.
+      // Get an existing registration if there is one, otherwise
+      // register /sw.js ourselves and wait for it to activate.
+      let reg = (await navigator.serviceWorker.getRegistration()) || null;
+      if (!reg) {
+        reg = await withTimeout(
+          navigator.serviceWorker.register('/sw.js', { scope: '/' }),
+          10_000,
+          'serviceWorker.register'
+        );
+      }
+      // Wait for it to actually be active (installing → activated).
+      if (!reg.active) {
+        await withTimeout(
+          new Promise<void>((resolve, reject) => {
+            const sw = reg!.installing || reg!.waiting;
+            if (!sw) {
+              if (reg!.active) return resolve();
+              return reject(new Error('no installing/waiting/active worker on registration'));
+            }
+            const onChange = () => {
+              if (sw.state === 'activated') {
+                sw.removeEventListener('statechange', onChange);
+                resolve();
+              } else if (sw.state === 'redundant') {
+                sw.removeEventListener('statechange', onChange);
+                reject(new Error('worker became redundant'));
+              }
+            };
+            sw.addEventListener('statechange', onChange);
+          }),
+          10_000,
+          'serviceWorker activation'
+        );
+      }
 
       stage = 'subscribing to push';
       toast.loading('Step 3/4: subscribing to push…', { id: 'push-step', duration: 8000 });
