@@ -146,11 +146,17 @@ export default function NotificationsPage() {
   // throws PushManager errors when the page isn't installed as a
   // PWA, and we don't want that to crash the whole page.
   const subscribeToPush = async () => {
-    if (!user?.id) return;
-    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+    if (!user?.id) {
+      toast.error('No user — please sign in again');
+      return;
+    }
+    if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
+      toast.error('Service workers not supported in this browser');
+      return;
+    }
     const vapid = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     if (!vapid || vapid === 'your_vapid_public_key') {
-      console.warn('VAPID public key not configured — skipping push subscription.');
+      toast.error('VAPID key missing in build (env var not deployed yet)');
       return;
     }
     setSubscribing(true);
@@ -165,14 +171,14 @@ export default function NotificationsPage() {
       if (!sub) {
         const key = urlBase64ToUint8Array(vapid);
         if (!key) {
-          throw new Error('VAPID key looks malformed.');
+          throw new Error('VAPID key looks malformed');
         }
         sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
           applicationServerKey: key,
         });
       }
-      await supabase
+      const { error: upsertErr } = await supabase
         .from('notification_preferences')
         .upsert(
           {
@@ -182,16 +188,20 @@ export default function NotificationsPage() {
           } as any,
           { onConflict: 'user_id' } as any
         );
+      if (upsertErr) {
+        throw new Error('DB save failed: ' + upsertErr.message);
+      }
+      toast.success('Push subscription saved!');
     } catch (err: any) {
+      const msg = (err && err.message) || String(err);
       // iOS Safari throws here when the page isn't installed as a
       // PWA via "Add to Home Screen". Surface a tip in that case
       // instead of a generic error.
-      const msg = (err && err.message) || '';
       if (/permission|gesture|user/i.test(msg)) {
-        toast.error('Permission denied or not in a PWA. iOS users: tap Share → Add to Home Screen, then open from there.');
+        toast.error('Push blocked. iOS users: install via Add to Home Screen first.');
       } else {
+        toast.error('Subscribe failed: ' + msg);
         console.error('push subscribe failed:', err);
-        toast.error('Could not subscribe to push.');
       }
     } finally {
       setSubscribing(false);
