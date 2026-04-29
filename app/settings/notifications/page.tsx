@@ -155,20 +155,46 @@ export default function NotificationsPage() {
       return;
     }
     setSubscribing(true);
+
+    // Helper that races a promise against a timeout so we can catch
+    // hangs (especially iOS Safari's pushManager calls) instead of
+    // leaving the user staring at a spinner forever.
+    const withTimeout = <T,>(p: Promise<T>, ms: number, label: string) =>
+      Promise.race<T>([
+        p,
+        new Promise<T>((_, reject) =>
+          setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms)
+        ),
+      ]);
+
+    let stage = 'init';
     try {
-      // Fetch the VAPID key from our own API at runtime so the client
-      // doesn't depend on a NEXT_PUBLIC_* env var being inlined at
-      // build time. The route reads from process.env at request time.
-      const cfgRes = await fetch('/api/push/config', { cache: 'no-store' });
+      stage = 'fetching VAPID config';
+      toast.loading('Step 1/4: fetching VAPID config…', { id: 'push-step', duration: 4000 });
+      const cfgRes = await withTimeout(
+        fetch('/api/push/config', { cache: 'no-store' }),
+        10_000,
+        'config fetch'
+      );
       const cfg = await cfgRes.json().catch(() => ({}));
       const vapid = (cfg && cfg.vapidPublicKey) || '';
       if (!vapid || vapid === 'your_vapid_public_key') {
-        toast.error('Server is missing VAPID_PUBLIC_KEY env var');
+        toast.dismiss('push-step');
+        toast.error('Server missing VAPID_PUBLIC_KEY env var');
         setSubscribing(false);
         return;
       }
 
-      const reg = await navigator.serviceWorker.ready;
+      stage = 'waiting for service worker';
+      toast.loading('Step 2/4: waiting for service worker…', { id: 'push-step', duration: 6000 });
+      const reg = await withTimeout(
+        navigator.serviceWorker.ready,
+        8_000,
+        'service worker ready'
+      );
+
+      stage = 'subscribing to push';
+      toast.loading('Step 3/4: subscribing to push…', { id: 'push-step', duration: 8000 });
       let sub: PushSubscription | null = null;
       try {
         sub = await reg.pushManager.getSubscription();
@@ -177,14 +203,19 @@ export default function NotificationsPage() {
       }
       if (!sub) {
         const key = urlBase64ToUint8Array(vapid);
-        if (!key) {
-          throw new Error('VAPID key looks malformed');
-        }
-        sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: key,
-        });
+        if (!key) throw new Error('VAPID key looks malformed');
+        sub = await withTimeout(
+          reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: key,
+          }),
+          15_000,
+          'pushManager.subscribe'
+        );
       }
+
+      stage = 'saving subscription';
+      toast.loading('Step 4/4: saving to your account…', { id: 'push-step', duration: 6000 });
       const { error: upsertErr } = await supabase
         .from('notification_preferences')
         .upsert(
@@ -195,18 +226,15 @@ export default function NotificationsPage() {
           } as any,
           { onConflict: 'user_id' } as any
         );
-      if (upsertErr) {
-        throw new Error('DB save failed: ' + upsertErr.message);
-      }
+      if (upsertErr) throw new Error('DB save failed: ' + upsertErr.message);
+
+      toast.dismiss('push-step');
       toast.success('Push subscription saved!');
     } catch (err: any) {
+      toast.dismiss('push-step');
       const msg = (err && err.message) || String(err);
-      if (/permission|gesture|user/i.test(msg)) {
-        toast.error('Push blocked. iOS users: install via Add to Home Screen first.');
-      } else {
-        toast.error('Subscribe failed: ' + msg);
-        console.error('push subscribe failed:', err);
-      }
+      toast.error(`Failed at "${stage}": ${msg}`);
+      console.error('push subscribe failed at', stage, err);
     } finally {
       setSubscribing(false);
     }
