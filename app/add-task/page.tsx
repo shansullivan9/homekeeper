@@ -160,6 +160,19 @@ function AddTaskForm() {
     }
   };
 
+  // Calendar's empty-day "+ Add task on Jun 14" button stashes the
+  // chosen date in sessionStorage. Pick it up on mount so the form
+  // opens with that date pre-selected.
+  useEffect(() => {
+    if (editId || typeof window === 'undefined') return;
+    const prefilled = sessionStorage.getItem('homekeeper.prefilledDueDate');
+    if (prefilled) {
+      setDueDate(prefilled);
+      sessionStorage.removeItem('homekeeper.prefilledDueDate');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId]);
+
   // Load existing task for editing
   useEffect(() => {
     if (editId) {
@@ -568,6 +581,36 @@ function AddTaskForm() {
                   ? format(parseISO(dueDate), 'MMM d, yyyy')
                   : <span className="text-ink-tertiary">No date</span>}
               </span>
+            </div>
+            {/* Quick-pick shortcuts that cover the common cases so the
+                user doesn't have to scrub the calendar for "today" or
+                "next month". */}
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {[
+                { label: 'Today', daysFromNow: 0 },
+                { label: 'Tomorrow', daysFromNow: 1 },
+                { label: 'Next week', daysFromNow: 7 },
+                { label: 'Next month', daysFromNow: 30 },
+              ].map(({ label, daysFromNow }) => {
+                const target = new Date();
+                target.setDate(target.getDate() + daysFromNow);
+                const targetStr = target.toISOString().slice(0, 10);
+                const active = dueDate === targetStr;
+                return (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => setDueDate(targetStr)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                      active
+                        ? 'bg-brand-500 text-white'
+                        : 'bg-surface-secondary text-ink-secondary md:hover:bg-surface-tertiary active:bg-surface-tertiary'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
             </div>
             <InlineCalendar value={dueDate} onChange={setDueDate} />
             {dueDate && (
