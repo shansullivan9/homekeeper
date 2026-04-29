@@ -12,7 +12,7 @@ import { Home as HomeIcon, Users, ChevronRight, Package, Clock3, Banknote, FileT
 type ClaimFilter = 'all' | 'unclaimed' | 'mine' | 'theirs';
 
 export default function DashboardPage() {
-  const { tasks, home, user, members, history } = useStore();
+  const { tasks, home, user, members, history, appliances, documents } = useStore();
   const { loadData } = useAppInit();
   const router = useRouter();
   const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
@@ -232,12 +232,12 @@ export default function DashboardPage() {
           <div className="mx-4 mb-4">
             <div className="ios-card overflow-hidden">
               {[
-                { label: 'Appliances & Systems', icon: Package, href: '/appliances', color: 'text-purple-500' },
-                { label: 'Documents', icon: FileText, href: '/documents', color: 'text-sky-500' },
-                { label: 'Expenses', icon: Banknote, href: '/expenses', color: 'text-emerald-500' },
-                { label: 'Home Profile', icon: HomeIcon, href: '/home-profile', color: 'text-brand-500' },
-                { label: 'Home Timeline', icon: Clock3, href: '/timeline', color: 'text-amber-500' },
-              ].map(({ label, icon: Icon, href, color }) => (
+                { label: 'Appliances & Systems', icon: Package, href: '/appliances', color: 'text-purple-500', count: appliances.length },
+                { label: 'Documents', icon: FileText, href: '/documents', color: 'text-sky-500', count: documents.length },
+                { label: 'Expenses', icon: Banknote, href: '/expenses', color: 'text-emerald-500', count: null as number | null },
+                { label: 'Home Profile', icon: HomeIcon, href: '/home-profile', color: 'text-brand-500', count: null as number | null },
+                { label: 'Home Timeline', icon: Clock3, href: '/timeline', color: 'text-amber-500', count: null as number | null },
+              ].map(({ label, icon: Icon, href, color, count }) => (
                 <button key={href} onClick={() => router.push(href)} className="ios-list-item w-full">
                   <div className="flex items-center gap-3">
                     <div className={`w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center ${color}`}>
@@ -245,7 +245,12 @@ export default function DashboardPage() {
                     </div>
                     <span className="text-[15px] font-medium">{label}</span>
                   </div>
-                  <ChevronRight size={16} className="text-ink-tertiary" />
+                  <div className="flex items-center gap-2">
+                    {count !== null && count > 0 && (
+                      <span className="text-xs text-ink-tertiary tabular-nums">{count}</span>
+                    )}
+                    <ChevronRight size={16} className="text-ink-tertiary" />
+                  </div>
                 </button>
               ))}
             </div>
