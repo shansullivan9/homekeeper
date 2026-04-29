@@ -17,6 +17,8 @@ import {
   Image as ImageIcon,
   FileSpreadsheet,
   File as FileIcon,
+  Sparkles,
+  Check,
 } from 'lucide-react';
 import { format, parseISO, addDays, addMonths, addYears } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -79,6 +81,20 @@ export default function DocumentsPage() {
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [form, setForm] = useState({ title: '', category: '', notes: '', appliance_id: '' });
+  // Bulk-upload review queue. After upload + classify, instead of
+  // immediately calling each processor (which auto-creates appliances,
+  // tasks, history rows, profile updates), we hand them to this modal
+  // so the user can confirm or skip each AI action.
+  const [reviewBuckets, setReviewBuckets] = useState<{
+    Manual: Document[];
+    Invoice: Document[];
+    'Builder Doc': Document[];
+  } | null>(null);
+  const [reviewSelections, setReviewSelections] = useState<{
+    Manual: boolean;
+    Invoice: boolean;
+    'Builder Doc': boolean;
+  }>({ Manual: true, Invoice: true, 'Builder Doc': true });
 
   // Run classify on each uploaded document. If the user didn't pick a
   // category in the form, use the classifier's pick. Always store the
@@ -808,21 +824,55 @@ export default function DocumentsPage() {
         buckets[cat].push(doc);
       }
 
-      if (buckets['Manual']?.length === 1) {
-        await analyzeManual(buckets['Manual'][0]);
-      } else if (buckets['Manual']?.length) {
-        await batchAnalyzeManuals(buckets['Manual']);
-      }
-      if (buckets['Invoice']?.length) {
-        await processInvoices(buckets['Invoice']);
-      }
-      if (buckets['Builder Doc']?.length) {
-        await processBuilderDocs(buckets['Builder Doc']);
+      const manuals = buckets['Manual'] || [];
+      const invoices = buckets['Invoice'] || [];
+      const builderDocs = buckets['Builder Doc'] || [];
+
+      // Single-file uploads keep the legacy direct flow so the user
+      // doesn't get an extra confirmation for one document. Bulk
+      // uploads (or any time multiple categories land at once) go
+      // through the review modal so the user can pick which AI
+      // actions actually run.
+      const total = manuals.length + invoices.length + builderDocs.length;
+      const isSingle = uploaded.length === 1;
+      if (isSingle && total <= 1) {
+        if (manuals.length === 1) {
+          await analyzeManual(manuals[0]);
+        } else if (invoices.length === 1) {
+          await processInvoices(invoices);
+        } else if (builderDocs.length === 1) {
+          await processBuilderDocs(builderDocs);
+        }
+      } else if (total > 0) {
+        setReviewBuckets({
+          Manual: manuals,
+          Invoice: invoices,
+          'Builder Doc': builderDocs,
+        });
+        setReviewSelections({
+          Manual: manuals.length > 0,
+          Invoice: invoices.length > 0,
+          'Builder Doc': builderDocs.length > 0,
+        });
       }
     } catch (err: any) {
       toast.error(err.message || 'Upload failed');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const reanalyze = async (doc: Document) => {
+    // Re-run AI classification on this single document. If the
+    // resulting category is Manual we then offer the manual extraction
+    // flow as well, since that's what produces the appliance prefill.
+    const updated = await classifyAndUpdate([doc], null);
+    const fresh = updated[0];
+    if (!fresh) return;
+    if (fresh.category === 'Manual') {
+      await analyzeManual(fresh);
+    } else {
+      toast.success(`Classified as ${fresh.category || 'Other'}`);
     }
   };
 
@@ -996,6 +1046,17 @@ export default function DocumentsPage() {
                 </p>
               </div>
               <ChevronRight size={16} className="text-ink-tertiary" />
+            </button>
+          )}
+
+          {editing && (
+            <button
+              onClick={() => reanalyze(editing)}
+              disabled={analyzingId === editing.id}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-ios bg-brand-50 text-brand-600 text-sm font-semibold active:bg-brand-100 md:hover:bg-brand-100 transition-colors disabled:opacity-50"
+            >
+              <Sparkles size={14} className={analyzingId === editing.id ? 'animate-pulse' : ''} />
+              {analyzingId === editing.id ? 'Re-analyzing…' : 'Re-analyze with AI'}
             </button>
           )}
 
@@ -1252,6 +1313,127 @@ export default function DocumentsPage() {
           </div>
         )}
       </div>
+
+      {/* Bulk upload review */}
+      {reviewBuckets && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4"
+          onClick={() => !uploading && setReviewBuckets(null)}
+        >
+          <div
+            className="bg-white rounded-ios-lg w-full max-w-md shadow-xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+              <p className="text-[15px] font-semibold">Review uploads</p>
+              <button
+                onClick={() => setReviewBuckets(null)}
+                disabled={uploading}
+                className="p-1 text-ink-tertiary"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="px-4 py-3">
+              <p className="text-xs text-ink-secondary mb-3">
+                AI detected actionable documents. Pick which to process now —
+                anything you skip stays as a plain document.
+              </p>
+              <div className="space-y-2">
+                {(['Manual', 'Invoice', 'Builder Doc'] as const).map((cat) => {
+                  const docs = reviewBuckets[cat];
+                  if (docs.length === 0) return null;
+                  const checked = reviewSelections[cat];
+                  const desc =
+                    cat === 'Manual'
+                      ? 'Extract appliance details (manufacturer, model, serial)'
+                      : cat === 'Invoice'
+                      ? 'Log a completed task with cost; schedule next if recurring'
+                      : 'Fill missing home profile fields & extract appliances';
+                  return (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() =>
+                        setReviewSelections((s) => ({ ...s, [cat]: !checked }))
+                      }
+                      className={`w-full flex items-start gap-3 p-3 rounded-ios border-2 text-left transition-colors ${
+                        checked
+                          ? 'border-brand-500 bg-brand-50'
+                          : 'border-gray-200 bg-white md:hover:border-gray-300'
+                      }`}
+                    >
+                      <div
+                        className={`w-5 h-5 rounded mt-0.5 flex items-center justify-center flex-shrink-0 ${
+                          checked ? 'bg-brand-500 text-white' : 'border-2 border-gray-300'
+                        }`}
+                      >
+                        {checked && <Check size={12} strokeWidth={3} />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-semibold">
+                          {docs.length} {cat}
+                          {docs.length === 1 ? '' : cat === 'Builder Doc' ? 's' : 's'}
+                        </p>
+                        <p className="text-xs text-ink-secondary mt-0.5">{desc}</p>
+                        <p className="text-[11px] text-ink-tertiary mt-1 truncate">
+                          {docs.map((d) => d.title || d.file_name).join(', ')}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex gap-2">
+              <button
+                onClick={() => setReviewBuckets(null)}
+                disabled={uploading}
+                className="flex-1 py-2.5 rounded-ios bg-white border border-gray-200 text-sm font-semibold text-ink-secondary md:hover:bg-gray-50 active:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Skip all
+              </button>
+              <button
+                onClick={async () => {
+                  if (!reviewBuckets) return;
+                  setUploading(true);
+                  try {
+                    if (reviewSelections.Manual && reviewBuckets.Manual.length === 1) {
+                      await analyzeManual(reviewBuckets.Manual[0]);
+                    } else if (reviewSelections.Manual && reviewBuckets.Manual.length > 1) {
+                      await batchAnalyzeManuals(reviewBuckets.Manual);
+                    }
+                    if (reviewSelections.Invoice && reviewBuckets.Invoice.length > 0) {
+                      await processInvoices(reviewBuckets.Invoice);
+                    }
+                    if (
+                      reviewSelections['Builder Doc'] &&
+                      reviewBuckets['Builder Doc'].length > 0
+                    ) {
+                      await processBuilderDocs(reviewBuckets['Builder Doc']);
+                    }
+                  } finally {
+                    setUploading(false);
+                    setReviewBuckets(null);
+                  }
+                }}
+                disabled={
+                  uploading ||
+                  !(
+                    (reviewSelections.Manual && reviewBuckets.Manual.length > 0) ||
+                    (reviewSelections.Invoice && reviewBuckets.Invoice.length > 0) ||
+                    (reviewSelections['Builder Doc'] &&
+                      reviewBuckets['Builder Doc'].length > 0)
+                  )
+                }
+                className="flex-1 py-2.5 rounded-ios bg-brand-500 text-white text-sm font-semibold active:bg-brand-600 md:hover:bg-brand-600 transition-colors disabled:opacity-50"
+              >
+                {uploading ? 'Processing…' : 'Process selected'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
