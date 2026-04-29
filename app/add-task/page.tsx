@@ -364,14 +364,10 @@ function AddTaskForm() {
         }
         toast.success(isCompleted ? 'Logged completed task' : 'Task created');
         await loadData();
-        // Stay on the page in view mode by re-opening the freshly
-        // created task in its own edit URL.
-        if (inserted) {
-          router.replace(`/add-task?edit=${(inserted as any).id}`);
-          setEditMode(false);
-        } else {
-          router.push('/dashboard');
-        }
+        // For a freshly created task, drop the user back on the
+        // dashboard so they see the new row in context. For edits we
+        // already returned earlier (edit mode flips to view in place).
+        router.push('/dashboard');
         return;
       }
       await loadData();
