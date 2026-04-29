@@ -77,20 +77,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         // home-switcher can list them with names.
         store.setUserMemberships(memberships as any);
 
-        // First-run redirect: any user who has a home but hasn't been
-        // through the welcome wizard yet gets sent there once. We use
-        // localStorage so the user doesn't see the wizard on every
-        // device, but that's fine — they can re-run by clearing the
-        // flag in the browser if they want.
-        if (
-          typeof window !== 'undefined' &&
-          !window.localStorage.getItem('homekeeper.welcomedAt') &&
-          pathname !== '/welcome' &&
-          pathname !== '/home-profile'
-        ) {
-          router.push('/welcome');
-        }
-
         // Load everything else in parallel
         const homeId = homeData?.id || membership.home_id;
         const results = await Promise.allSettled([
@@ -113,6 +99,26 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         store.setDismissedSuggestions(
           getData(results[6]).map((r: any) => (r.title || '').trim().toLowerCase())
         );
+
+        // First-run welcome redirect — only fire for genuinely brand
+        // new accounts. If the user already has real tasks (anything
+        // is_suggestion=false) or any task_history rows, they're an
+        // existing user — quietly set the flag and skip the wizard.
+        if (typeof window !== 'undefined' && pathname !== '/welcome' && pathname !== '/home-profile') {
+          const tasksLoaded = getData(results[0]) as any[];
+          const historyLoaded = getData(results[4]) as any[];
+          const hasRealActivity =
+            tasksLoaded.some((t: any) => !t.is_suggestion) ||
+            historyLoaded.length > 0;
+          if (hasRealActivity) {
+            window.localStorage.setItem(
+              'homekeeper.welcomedAt',
+              new Date().toISOString()
+            );
+          } else if (!window.localStorage.getItem('homekeeper.welcomedAt')) {
+            router.push('/welcome');
+          }
+        }
 
         const memberUserIds = rawMembers
           .map((m: any) => m.user_id)
