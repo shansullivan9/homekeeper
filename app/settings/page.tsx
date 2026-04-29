@@ -6,9 +6,9 @@ import PageHeader from '@/components/layout/PageHeader';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import {
-  Users, Copy, Plus, LogOut, Home, ChevronRight,
-  UserCircle2, Package, Clock3, Banknote, Share2,
-  RefreshCw, X, LogOut as LeaveIcon,
+  Users, Plus, LogOut, Home, ChevronRight,
+  UserCircle2, Share2, RefreshCw, X,
+  LogOut as LeaveIcon,
 } from 'lucide-react';
 
 // "abcdef012345" → "abcd-ef01-2345"
@@ -350,26 +350,9 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Navigation Links */}
-        <div>
-          <p className="section-header">Manage</p>
-          <div className="mx-4 ios-card overflow-hidden">
-            {[
-              { label: 'Appliances & Systems', icon: Package, href: '/appliances' },
-              { label: 'Expenses', icon: Banknote, href: '/expenses' },
-              { label: 'Home Timeline', icon: Clock3, href: '/timeline' },
-              { label: 'Home Profile', icon: Home, href: '/home-profile' },
-            ].map(({ label, icon: Icon, href }) => (
-              <button key={href} onClick={() => router.push(href)} className="ios-list-item w-full">
-                <div className="flex items-center gap-3">
-                  <Icon size={18} className="text-ink-secondary" />
-                  <span className="text-[15px]">{label}</span>
-                </div>
-                <ChevronRight size={16} className="text-ink-tertiary" />
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* (Manage links live on the dashboard quick-links and the
+            desktop sidebar — removed from here so Settings stays
+            focused on household and account.) */}
 
         {/* Sign Out */}
         <div className="mx-4">

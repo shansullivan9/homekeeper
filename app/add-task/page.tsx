@@ -319,23 +319,46 @@ function AddTaskForm() {
             const baseDate = completedOn || new Date().toISOString().slice(0, 10);
             const nextDue = nextDueFromCompleted(baseDate, recurrence);
             if (nextDue) {
-              await supabase.from('tasks').insert({
-                home_id: home.id,
-                title: title.trim(),
-                category_id: categoryId || null,
-                due_date: nextDue,
-                recurrence,
-                recurrence_days: recurrence === 'custom' && recurrenceDays
-                  ? parseInt(recurrenceDays) : null,
-                notes: notes || null,
-                estimated_minutes: estimatedMinutes ? parseInt(estimatedMinutes) : null,
-                estimated_cost: estimatedCost ? parseFloat(estimatedCost) : null,
-                priority,
-                appliance_id: applianceId || null,
-                assigned_to: assignedTo || null,
-                created_by: user?.id,
-                status: 'pending',
-              } as any);
+              // Don't double-insert if a pending sibling with the same
+              // title is already scheduled. If one exists with an
+              // earlier due_date (or none), bump it forward; otherwise
+              // leave it alone.
+              const normalized = title.trim().toLowerCase();
+              const { data: existingRows } = await supabase
+                .from('tasks')
+                .select('id, due_date')
+                .eq('home_id', home.id)
+                .eq('status', 'pending')
+                .ilike('title', title.trim());
+              const sibling = (existingRows || []).find(
+                (r: any) => (r.title || '').trim().toLowerCase() === normalized
+              ) || (existingRows && existingRows[0]);
+              if (sibling) {
+                if (!(sibling as any).due_date || (sibling as any).due_date < nextDue) {
+                  await supabase
+                    .from('tasks')
+                    .update({ due_date: nextDue, updated_at: new Date().toISOString() })
+                    .eq('id', (sibling as any).id);
+                }
+              } else {
+                await supabase.from('tasks').insert({
+                  home_id: home.id,
+                  title: title.trim(),
+                  category_id: categoryId || null,
+                  due_date: nextDue,
+                  recurrence,
+                  recurrence_days: recurrence === 'custom' && recurrenceDays
+                    ? parseInt(recurrenceDays) : null,
+                  notes: notes || null,
+                  estimated_minutes: estimatedMinutes ? parseInt(estimatedMinutes) : null,
+                  estimated_cost: estimatedCost ? parseFloat(estimatedCost) : null,
+                  priority,
+                  appliance_id: applianceId || null,
+                  assigned_to: assignedTo || null,
+                  created_by: user?.id,
+                  status: 'pending',
+                } as any);
+              }
             }
           }
         }

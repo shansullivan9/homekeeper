@@ -279,26 +279,72 @@ export default function AppliancesPage() {
               </p>
               <div className="ios-card overflow-hidden">
                 {linkedDocuments.length > 0 ? (
-                  linkedDocuments.map((d) => (
-                    <button
-                      key={d.id}
-                      onClick={() => router.push(`/documents?edit=${d.id}`)}
-                      className="ios-list-item w-full"
-                    >
-                      <div className="flex items-center gap-3 flex-1 min-w-0 text-left">
-                        <div className="w-9 h-9 rounded-lg bg-sky-50 text-sky-500 flex items-center justify-center flex-shrink-0">
-                          <FileText size={18} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[14px] font-medium truncate">{d.title}</p>
-                          <p className="text-xs text-ink-tertiary truncate">
-                            {d.category || 'Uncategorized'}
-                          </p>
-                        </div>
+                  linkedDocuments.map((d) => {
+                    const unlink = async (e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      if (!editing) return;
+                      if (!confirm(`Unlink "${d.title}" from this appliance?`)) return;
+                      const isManual = manualDocId === d.id;
+                      const { error } = await supabase
+                        .from('documents')
+                        .update({
+                          appliance_id: null,
+                          updated_at: new Date().toISOString(),
+                        })
+                        .eq('id', d.id);
+                      if (error) {
+                        toast.error('Could not unlink');
+                        return;
+                      }
+                      // Also clear the manual_document_id pointer if this
+                      // doc was the one we extracted appliance details from.
+                      if (isManual) {
+                        await supabase
+                          .from('appliances')
+                          .update({ manual_document_id: null })
+                          .eq('id', editing.id);
+                        setManualDocId(null);
+                        setAppliances(
+                          appliances.map((a) =>
+                            a.id === editing.id ? { ...a, manual_document_id: null } : a
+                          )
+                        );
+                      }
+                      const { setDocuments } = useStore.getState();
+                      setDocuments(
+                        useStore.getState().documents.map((doc: any) =>
+                          doc.id === d.id ? { ...doc, appliance_id: null } : doc
+                        )
+                      );
+                      toast.success('Unlinked');
+                    };
+                    return (
+                      <div key={d.id} className="ios-list-item">
+                        <button
+                          onClick={() => router.push(`/documents?edit=${d.id}`)}
+                          className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                        >
+                          <div className="w-9 h-9 rounded-lg bg-sky-50 text-sky-500 flex items-center justify-center flex-shrink-0">
+                            <FileText size={18} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[14px] font-medium truncate">{d.title}</p>
+                            <p className="text-xs text-ink-tertiary truncate">
+                              {d.category || 'Uncategorized'}
+                            </p>
+                          </div>
+                        </button>
+                        <button
+                          onClick={unlink}
+                          title="Unlink"
+                          className="text-ink-tertiary md:hover:text-status-red active:text-status-red transition-colors p-1.5 -mr-1"
+                        >
+                          <X size={16} />
+                        </button>
                       </div>
-                      <ChevronRight size={16} className="text-ink-tertiary flex-shrink-0" />
-                    </button>
-                  ))
+                    );
+                  })
                 ) : (
                   <div className="px-4 py-3.5 text-sm text-ink-tertiary">
                     No documents linked yet.

@@ -68,14 +68,19 @@ export default function HistoryPage() {
         revivedTask = data;
       } else {
         // Original task was deleted; recreate one so the user has
-        // something to act on. Fall back to defaults for fields the
-        // history row doesn't carry.
+        // something to act on. We preserve as much as we can — title,
+        // notes, cost, duration, and the category if the history row
+        // remembered the name.
+        const matchedCategory = h.category_name
+          ? categories.find((c) => c.name === h.category_name) || null
+          : null;
         const { data, error } = await supabase
           .from('tasks')
           .insert({
             home_id: h.home_id,
             title: h.title,
             notes: h.notes,
+            category_id: matchedCategory?.id || null,
             estimated_cost: h.cost,
             estimated_minutes: h.duration_minutes,
             recurrence: 'one_time',
@@ -86,6 +91,7 @@ export default function HistoryPage() {
           .single();
         if (error) throw error;
         revivedTask = data;
+        toast('Recreated as a one-time task — original recurrence was lost', { icon: 'ℹ️' });
       }
 
       const { error: hErr } = await supabase

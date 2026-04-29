@@ -1,5 +1,5 @@
 'use client';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Task } from '@/lib/types';
 import { createClient } from '@/lib/supabase-browser';
 import { useStore } from '@/lib/store';
@@ -17,6 +17,7 @@ export default function SuggestionBanner() {
     updateTask,
   } = useStore();
   const supabase = createClient();
+  const [expanded, setExpanded] = useState(false);
 
   const suggestions = useMemo(() => {
     // Stop-words that don't carry meaning when comparing task titles
@@ -127,7 +128,7 @@ export default function SuggestionBanner() {
         </span>
       </div>
       <div className="ios-card overflow-hidden divide-y divide-gray-50">
-        {suggestions.slice(0, 3).map((s) => (
+        {(expanded ? suggestions : suggestions.slice(0, 3)).map((s) => (
           <div key={s.id} className="flex items-center gap-3 px-4 py-3">
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium truncate">{s.title}</p>
@@ -149,6 +150,16 @@ export default function SuggestionBanner() {
             </div>
           </div>
         ))}
+        {suggestions.length > 3 && (
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="w-full px-4 py-2.5 text-xs font-semibold text-brand-600 active:bg-gray-50 md:hover:bg-gray-50 transition-colors"
+          >
+            {expanded
+              ? 'Show fewer'
+              : `Show ${suggestions.length - 3} more`}
+          </button>
+        )}
       </div>
     </div>
   );

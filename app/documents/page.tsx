@@ -766,13 +766,38 @@ export default function DocumentsPage() {
       return;
     }
 
+    // crypto.randomUUID() exists in modern browsers; provide a fallback
+    // for older iOS Safari (<15.4) so this doesn't blow up at runtime.
+    const safeUuid = (): string => {
+      const c = (typeof crypto !== 'undefined' ? crypto : null) as any;
+      if (c?.randomUUID) return c.randomUUID();
+      // RFC4122 v4 fallback using crypto.getRandomValues
+      const arr = new Uint8Array(16);
+      (c?.getRandomValues || ((a: any) => {
+        for (let i = 0; i < a.length; i++) a[i] = Math.floor(Math.random() * 256);
+      }))(arr);
+      arr[6] = (arr[6] & 0x0f) | 0x40;
+      arr[8] = (arr[8] & 0x3f) | 0x80;
+      const hex = Array.from(arr).map((b) => b.toString(16).padStart(2, '0'));
+      return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10, 16).join('')}`;
+    };
+
     setUploading(true);
     const uploaded: Document[] = [];
     const isBatch = files.length > 1;
+    // Show a single progress toast and update it as each file lands.
+    const progressToast = isBatch
+      ? toast.loading(`Uploading 0/${files.length}…`)
+      : null;
     try {
+      let i = 0;
       for (const f of files) {
+        i += 1;
+        if (progressToast) {
+          toast.loading(`Uploading ${i}/${files.length} (${f.name})…`, { id: progressToast });
+        }
         const safeName = f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-        const path = `${home.id}/${crypto.randomUUID()}-${safeName}`;
+        const path = `${home.id}/${safeUuid()}-${safeName}`;
         const { error: upErr } = await supabase.storage.from('documents').upload(path, f, {
           contentType: f.type || undefined,
           upsert: false,
@@ -781,13 +806,21 @@ export default function DocumentsPage() {
           toast.error(`${f.name}: ${upErr.message}`);
           continue;
         }
+        // For batch uploads, prefix the user-typed title onto each
+        // filename so the user-typed value isn't silently dropped.
+        // ("Receipts 2026" + "rent.pdf" → "Receipts 2026 — rent")
+        const baseName = f.name.replace(/\.[^.]+$/, '');
+        const title = isBatch
+          ? form.title.trim()
+            ? `${form.title.trim()} — ${baseName}`
+            : baseName
+          : form.title.trim() || f.name;
+
         const { data, error } = await supabase
           .from('documents')
           .insert({
             home_id: home.id,
-            title: isBatch
-              ? f.name.replace(/\.[^.]+$/, '')
-              : form.title.trim() || f.name,
+            title,
             category: form.category || null,
             file_path: path,
             file_name: f.name,
@@ -805,6 +838,7 @@ export default function DocumentsPage() {
         }
         uploaded.push(data as Document);
       }
+      if (progressToast) toast.dismiss(progressToast);
 
       if (uploaded.length === 0) return;
 
@@ -879,35 +913,60 @@ export default function DocumentsPage() {
   const handleDelete = async () => {
     if (!editing) return;
     if (!confirm('Delete this document? This cannot be undone.')) return;
-    const { error } = await supabase.from('documents').delete().eq('id', editing.id);
-    if (error) {
-      toast.error('Failed to delete');
+    // Remove the storage object first, then the DB row. If the storage
+    // delete fails we surface the error and bail without orphaning the
+    // file (the DB row is still pointing at it). Inverse of the old
+    // order which could orphan files when the storage call blipped.
+    const { error: storageErr } = await supabase.storage
+      .from('documents')
+      .remove([editing.file_path]);
+    if (storageErr) {
+      toast.error(`Could not remove file: ${storageErr.message}`);
       return;
     }
-    await supabase.storage.from('documents').remove([editing.file_path]);
+    const { error } = await supabase.from('documents').delete().eq('id', editing.id);
+    if (error) {
+      toast.error('Storage cleared but DB delete failed — refresh and try again');
+      return;
+    }
     setDocuments(documents.filter((d) => d.id !== editing.id));
     toast.success('Deleted');
     resetForm();
   };
 
   const handleOpen = async (d: Document) => {
-    // Open the popup synchronously while we still have the user-gesture
-    // context — mobile browsers (Safari especially) block window.open after
-    // an await. We navigate the popup once we have the signed URL.
-    const popup = typeof window !== 'undefined' ? window.open('', '_blank') : null;
+    // Fetch the file as a blob and open it via an <a download>. This
+    // avoids the Safari popup-blocker race (window.open then awaiting
+    // a signed URL drops the user-gesture context) and keeps the
+    // user's current tab — they can still tap and view inline if the
+    // browser supports it.
+    const t = toast.loading('Opening…');
     try {
       const { data, error } = await supabase.storage
         .from('documents')
         .createSignedUrl(d.file_path, 60 * 5);
       if (error || !data) throw new Error('Could not open file');
-      if (popup && !popup.closed) {
-        popup.location.href = data.signedUrl;
-      } else {
-        // Popup blocked (mobile) — fall back to navigating the current tab.
-        window.location.href = data.signedUrl;
-      }
+
+      const res = await fetch(data.signedUrl);
+      if (!res.ok) throw new Error(`Could not download (${res.status})`);
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+
+      // Use a synthetic anchor with target=_blank — this works in
+      // mobile Safari without needing a popup window.
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.download = d.file_name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      // Revoke after a delay so the open tab has time to load.
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000);
+      toast.dismiss(t);
     } catch (err: any) {
-      if (popup && !popup.closed) popup.close();
+      toast.dismiss(t);
       toast.error(err?.message || 'Could not open file');
     }
   };

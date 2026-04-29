@@ -173,7 +173,11 @@ export default function DashboardPage() {
     <div>
       <PageHeader
         title={home?.name || 'HomeKeeper'}
-        subtitle={`${activeTasks.length} active tasks`}
+        subtitle={
+          claimFilter === 'all'
+            ? `${activeTasks.length} active tasks`
+            : `${filteredTasks.length} of ${activeTasks.length} active`
+        }
         rightAction={
           <button onClick={() => router.push('/settings')} className="text-brand-500 text-sm font-semibold">
             <Users size={22} />

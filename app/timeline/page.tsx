@@ -238,6 +238,12 @@ export default function TimelinePage() {
           <button onClick={handleSave} disabled={!form.title.trim()} className="ios-button">
             {editingId ? 'Save Changes' : 'Add to Timeline'}
           </button>
+          <button
+            onClick={closeForm}
+            className="w-full py-3 text-ink-secondary font-medium text-sm md:hover:text-ink-primary transition-colors"
+          >
+            Cancel
+          </button>
           {editingId && (
             <button onClick={handleDelete} className="w-full py-3 text-status-red font-semibold text-sm">
               Delete Event
