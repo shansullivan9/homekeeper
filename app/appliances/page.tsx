@@ -486,7 +486,11 @@ export default function AppliancesPage() {
           </div>
         ) : (
           <div className="mx-4 ios-card overflow-hidden">
-            {appliances.map((a) => {
+            {[...appliances]
+              .sort((a, b) =>
+                (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
+              )
+              .map((a) => {
               const ws = warrantyStatus(a.warranty_expiration);
               return (
                 <button key={a.id} onClick={() => openEdit(a)} className="ios-list-item w-full">
