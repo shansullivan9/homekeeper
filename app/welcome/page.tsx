@@ -55,10 +55,50 @@ export default function WelcomePage() {
     setFeatures(next);
   }, [home]);
 
-  const suggestions = useMemo(
-    () => tasks.filter((t) => t.is_suggestion && t.status === 'pending'),
-    [tasks]
-  );
+  // Dedupe suggestions the same way the dashboard's SuggestionBanner
+  // does — exact title match against existing real tasks plus a
+  // category-scoped keyword overlap. Otherwise a returning user who
+  // already entered "Replace Air Filters" sees "Change HVAC Filter"
+  // here and rightly thinks the wizard isn't paying attention.
+  const suggestions = useMemo(() => {
+    const STOP = new Set([
+      'the', 'and', 'for', 'with', 'from', 'this', 'that', 'your',
+      'have', 'will', 'check', 'inspect', 'service', 'maintenance',
+      'replace', 'change', 'clean', 'test', 'annual', 'monthly',
+      'yearly', 'quarterly', 'every',
+    ]);
+    const keywords = (title: string): Set<string> => {
+      const out = new Set<string>();
+      for (const w of (title || '').toLowerCase().split(/\W+/)) {
+        if (w.length >= 4 && !STOP.has(w)) out.add(w);
+      }
+      return out;
+    };
+    const overlaps = (a: Set<string>, b: Set<string>) => {
+      for (const w of a) if (b.has(w)) return true;
+      return false;
+    };
+
+    const realTasks = tasks.filter(
+      (t) => !t.is_suggestion && t.status !== 'skipped'
+    );
+    const realTitles = new Set(
+      realTasks.map((t) => t.title.trim().toLowerCase())
+    );
+
+    return tasks.filter((t) => {
+      if (!t.is_suggestion || t.status !== 'pending') return false;
+      if (realTitles.has(t.title.trim().toLowerCase())) return false;
+      const sKw = keywords(t.title);
+      if (sKw.size === 0) return true;
+      const dup = realTasks.some(
+        (other) =>
+          (!t.category_id || other.category_id === t.category_id) &&
+          overlaps(sKw, keywords(other.title))
+      );
+      return !dup;
+    });
+  }, [tasks]);
 
   // When we land on step 3, default every suggestion to "keep".
   useEffect(() => {

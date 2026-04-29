@@ -29,15 +29,26 @@ export default function NotificationsPage() {
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pushPermission, setPushPermission] = useState<PushState>('default');
+  const [subscribing, setSubscribing] = useState(false);
 
+  // Detect notification permission on mount. Wrapped in try/catch and
+  // null-checks so the page never throws a render-time exception on
+  // browsers that don't expose the API (older iOS, in-app browsers,
+  // Private Browsing, etc.).
   useEffect(() => {
     try {
-      if (typeof window === 'undefined' || !('Notification' in window)) {
+      if (typeof window === 'undefined') return;
+      const N = (window as any).Notification;
+      if (!N || typeof N.permission !== 'string') {
         setPushPermission('unsupported');
         return;
       }
-      const perm = (window as any).Notification?.permission as PushState;
-      setPushPermission(perm || 'default');
+      const perm = N.permission;
+      if (perm === 'granted' || perm === 'denied' || perm === 'default') {
+        setPushPermission(perm);
+      } else {
+        setPushPermission('default');
+      }
     } catch {
       setPushPermission('unsupported');
     }
@@ -72,7 +83,6 @@ export default function NotificationsPage() {
           });
         }
       } catch (err) {
-        // Table missing or RLS denied — fall back to defaults silently.
         console.error('notification prefs load:', err);
       }
       if (!cancelled) setLoaded(true);
@@ -114,35 +124,52 @@ export default function NotificationsPage() {
     save(merged);
   };
 
-  // Convert the URL-safe base64 VAPID key into a Uint8Array for the
-  // PushManager subscribe call.
-  const urlBase64ToUint8Array = (base64String: string): Uint8Array => {
-    const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
-    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
-    const raw = atob(base64);
-    const out = new Uint8Array(raw.length);
-    for (let i = 0; i < raw.length; ++i) out[i] = raw.charCodeAt(i);
-    return out;
+  // Translate a URL-safe base64 VAPID key into a Uint8Array. Wrapped
+  // so any decoding glitch (bad chars, missing atob) returns null
+  // instead of throwing.
+  const urlBase64ToUint8Array = (base64String: string): Uint8Array | null => {
+    try {
+      const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+      const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+      const raw = atob(base64);
+      const out = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; ++i) out[i] = raw.charCodeAt(i);
+      return out;
+    } catch {
+      return null;
+    }
   };
 
+  // Subscribe the browser to push and persist the endpoint to the
+  // user's prefs row. This now ONLY runs from the explicit Enable
+  // button click — no useEffect auto-fire — because iOS Safari
+  // throws PushManager errors when the page isn't installed as a
+  // PWA, and we don't want that to crash the whole page.
   const subscribeToPush = async () => {
     if (!user?.id) return;
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
     const vapid = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     if (!vapid || vapid === 'your_vapid_public_key') {
-      // No VAPID key configured — silently skip the subscription so
-      // the browser permission still gets granted (the user may want
-      // local-only Notification API). The edge function won't have
-      // anything to send to until VAPID is set up.
+      console.warn('VAPID public key not configured — skipping push subscription.');
       return;
     }
+    setSubscribing(true);
     try {
       const reg = await navigator.serviceWorker.ready;
-      let sub = await reg.pushManager.getSubscription();
+      let sub: PushSubscription | null = null;
+      try {
+        sub = await reg.pushManager.getSubscription();
+      } catch {
+        sub = null;
+      }
       if (!sub) {
+        const key = urlBase64ToUint8Array(vapid);
+        if (!key) {
+          throw new Error('VAPID key looks malformed.');
+        }
         sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapid),
+          applicationServerKey: key,
         });
       }
       await supabase
@@ -155,37 +182,45 @@ export default function NotificationsPage() {
           } as any,
           { onConflict: 'user_id' } as any
         );
-    } catch (err) {
-      console.error('push subscribe failed:', err);
+    } catch (err: any) {
+      // iOS Safari throws here when the page isn't installed as a
+      // PWA via "Add to Home Screen". Surface a tip in that case
+      // instead of a generic error.
+      const msg = (err && err.message) || '';
+      if (/permission|gesture|user/i.test(msg)) {
+        toast.error('Permission denied or not in a PWA. iOS users: tap Share → Add to Home Screen, then open from there.');
+      } else {
+        console.error('push subscribe failed:', err);
+        toast.error('Could not subscribe to push.');
+      }
+    } finally {
+      setSubscribing(false);
     }
   };
 
   const requestPushPermission = async () => {
     try {
-      if (typeof window === 'undefined' || !('Notification' in window)) {
+      if (typeof window === 'undefined') return;
+      const N = (window as any).Notification;
+      if (!N) {
         toast.error('Notifications not supported in this browser');
         return;
       }
-      const result = await (window as any).Notification.requestPermission();
-      setPushPermission((result as PushState) || 'default');
+      const result = await N.requestPermission();
+      if (result === 'granted' || result === 'denied' || result === 'default') {
+        setPushPermission(result);
+      }
       if (result === 'granted') {
         toast.success('Notifications enabled');
-        subscribeToPush();
+        await subscribeToPush();
       } else if (result === 'denied') {
         toast.error('Notifications blocked — enable in your browser settings');
       }
-    } catch {
-      toast.error('Notifications not supported');
+    } catch (err) {
+      console.error('notification permission failed:', err);
+      toast.error('Notifications not supported on this device.');
     }
   };
-
-  // If the user has already granted permission on a previous visit
-  // (e.g. they hit Enable last week), re-subscribe on mount so the
-  // server has an up-to-date push endpoint.
-  useEffect(() => {
-    if (pushPermission === 'granted') subscribeToPush();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pushPermission, user?.id]);
 
   return (
     <div>
@@ -215,13 +250,30 @@ export default function NotificationsPage() {
               {pushPermission === 'default' && (
                 <button
                   onClick={requestPushPermission}
-                  className="text-brand-500 text-sm font-semibold"
+                  disabled={subscribing}
+                  className="text-brand-500 text-sm font-semibold disabled:opacity-50"
                 >
-                  Enable
+                  {subscribing ? 'Enabling…' : 'Enable'}
+                </button>
+              )}
+              {pushPermission === 'granted' && (
+                <button
+                  onClick={subscribeToPush}
+                  disabled={subscribing}
+                  className="text-brand-500 text-xs font-semibold disabled:opacity-50"
+                  title="Re-register this device for push"
+                >
+                  {subscribing ? '…' : 'Refresh'}
                 </button>
               )}
             </div>
           </div>
+          {pushPermission === 'unsupported' && (
+            <p className="text-[11px] text-ink-tertiary mx-4 mt-2">
+              On iPhone, install the app first: tap Share in Safari → Add to
+              Home Screen, then open it from your home screen and try again.
+            </p>
+          )}
         </div>
 
         {/* Reminder rules */}
@@ -303,7 +355,8 @@ export default function NotificationsPage() {
           </div>
           <p className="text-[11px] text-ink-tertiary mx-4 mt-2">
             Preferences save automatically. Push delivery requires browser
-            permission and may not be available in every browser.
+            permission. iPhone users must install the app to the Home Screen
+            first.
           </p>
         </div>
       </div>

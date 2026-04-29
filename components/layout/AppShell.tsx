@@ -77,20 +77,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         // home-switcher can list them with names.
         store.setUserMemberships(memberships as any);
 
-        // First-run redirect: any user who has a home but hasn't been
-        // through the welcome wizard yet gets sent there once. We use
-        // localStorage so the user doesn't see the wizard on every
-        // device, but that's fine — they can re-run by clearing the
-        // flag in the browser if they want.
-        if (
-          typeof window !== 'undefined' &&
-          !window.localStorage.getItem('homekeeper.welcomedAt') &&
-          pathname !== '/welcome' &&
-          pathname !== '/home-profile'
-        ) {
-          router.push('/welcome');
-        }
-
         // Load everything else in parallel
         const homeId = homeData?.id || membership.home_id;
         const results = await Promise.allSettled([
@@ -113,6 +99,24 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         store.setDismissedSuggestions(
           getData(results[6]).map((r: any) => (r.title || '').trim().toLowerCase())
         );
+
+        // First-run welcome redirect — only fire for genuinely brand
+        // new accounts. The mere existence of a `homes` row that this
+        // user belongs to means setup happened (either via the old
+        // home-profile flow or a previous welcome run), so we set the
+        // flag and stay put. The wizard is reserved for true first-
+        // run flows where the user just signed up and has no home yet
+        // (and that case is handled earlier by the no-memberships
+        // redirect to /home-profile).
+        if (typeof window !== 'undefined' && pathname !== '/welcome') {
+          const hasHome = !!homeData;
+          if (hasHome) {
+            window.localStorage.setItem(
+              'homekeeper.welcomedAt',
+              new Date().toISOString()
+            );
+          }
+        }
 
         const memberUserIds = rawMembers
           .map((m: any) => m.user_id)
