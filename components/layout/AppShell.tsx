@@ -101,22 +101,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         );
 
         // First-run welcome redirect — only fire for genuinely brand
-        // new accounts. If the user already has real tasks (anything
-        // is_suggestion=false) or any task_history rows, they're an
-        // existing user — quietly set the flag and skip the wizard.
-        if (typeof window !== 'undefined' && pathname !== '/welcome' && pathname !== '/home-profile') {
-          const tasksLoaded = getData(results[0]) as any[];
-          const historyLoaded = getData(results[4]) as any[];
-          const hasRealActivity =
-            tasksLoaded.some((t: any) => !t.is_suggestion) ||
-            historyLoaded.length > 0;
-          if (hasRealActivity) {
+        // new accounts. The mere existence of a `homes` row that this
+        // user belongs to means setup happened (either via the old
+        // home-profile flow or a previous welcome run), so we set the
+        // flag and stay put. The wizard is reserved for true first-
+        // run flows where the user just signed up and has no home yet
+        // (and that case is handled earlier by the no-memberships
+        // redirect to /home-profile).
+        if (typeof window !== 'undefined' && pathname !== '/welcome') {
+          const hasHome = !!homeData;
+          if (hasHome) {
             window.localStorage.setItem(
               'homekeeper.welcomedAt',
               new Date().toISOString()
             );
-          } else if (!window.localStorage.getItem('homekeeper.welcomedAt')) {
-            router.push('/welcome');
           }
         }
 
