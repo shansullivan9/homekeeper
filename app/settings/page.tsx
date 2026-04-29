@@ -11,12 +11,32 @@ import {
 } from 'lucide-react';
 
 export default function SettingsPage() {
-  const { user, home, members } = useStore();
+  const { user, home, members, setUser } = useStore();
   const supabase = createClient();
   const router = useRouter();
   const [joinCode, setJoinCode] = useState('');
   const [joining, setJoining] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+
+  const saveName = async () => {
+    if (!user || !nameDraft.trim()) return;
+    const next = nameDraft.trim();
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ display_name: next })
+      .eq('id', user.id)
+      .select()
+      .single();
+    if (error) {
+      toast.error('Could not update name');
+      return;
+    }
+    if (data) setUser(data as any);
+    toast.success('Name updated');
+    setEditingName(false);
+  };
 
   const copyInviteCode = () => {
     if (!home?.invite_code) return;
@@ -63,6 +83,12 @@ export default function SettingsPage() {
   const handleSignOut = async () => {
     if (!confirm('Sign out of HomeKeeper?')) return;
     await supabase.auth.signOut();
+    // Reset the in-memory store so the next user on this device doesn't
+    // see a flash of the previous user's data.
+    useStore.setState({
+      user: null, home: null, members: [], tasks: [], categories: [],
+      appliances: [], history: [], documents: [],
+    });
     router.push('/auth');
   };
 
@@ -77,10 +103,35 @@ export default function SettingsPage() {
             <div className="w-12 h-12 rounded-full bg-brand-100 flex items-center justify-center">
               <UserCircle2 size={28} className="text-brand-500" />
             </div>
-            <div>
-              <p className="font-semibold text-[15px]">{user?.display_name || 'User'}</p>
-              <p className="text-xs text-ink-secondary">{user?.email}</p>
+            <div className="flex-1 min-w-0">
+              {editingName ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') saveName(); }}
+                    autoFocus
+                    maxLength={60}
+                    className="ios-input py-1.5"
+                  />
+                  <button onClick={saveName} className="text-brand-500 text-sm font-semibold">Save</button>
+                  <button onClick={() => setEditingName(false)} className="text-ink-tertiary text-sm">Cancel</button>
+                </div>
+              ) : (
+                <>
+                  <p className="font-semibold text-[15px] truncate">{user?.display_name || 'Add your name'}</p>
+                  <p className="text-xs text-ink-secondary truncate">{user?.email}</p>
+                </>
+              )}
             </div>
+            {!editingName && (
+              <button
+                onClick={() => { setNameDraft(user?.display_name || ''); setEditingName(true); }}
+                className="text-brand-500 text-sm font-medium"
+              >
+                Edit
+              </button>
+            )}
           </div>
         </div>
 
@@ -103,17 +154,27 @@ export default function SettingsPage() {
                 <Users size={16} className="text-ink-secondary" />
                 <span className="text-sm font-medium text-ink-secondary">Members</span>
               </div>
-              {members.map((m) => (
-                <div key={m.id} className="flex items-center gap-2 py-1.5">
-                  <div className="w-7 h-7 rounded-full bg-brand-50 flex items-center justify-center text-xs font-bold text-brand-500">
-                    {((m as any).profiles?.display_name || 'U')[0].toUpperCase()}
+              {members.map((m) => {
+                const name =
+                  (m as any).display_name ||
+                  (m as any).profiles?.display_name ||
+                  (m as any).email ||
+                  (m as any).profiles?.email ||
+                  'Member';
+                const initial = name.trim()[0]?.toUpperCase() || 'M';
+                const isMe = (m as any).user_id === user?.id;
+                return (
+                  <div key={m.id} className="flex items-center gap-2 py-1.5">
+                    <div className="w-7 h-7 rounded-full bg-brand-50 flex items-center justify-center text-xs font-bold text-brand-500">
+                      {initial}
+                    </div>
+                    <span className="text-sm">{isMe ? `${name} (you)` : name}</span>
+                    {m.role === 'owner' && (
+                      <span className="text-[10px] bg-brand-50 text-brand-500 px-1.5 py-0.5 rounded-full font-medium">Owner</span>
+                    )}
                   </div>
-                  <span className="text-sm">{(m as any).profiles?.display_name || (m as any).profiles?.email}</span>
-                  {m.role === 'owner' && (
-                    <span className="text-[10px] bg-brand-50 text-brand-500 px-1.5 py-0.5 rounded-full font-medium">Owner</span>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Invite Code */}

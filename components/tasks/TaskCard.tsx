@@ -73,6 +73,19 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
     if (error) {
       toast.error('Failed to complete task');
     } else {
+      // Optimistically flip the task to completed in the store so the
+      // dashboard re-buckets immediately. The full reload via
+      // onComplete() will reconcile any next-occurrence task created by
+      // the RPC.
+      const store = useStore.getState();
+      const completedAt = new Date().toISOString();
+      store.setTasks(
+        store.tasks.map((t) =>
+          t.id === task.id
+            ? ({ ...t, status: 'completed', completed_at: completedAt, completed_by: user.id } as any)
+            : t
+        )
+      );
       toast.success('Task completed!');
       onComplete?.();
     }
@@ -82,12 +95,12 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
     e.stopPropagation();
     e.preventDefault();
     if (!user) return;
-    const claimMsg = isMine
-      ? `Unclaim "${task.title}"?`
-      : isClaimed
-      ? `Take over "${task.title}" from ${assigneeLabel || 'the current owner'}?`
-      : `Claim "${task.title}"?`;
-    if (!confirm(claimMsg)) return;
+    // Claiming is reversible with a single tap — no confirm needed.
+    // For "take over from someone else", prompt because that's a more
+    // significant change.
+    if (isClaimed && !isMine) {
+      if (!confirm(`Take over "${task.title}" from ${assigneeLabel || 'the current owner'}?`)) return;
+    }
 
     const { data, error } = await supabase.rpc('toggle_task_claim', {
       p_task_id: task.id,
@@ -97,7 +110,15 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
     if (error || (data && (data as any).error)) {
       toast.error('Failed to update task');
     } else {
-      const nowAssigned = (data as any)?.assigned_to;
+      const nowAssigned = (data as any)?.assigned_to ?? null;
+      // Patch the store immediately so the chip / icon updates without
+      // waiting for a full refetch.
+      const store = useStore.getState();
+      store.setTasks(
+        store.tasks.map((t) =>
+          t.id === task.id ? ({ ...t, assigned_to: nowAssigned } as any) : t
+        )
+      );
       toast.success(
         nowAssigned === user.id ? "You've got it" :
         nowAssigned === null ? 'Unclaimed' :
@@ -124,7 +145,18 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
       toast.error('Failed to undo');
       return;
     }
-    await supabase.from('task_history').delete().eq('task_id', task.id);
+    // Only delete the most recent history row for this task — older
+    // recurring completions need to stay in the log.
+    const { data: latestHist } = await supabase
+      .from('task_history')
+      .select('id')
+      .eq('task_id', task.id)
+      .order('completed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (latestHist) {
+      await supabase.from('task_history').delete().eq('id', (latestHist as any).id);
+    }
     toast.success('Marked as not completed');
     onComplete?.();
   };

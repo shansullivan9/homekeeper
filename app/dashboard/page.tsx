@@ -92,7 +92,14 @@ export default function DashboardPage() {
   const mineCount = useMemo(() => activeTasks.filter((t: any) => t.assigned_to === user?.id).length, [activeTasks, user]);
   const theirsCount = useMemo(() => activeTasks.filter((t: any) => t.assigned_to && t.assigned_to !== user?.id).length, [activeTasks, user]);
 
-  const partnerLabel = members.length > 1 ? 'Theirs' : 'Theirs';
+  const partnerLabel = (() => {
+    if (members.length <= 1) return 'Theirs';
+    const partner = members.find((m: any) => m.user_id !== user?.id);
+    const partnerName =
+      (partner as any)?.display_name ||
+      (partner as any)?.email?.split('@')[0];
+    return partnerName ? `${partnerName}'s` : 'Theirs';
+  })();
   const showFilters = members.length > 1 || mineCount > 0 || theirsCount > 0;
 
   const FilterChip = ({ value, label, count }: { value: ClaimFilter; label: string; count: number }) => (

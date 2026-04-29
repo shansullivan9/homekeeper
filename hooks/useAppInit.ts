@@ -1,94 +1,112 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { createClient } from '@/lib/supabase-browser';
 import { useStore } from '@/lib/store';
 import { useRouter } from 'next/navigation';
 
+// Hook the dashboard uses to keep its data fresh after task actions.
+// AppShell already does the initial population on mount, so this hook
+// is mostly a refresh button: any caller can invoke `loadData()` and
+// it will re-fetch tasks/categories/members/appliances/history/documents
+// in parallel without duplicating the auth bootstrap.
 export function useAppInit() {
   const router = useRouter();
-  const store = useStore();
   const supabase = createClient();
-  const [started, setStarted] = useState(false);
+  const startedRef = useRef(false);
 
-  useEffect(() => {
-    if (started) return;
-    setStarted(true);
+  const load = useCallback(async () => {
+    const store = useStore.getState();
+    store.setLoading(true);
 
-    async function load() {
-      store.setLoading(true);
-
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          store.setLoading(false);
-          router.push('/auth');
-          return;
-        }
-
-        const userId = session.user.id;
-
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', userId)
-          .maybeSingle();
-
-        if (profile) store.setUser(profile);
-
-        const { data: membership } = await supabase
-          .from('home_members')
-          .select('*')
-          .eq('user_id', userId)
-          .limit(1)
-          .maybeSingle();
-
-        if (!membership) {
-          store.setLoading(false);
-          router.push('/home-profile');
-          return;
-        }
-
-        const { data: homeData } = await supabase
-          .from('homes')
-          .select('*')
-          .eq('id', membership.home_id)
-          .maybeSingle();
-
-        if (!homeData) {
-          store.setLoading(false);
-          router.push('/home-profile');
-          return;
-        }
-
-        store.setHome(homeData);
-
-        const [tasksRes, catsRes, membersRes, appliancesRes, historyRes] = await Promise.all([
-          supabase.from('tasks').select('*').eq('home_id', homeData.id).order('due_date', { ascending: true, nullsFirst: false }),
-          supabase.from('categories').select('*').order('sort_order'),
-          supabase.from('home_members').select('*').eq('home_id', homeData.id),
-          supabase.from('appliances').select('*').eq('home_id', homeData.id),
-          supabase.from('task_history').select('*').eq('home_id', homeData.id).order('completed_at', { ascending: false }).limit(100),
-        ]);
-
-        if (tasksRes.data) store.setTasks(tasksRes.data);
-        if (catsRes.data) store.setCategories(catsRes.data);
-        if (membersRes.data) store.setMembers(membersRes.data);
-        if (appliancesRes.data) store.setAppliances(appliancesRes.data);
-        if (historyRes.data) store.setHistory(historyRes.data);
-
-      } catch (err) {
-        console.error('Load error:', err);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        store.setLoading(false);
+        router.push('/auth');
+        return;
       }
 
-      store.setLoading(false);
+      const userId = session.user.id;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+      if (profile) store.setUser(profile);
+
+      const { data: membership } = await supabase
+        .from('home_members')
+        .select('*')
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+
+      if (!membership) {
+        store.setLoading(false);
+        router.push('/home-profile');
+        return;
+      }
+
+      const { data: homeData } = await supabase
+        .from('homes')
+        .select('*')
+        .eq('id', membership.home_id)
+        .maybeSingle();
+
+      if (!homeData) {
+        store.setLoading(false);
+        router.push('/home-profile');
+        return;
+      }
+
+      store.setHome(homeData);
+
+      const [tasksRes, catsRes, membersRes, appliancesRes, historyRes, docsRes] = await Promise.all([
+        supabase.from('tasks').select('*').eq('home_id', homeData.id).order('due_date', { ascending: true, nullsFirst: false }),
+        supabase.from('categories').select('*').order('sort_order'),
+        supabase.from('home_members').select('*').eq('home_id', homeData.id),
+        supabase.from('appliances').select('*').eq('home_id', homeData.id),
+        supabase.from('task_history').select('*').eq('home_id', homeData.id).order('completed_at', { ascending: false }).limit(100),
+        supabase.from('documents').select('*').eq('home_id', homeData.id).order('uploaded_at', { ascending: false }),
+      ]);
+
+      if (tasksRes.data) store.setTasks(tasksRes.data);
+      if (catsRes.data) store.setCategories(catsRes.data);
+      if (membersRes.data) {
+        const memberIds = membersRes.data.map((m: any) => m.user_id).filter(Boolean);
+        if (memberIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, display_name, email')
+            .in('id', memberIds);
+          const byId = new Map((profiles || []).map((p: any) => [p.id, p]));
+          store.setMembers(
+            membersRes.data.map((m: any) => ({
+              ...m,
+              display_name: byId.get(m.user_id)?.display_name || null,
+              email: byId.get(m.user_id)?.email || null,
+            }))
+          );
+        } else {
+          store.setMembers(membersRes.data);
+        }
+      }
+      if (appliancesRes.data) store.setAppliances(appliancesRes.data);
+      if (historyRes.data) store.setHistory(historyRes.data);
+      if (docsRes.data) store.setDocuments(docsRes.data);
+    } catch (err) {
+      console.error('Load error:', err);
     }
 
+    store.setLoading(false);
+  }, [supabase, router]);
+
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
     load();
-  }, [started]);
+  }, [load]);
 
-  return {
-    loadData: () => {
-      setStarted(false);
-    }
-  };
+  return { loadData: load };
 }

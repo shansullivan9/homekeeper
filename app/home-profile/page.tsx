@@ -178,24 +178,15 @@ export default function HomeProfilePage() {
 
     try {
       if (isNew) {
+        // Server-side RPC creates the home and the owner-membership in
+        // one transaction so it can't race the home_members RLS policy.
         const { data: newHome, error: homeErr } = await supabase
-          .from('homes')
-          .insert(payload)
-          .select()
-          .single();
+          .rpc('create_home_with_owner', { p_payload: payload });
 
         if (homeErr) throw homeErr;
 
-        const { error: memberErr } = await supabase.from('home_members').insert({
-          home_id: newHome.id,
-          user_id: user!.id,
-          role: 'owner',
-        });
-
-        if (memberErr) throw memberErr;
-
-        setHome(newHome);
-        await supabase.rpc('generate_suggestions', { p_home_id: newHome.id });
+        setHome(newHome as any);
+        await supabase.rpc('generate_suggestions', { p_home_id: (newHome as any).id });
 
         toast.success('Home created! Check your dashboard for suggested tasks.');
         setEditMode(false);

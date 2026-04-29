@@ -81,7 +81,11 @@ export default function CalendarPage() {
       {/* Month Navigation */}
       <div className="flex items-center justify-between mb-4">
         <button
-          onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+          onClick={() => {
+            const next = subMonths(currentMonth, 1);
+            setCurrentMonth(next);
+            setSelectedDate(startOfMonth(next));
+          }}
           aria-label="Previous month"
           className="p-2 rounded-full text-ink-secondary active:text-brand-500 md:hover:bg-gray-100 transition-colors"
         >
@@ -101,7 +105,11 @@ export default function CalendarPage() {
           </button>
         </div>
         <button
-          onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+          onClick={() => {
+            const next = addMonths(currentMonth, 1);
+            setCurrentMonth(next);
+            setSelectedDate(startOfMonth(next));
+          }}
           aria-label="Next month"
           className="p-2 rounded-full text-ink-secondary active:text-brand-500 md:hover:bg-gray-100 transition-colors"
         >

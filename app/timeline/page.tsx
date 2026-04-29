@@ -220,6 +220,7 @@ export default function TimelinePage() {
             />
             <input
               type="number"
+              min="0"
               step="0.01"
               value={form.cost}
               onChange={(e) => update('cost', e.target.value)}
