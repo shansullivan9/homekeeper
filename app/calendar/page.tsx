@@ -1,5 +1,6 @@
 'use client';
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import PageHeader from '@/components/layout/PageHeader';
 import TaskCard from '@/components/tasks/TaskCard';
@@ -14,6 +15,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 export default function CalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
+  const router = useRouter();
   const { tasks } = useStore();
   const { loadData } = useAppInit();
 
@@ -186,7 +188,21 @@ export default function CalendarPage() {
         </div>
       ) : (
         <div className="mx-4 ios-card px-4 py-8 text-center">
-          <p className="text-ink-tertiary text-sm">No tasks on this date</p>
+          <p className="text-ink-tertiary text-sm mb-3">No tasks on this date</p>
+          <button
+            onClick={() => {
+              // Pre-set the new task's due_date via sessionStorage; Add
+              // Task picks it up on mount.
+              const dateStr = format(selectedDate, 'yyyy-MM-dd');
+              if (typeof window !== 'undefined') {
+                sessionStorage.setItem('homekeeper.prefilledDueDate', dateStr);
+              }
+              router.push('/add-task');
+            }}
+            className="px-4 py-2 rounded-ios bg-brand-500 text-white text-sm font-semibold active:bg-brand-600 md:hover:bg-brand-600 transition-colors"
+          >
+            + Add task on {format(selectedDate, 'MMM d')}
+          </button>
         </div>
       )}
     </div>
