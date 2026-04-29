@@ -10,6 +10,12 @@ interface AppState {
   appliances: Appliance[];
   history: TaskHistory[];
   documents: Document[];
+  /**
+   * Lower-cased suggestion titles the user has dismissed for this home.
+   * The dashboard's SuggestionBanner uses this to keep dismissed
+   * items hidden even after generate_suggestions re-inserts them.
+   */
+  dismissedSuggestions: string[];
   loading: boolean;
   setUser: (user: Profile | null) => void;
   setHome: (home: Home | null) => void;
@@ -19,6 +25,7 @@ interface AppState {
   setAppliances: (appliances: Appliance[]) => void;
   setHistory: (history: TaskHistory[]) => void;
   setDocuments: (documents: Document[]) => void;
+  setDismissedSuggestions: (titles: string[]) => void;
   setLoading: (loading: boolean) => void;
   addTask: (task: Task) => void;
   updateTask: (task: Task) => void;
@@ -34,6 +41,7 @@ export const useStore = create<AppState>((set) => ({
   appliances: [],
   history: [],
   documents: [],
+  dismissedSuggestions: [],
   loading: true,
   setUser: (user) => set({ user }),
   setHome: (home) => set({ home }),
@@ -43,6 +51,7 @@ export const useStore = create<AppState>((set) => ({
   setAppliances: (appliances) => set({ appliances }),
   setHistory: (history) => set({ history }),
   setDocuments: (documents) => set({ documents }),
+  setDismissedSuggestions: (titles) => set({ dismissedSuggestions: titles }),
   setLoading: (loading) => set({ loading }),
   addTask: (task) => set((s) => ({ tasks: [task, ...s.tasks] })),
   updateTask: (task) => set((s) => ({ tasks: s.tasks.map((t) => (t.id === task.id ? task : t)) })),

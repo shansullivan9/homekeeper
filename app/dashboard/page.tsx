@@ -30,7 +30,11 @@ export default function DashboardPage() {
   }, [activeTasks, claimFilter, user]);
 
   const now = startOfDay(new Date());
-  const weekEnd = endOfDay(addDays(now, 7));
+  // "Due This Week" covers today through 6 days from now (a real
+  // 7-day window). Using addDays(now, 7) for the cutoff with isBefore
+  // would actually include day 8, since endOfDay(now+7) sits inside
+  // the start of day 8.
+  const weekEnd = endOfDay(addDays(now, 6));
   const monthEnd = endOfDay(endOfMonth(now));
 
   const sixWeeksOut = useMemo(() => endOfDay(addDays(now, 42)), [now]);
@@ -70,11 +74,19 @@ export default function DashboardPage() {
     tasks
       .filter((t) => {
         if (t.status !== 'completed' || !t.completed_at) return false;
-        return new Date(t.completed_at) >= recentlyCompletedCutoff;
+        if (new Date(t.completed_at) < recentlyCompletedCutoff) return false;
+        // Match the claim filter so "Yours" shows only tasks you
+        // completed, "Theirs" shows partner-completed, etc.
+        if (claimFilter === 'mine')
+          return (t as any).completed_by === user?.id;
+        if (claimFilter === 'theirs')
+          return (t as any).completed_by && (t as any).completed_by !== user?.id;
+        if (claimFilter === 'unclaimed') return !(t as any).completed_by;
+        return true;
       })
       .sort((a, b) => new Date(b.completed_at || 0).getTime() - new Date(a.completed_at || 0).getTime())
       .slice(0, 5),
-    [tasks, recentlyCompletedCutoff]
+    [tasks, recentlyCompletedCutoff, claimFilter, user]
   );
 
   const currentYear = now.getFullYear();
@@ -115,15 +127,45 @@ export default function DashboardPage() {
     </button>
   );
 
+  // True when there are zero tasks in any visible bucket. We use this
+  // to show a friendly hero on a brand-new household instead of five
+  // "None" cards stacked on top of each other.
+  const everythingEmpty =
+    overdue.length === 0 &&
+    dueThisWeek.length === 0 &&
+    dueThisMonth.length === 0 &&
+    upcoming.length === 0 &&
+    later.length === 0;
+
   const emptyState = (
-    <div className="mx-4 mt-8 text-center">
-      <div className="text-4xl mb-3">🎉</div>
-      <p className="text-lg font-semibold text-ink-primary">All caught up!</p>
-      <p className="text-sm text-ink-secondary mt-1">
-        {claimFilter === 'all'
-          ? 'No pending tasks. Tap + to add one.'
-          : 'Nothing in this view.'}
+    <div className="mx-4 mt-6 mb-6 ios-card p-6 text-center">
+      <div className="text-5xl mb-3">🎉</div>
+      <p className="text-lg font-semibold text-ink-primary">
+        {claimFilter === 'all' ? 'All caught up!' : 'Nothing in this view'}
       </p>
+      <p className="text-sm text-ink-secondary mt-1 mb-4">
+        {claimFilter === 'all'
+          ? activeTasks.length === 0
+            ? 'No tasks yet. Add one or complete your home profile to get suggestions tailored to your house.'
+            : 'You have no pending tasks. Nice work.'
+          : 'Try switching filters to see other tasks.'}
+      </p>
+      {claimFilter === 'all' && activeTasks.length === 0 && (
+        <div className="flex flex-col sm:flex-row gap-2 justify-center">
+          <button
+            onClick={() => router.push('/add-task')}
+            className="px-4 py-2.5 rounded-ios bg-brand-500 text-white text-sm font-semibold active:bg-brand-600 md:hover:bg-brand-600 transition-colors"
+          >
+            Add a task
+          </button>
+          <button
+            onClick={() => router.push('/home-profile')}
+            className="px-4 py-2.5 rounded-ios bg-brand-50 text-brand-600 text-sm font-semibold active:bg-brand-100 md:hover:bg-brand-100 transition-colors"
+          >
+            Complete home profile
+          </button>
+        </div>
+      )}
     </div>
   );
 
@@ -206,8 +248,11 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Task buckets — single column on mobile, two columns on desktop */}
-        <div className="md:grid md:grid-cols-2 md:gap-x-4 md:px-0">
+        {everythingEmpty && emptyState}
+
+        {/* Task buckets — single column on mobile, two columns on desktop.
+            When everything is empty we show the hero above instead. */}
+        <div className={`md:grid md:grid-cols-2 md:gap-x-4 md:px-0 ${everythingEmpty ? 'hidden' : ''}`}>
           {/* Overdue */}
           <div>
             <p className="section-header">
@@ -292,26 +337,23 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
-
-          {/* Recently Completed — only on the unfiltered view */}
-          {claimFilter === 'all' && (
-            <div>
-              <p className="section-header">
-                <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#8E8E93' }} />
-                Recently Completed ({recentlyCompleted.length})
-              </p>
-              <div className="mx-4 ios-card overflow-hidden">
-                {recentlyCompleted.length > 0 ? (
-                  recentlyCompleted.map((t) => (
-                    <TaskCard key={t.id} task={t} compact sectionColor="#8E8E93" />
-                  ))
-                ) : (
-                  <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
-                )}
-              </div>
-            </div>
-          )}
         </div>
+
+        {/* Recently Completed — outside the conditional bucket grid so
+            it stays visible even when active buckets are empty. */}
+        {recentlyCompleted.length > 0 && (
+          <div>
+            <p className="section-header">
+              <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#8E8E93' }} />
+              Recently Completed ({recentlyCompleted.length})
+            </p>
+            <div className="mx-4 ios-card overflow-hidden">
+              {recentlyCompleted.map((t) => (
+                <TaskCard key={t.id} task={t} compact sectionColor="#8E8E93" />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

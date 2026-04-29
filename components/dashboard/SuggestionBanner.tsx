@@ -7,7 +7,15 @@ import { Sparkles, Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function SuggestionBanner() {
-  const { tasks, removeTask, updateTask } = useStore();
+  const {
+    tasks,
+    home,
+    user,
+    dismissedSuggestions,
+    setDismissedSuggestions,
+    removeTask,
+    updateTask,
+  } = useStore();
   const supabase = createClient();
 
   const suggestions = useMemo(() => {
@@ -39,8 +47,13 @@ export default function SuggestionBanner() {
       realTasks.map((t) => t.title.trim().toLowerCase())
     );
 
+    const dismissedSet = new Set(dismissedSuggestions);
+
     return tasks.filter((t) => {
       if (!t.is_suggestion || t.status !== 'pending') return false;
+      // Persistently dismissed → never show again, even though
+      // generate_suggestions re-inserts it on every profile save.
+      if (dismissedSet.has(t.title.trim().toLowerCase())) return false;
       // Exact title match → already covered.
       if (realTitles.has(t.title.trim().toLowerCase())) return false;
       // Same-category keyword overlap → user already has a task for this
@@ -55,7 +68,7 @@ export default function SuggestionBanner() {
       );
       return !dup;
     });
-  }, [tasks]);
+  }, [tasks, dismissedSuggestions]);
 
   if (suggestions.length === 0) return null;
 
@@ -76,8 +89,33 @@ export default function SuggestionBanner() {
 
   const dismissSuggestion = async (task: Task) => {
     if (!confirm(`Dismiss the suggestion "${task.title}"?`)) return;
-    const { error } = await supabase.from('tasks').delete().eq('id', task.id);
-    if (!error) removeTask(task.id);
+    if (!home) return;
+
+    // Record the dismissal so generate_suggestions() re-creating the
+    // row next time a profile is saved doesn't bring it back.
+    const titleKey = task.title.trim().toLowerCase();
+    const { error: dErr } = await supabase
+      .from('suggestion_dismissals')
+      .upsert(
+        {
+          home_id: home.id,
+          title: task.title.trim(),
+          dismissed_by: user?.id || null,
+        } as any,
+        { onConflict: 'home_id,title' } as any
+      );
+    if (dErr) {
+      toast.error('Could not dismiss');
+      return;
+    }
+    if (!dismissedSuggestions.includes(titleKey)) {
+      setDismissedSuggestions([...dismissedSuggestions, titleKey]);
+    }
+
+    // Drop the actual row so the banner doesn't render it until the
+    // next regeneration anyway.
+    await supabase.from('tasks').delete().eq('id', task.id);
+    removeTask(task.id);
   };
 
   return (

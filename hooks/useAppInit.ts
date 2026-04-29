@@ -62,13 +62,14 @@ export function useAppInit() {
 
       store.setHome(homeData);
 
-      const [tasksRes, catsRes, membersRes, appliancesRes, historyRes, docsRes] = await Promise.all([
+      const [tasksRes, catsRes, membersRes, appliancesRes, historyRes, docsRes, dismissedRes] = await Promise.all([
         supabase.from('tasks').select('*').eq('home_id', homeData.id).order('due_date', { ascending: true, nullsFirst: false }),
         supabase.from('categories').select('*').order('sort_order'),
         supabase.from('home_members').select('*').eq('home_id', homeData.id),
         supabase.from('appliances').select('*').eq('home_id', homeData.id),
         supabase.from('task_history').select('*').eq('home_id', homeData.id).order('completed_at', { ascending: false }).limit(100),
         supabase.from('documents').select('*').eq('home_id', homeData.id).order('uploaded_at', { ascending: false }),
+        supabase.from('suggestion_dismissals').select('title').eq('home_id', homeData.id),
       ]);
 
       if (tasksRes.data) store.setTasks(tasksRes.data);
@@ -95,6 +96,11 @@ export function useAppInit() {
       if (appliancesRes.data) store.setAppliances(appliancesRes.data);
       if (historyRes.data) store.setHistory(historyRes.data);
       if (docsRes.data) store.setDocuments(docsRes.data);
+      if (dismissedRes.data) {
+        store.setDismissedSuggestions(
+          dismissedRes.data.map((r: any) => (r.title || '').trim().toLowerCase())
+        );
+      }
     } catch (err) {
       console.error('Load error:', err);
     }

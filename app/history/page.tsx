@@ -28,12 +28,25 @@ export default function HistoryPage() {
   };
 
   const handleUndo = async (h: TaskHistory) => {
-    if (
-      !confirm(
-        `Mark "${h.title}" as not completed? It will go back to your task list.`
-      )
-    )
-      return;
+    // If this history entry is for a recurring task, completing it
+    // already auto-scheduled the next pending occurrence. Reviving
+    // would leave two identical pending tasks. Detect and ask before
+    // proceeding.
+    const futureSibling = h.task_id
+      ? null
+      : tasks.find(
+          (t) =>
+            t.status === 'pending' &&
+            !t.is_suggestion &&
+            t.title.trim().toLowerCase() === h.title.trim().toLowerCase()
+        );
+    const promptMsg = futureSibling
+      ? `"${h.title}" already has an upcoming occurrence. Just delete this history entry instead?`
+      : `Mark "${h.title}" as not completed? It will go back to your task list.`;
+    if (!confirm(promptMsg)) return;
+    if (futureSibling) {
+      return handleDelete(h);
+    }
     setBusyId(h.id);
     try {
       let revivedTask: any = null;

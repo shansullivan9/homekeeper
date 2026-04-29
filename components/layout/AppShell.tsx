@@ -68,6 +68,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           supabase.from('appliances').select('*').eq('home_id', homeId),
           supabase.from('task_history').select('*').eq('home_id', homeId).order('completed_at', { ascending: false }).limit(100),
           supabase.from('documents').select('*').eq('home_id', homeId).order('uploaded_at', { ascending: false }),
+          supabase.from('suggestion_dismissals').select('title').eq('home_id', homeId),
         ]);
 
         const getData = (r: any) => r.status === 'fulfilled' ? r.value.data || [] : [];
@@ -77,6 +78,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         store.setAppliances(getData(results[3]));
         store.setHistory(getData(results[4]));
         store.setDocuments(getData(results[5]));
+        store.setDismissedSuggestions(
+          getData(results[6]).map((r: any) => (r.title || '').trim().toLowerCase())
+        );
 
         const memberUserIds = rawMembers
           .map((m: any) => m.user_id)
