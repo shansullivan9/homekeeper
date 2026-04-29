@@ -1,14 +1,14 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase-browser';
 import PageHeader from '@/components/layout/PageHeader';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import {
-  Users, Copy, Plus, LogOut, Home, ChevronRight,
-  UserCircle2, Package, Clock3, Banknote, Share2,
-  RefreshCw, X, LogOut as LeaveIcon,
+  Users, Plus, LogOut, Home, ChevronRight,
+  UserCircle2, Share2, RefreshCw, X, Bell,
+  LogOut as LeaveIcon,
 } from 'lucide-react';
 
 // "abcdef012345" → "abcd-ef01-2345"
@@ -16,9 +16,42 @@ const formatInviteCode = (raw: string | null | undefined): string =>
   (raw || '').replace(/[^A-Za-z0-9]/g, '').match(/.{1,4}/g)?.join('-') || (raw || '');
 
 export default function SettingsPage() {
-  const { user, home, members, setUser, setHome, setMembers } = useStore();
+  const { user, home, members, setUser, setHome, setMembers, userMemberships } = useStore();
   const supabase = createClient();
   const router = useRouter();
+  const [otherHomes, setOtherHomes] = useState<{ id: string; name: string }[]>([]);
+
+  // Look up names for the user's other households so the switcher
+  // can label them. We only fetch what's not already the current
+  // home and only when there's more than one membership.
+  useEffect(() => {
+    const loadOtherNames = async () => {
+      if (!userMemberships || userMemberships.length <= 1) {
+        setOtherHomes([]);
+        return;
+      }
+      const otherIds = userMemberships
+        .map((m: any) => m.home_id)
+        .filter((id: string) => id && id !== home?.id);
+      if (otherIds.length === 0) {
+        setOtherHomes([]);
+        return;
+      }
+      const { data } = await supabase
+        .from('homes')
+        .select('id, name')
+        .in('id', otherIds);
+      if (data) setOtherHomes(data as any);
+    };
+    loadOtherNames();
+  }, [userMemberships, home?.id]);
+
+  const switchToHome = (homeId: string) => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('homekeeper.selectedHomeId', homeId);
+    }
+    window.location.reload();
+  };
   const [joinCode, setJoinCode] = useState('');
   const [joining, setJoining] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
@@ -123,6 +156,14 @@ export default function SettingsPage() {
         else throw error;
       } else {
         toast.success('Joined household!');
+        // Make the just-joined home the active one so the next reload
+        // shows it instead of the previous default.
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(
+            'homekeeper.selectedHomeId',
+            (targetHome as any).id
+          );
+        }
         window.location.reload();
       }
     } catch (err: any) {
@@ -152,7 +193,11 @@ export default function SettingsPage() {
       return;
     }
     toast.success('Left household');
-    // Force a reload — the user may have other memberships, or none.
+    // Drop the stored selection so AppShell falls back to whatever
+    // remaining membership (if any) it finds first.
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('homekeeper.selectedHomeId');
+    }
     window.location.reload();
   };
 
@@ -224,6 +269,39 @@ export default function SettingsPage() {
             )}
           </div>
         </div>
+
+        {/* Other households — only shown when the user belongs to
+            more than one. Tap to switch the active home; AppShell
+            reads localStorage on next load. */}
+        {otherHomes.length > 0 && (
+          <div>
+            <p className="section-header">Switch Household</p>
+            <div className="mx-4 ios-card overflow-hidden">
+              <div className="ios-list-item">
+                <div className="flex items-center gap-3">
+                  <Home size={18} className="text-brand-500" />
+                  <span className="text-[15px] font-medium">{home?.name || 'My Home'}</span>
+                </div>
+                <span className="text-[10px] bg-brand-50 text-brand-500 px-1.5 py-0.5 rounded-full font-medium">
+                  Current
+                </span>
+              </div>
+              {otherHomes.map((h) => (
+                <button
+                  key={h.id}
+                  onClick={() => switchToHome(h.id)}
+                  className="ios-list-item w-full"
+                >
+                  <div className="flex items-center gap-3">
+                    <Home size={18} className="text-ink-secondary" />
+                    <span className="text-[15px]">{h.name}</span>
+                  </div>
+                  <span className="text-xs text-brand-500 font-medium">Switch</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Household */}
         <div>
@@ -350,24 +428,20 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Navigation Links */}
+        {/* Account preferences */}
         <div>
-          <p className="section-header">Manage</p>
+          <p className="section-header">Preferences</p>
           <div className="mx-4 ios-card overflow-hidden">
-            {[
-              { label: 'Appliances & Systems', icon: Package, href: '/appliances' },
-              { label: 'Expenses', icon: Banknote, href: '/expenses' },
-              { label: 'Home Timeline', icon: Clock3, href: '/timeline' },
-              { label: 'Home Profile', icon: Home, href: '/home-profile' },
-            ].map(({ label, icon: Icon, href }) => (
-              <button key={href} onClick={() => router.push(href)} className="ios-list-item w-full">
-                <div className="flex items-center gap-3">
-                  <Icon size={18} className="text-ink-secondary" />
-                  <span className="text-[15px]">{label}</span>
-                </div>
-                <ChevronRight size={16} className="text-ink-tertiary" />
-              </button>
-            ))}
+            <button
+              onClick={() => router.push('/settings/notifications')}
+              className="ios-list-item w-full"
+            >
+              <div className="flex items-center gap-3">
+                <Bell size={18} className="text-ink-secondary" />
+                <span className="text-[15px]">Notifications</span>
+              </div>
+              <ChevronRight size={16} className="text-ink-tertiary" />
+            </button>
           </div>
         </div>
 

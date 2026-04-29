@@ -35,23 +35,30 @@ export function useAppInit() {
         .maybeSingle();
       if (profile) store.setUser(profile);
 
-      const { data: membership } = await supabase
+      const { data: memberships } = await supabase
         .from('home_members')
         .select('*')
-        .eq('user_id', userId)
-        .limit(1)
-        .maybeSingle();
+        .eq('user_id', userId);
 
-      if (!membership) {
+      if (!memberships || memberships.length === 0) {
         store.setLoading(false);
         router.push('/home-profile');
         return;
       }
 
+      const stored =
+        typeof window !== 'undefined'
+          ? window.localStorage.getItem('homekeeper.selectedHomeId')
+          : null;
+      const membership =
+        (stored && memberships.find((m: any) => m.home_id === stored)) ||
+        memberships[0];
+      store.setUserMemberships(memberships as any);
+
       const { data: homeData } = await supabase
         .from('homes')
         .select('*')
-        .eq('id', membership.home_id)
+        .eq('id', (membership as any).home_id)
         .maybeSingle();
 
       if (!homeData) {

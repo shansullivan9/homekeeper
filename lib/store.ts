@@ -16,6 +16,12 @@ interface AppState {
    * items hidden even after generate_suggestions re-inserts them.
    */
   dismissedSuggestions: string[];
+  /**
+   * Every home_members row for the signed-in user. Used by the
+   * Settings home-switcher to list "your other households" — the
+   * `members` array above is scoped to the *currently displayed* home.
+   */
+  userMemberships: HomeMember[];
   loading: boolean;
   setUser: (user: Profile | null) => void;
   setHome: (home: Home | null) => void;
@@ -26,6 +32,7 @@ interface AppState {
   setHistory: (history: TaskHistory[]) => void;
   setDocuments: (documents: Document[]) => void;
   setDismissedSuggestions: (titles: string[]) => void;
+  setUserMemberships: (memberships: HomeMember[]) => void;
   setLoading: (loading: boolean) => void;
   addTask: (task: Task) => void;
   updateTask: (task: Task) => void;
@@ -42,6 +49,7 @@ export const useStore = create<AppState>((set) => ({
   history: [],
   documents: [],
   dismissedSuggestions: [],
+  userMemberships: [],
   loading: true,
   setUser: (user) => set({ user }),
   setHome: (home) => set({ home }),
@@ -52,6 +60,7 @@ export const useStore = create<AppState>((set) => ({
   setHistory: (history) => set({ history }),
   setDocuments: (documents) => set({ documents }),
   setDismissedSuggestions: (titles) => set({ dismissedSuggestions: titles }),
+  setUserMemberships: (memberships) => set({ userMemberships: memberships }),
   setLoading: (loading) => set({ loading }),
   addTask: (task) => set((s) => ({ tasks: [task, ...s.tasks] })),
   updateTask: (task) => set((s) => ({ tasks: s.tasks.map((t) => (t.id === task.id ? task : t)) })),
