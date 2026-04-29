@@ -154,13 +154,20 @@ export default function NotificationsPage() {
       toast.error('Service workers not supported in this browser');
       return;
     }
-    const vapid = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-    if (!vapid || vapid === 'your_vapid_public_key') {
-      toast.error('VAPID key missing in build (env var not deployed yet)');
-      return;
-    }
     setSubscribing(true);
     try {
+      // Fetch the VAPID key from our own API at runtime so the client
+      // doesn't depend on a NEXT_PUBLIC_* env var being inlined at
+      // build time. The route reads from process.env at request time.
+      const cfgRes = await fetch('/api/push/config', { cache: 'no-store' });
+      const cfg = await cfgRes.json().catch(() => ({}));
+      const vapid = (cfg && cfg.vapidPublicKey) || '';
+      if (!vapid || vapid === 'your_vapid_public_key') {
+        toast.error('Server is missing VAPID_PUBLIC_KEY env var');
+        setSubscribing(false);
+        return;
+      }
+
       const reg = await navigator.serviceWorker.ready;
       let sub: PushSubscription | null = null;
       try {
@@ -194,9 +201,6 @@ export default function NotificationsPage() {
       toast.success('Push subscription saved!');
     } catch (err: any) {
       const msg = (err && err.message) || String(err);
-      // iOS Safari throws here when the page isn't installed as a
-      // PWA via "Add to Home Screen". Surface a tip in that case
-      // instead of a generic error.
       if (/permission|gesture|user/i.test(msg)) {
         toast.error('Push blocked. iOS users: install via Add to Home Screen first.');
       } else {
