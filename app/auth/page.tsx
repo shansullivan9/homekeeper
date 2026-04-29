@@ -19,13 +19,21 @@ export default function AuthPage() {
 
     try {
       if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { display_name: name } },
         });
         if (error) throw error;
-        toast.success('Account created! Check your email to verify.');
+        if (data.session) {
+          // Email confirmation is off — we're already signed in. Send
+          // them straight into the home-profile setup.
+          toast.success('Welcome!');
+          router.push('/home-profile');
+        } else {
+          toast.success('Check your email to verify your account, then sign in.');
+          setMode('login');
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;

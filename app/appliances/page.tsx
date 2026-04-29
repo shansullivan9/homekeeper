@@ -193,8 +193,8 @@ export default function AppliancesPage() {
   const warrantyStatus = (expDate: string | null) => {
     if (!expDate) return null;
     const exp = parseISO(expDate);
-    if (isPast(exp)) return { label: 'Expired', color: 'text-status-red bg-red-50' };
     const daysLeft = differenceInDays(exp, new Date());
+    if (daysLeft <= 0) return { label: 'Expired', color: 'text-status-red bg-red-50' };
     if (daysLeft <= 90) return { label: `${daysLeft}d left`, color: 'text-status-yellow bg-amber-50' };
     return { label: 'Active', color: 'text-status-green bg-green-50' };
   };
@@ -314,7 +314,7 @@ export default function AppliancesPage() {
           </div>
           <div>
             <label className="text-xs text-ink-secondary mb-1 block">Purchase price ($)</label>
-            <input type="number" step="0.01" value={form.purchase_price} onChange={(e) => u('purchase_price', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-60 disabled:cursor-not-allowed" />
+            <input type="number" min="0" step="0.01" value={form.purchase_price} onChange={(e) => u('purchase_price', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-60 disabled:cursor-not-allowed" />
           </div>
           <div>
             <label className="text-xs text-ink-secondary mb-1 block">Notes</label>

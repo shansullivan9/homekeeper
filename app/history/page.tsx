@@ -137,7 +137,8 @@ export default function HistoryPage() {
       (h) =>
         h.title.toLowerCase().includes(q) ||
         h.category_name?.toLowerCase().includes(q) ||
-        h.completed_by_name?.toLowerCase().includes(q)
+        h.completed_by_name?.toLowerCase().includes(q) ||
+        h.notes?.toLowerCase().includes(q)
     );
   }, [history, search]);
 

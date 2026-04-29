@@ -243,17 +243,21 @@ function AddTaskForm() {
         if (error) throw error;
 
         if (isCompleted && completedAtIso) {
-          // Update existing history rows for this task; insert one if none.
-          const { data: existingHist } = await supabase
+          // Update only the most recent history row's completed_at, so
+          // older completions of a recurring task aren't all rewritten
+          // to the new date.
+          const { data: latestHist } = await supabase
             .from('task_history')
             .select('id')
             .eq('task_id', editId)
-            .limit(1);
-          if (existingHist && existingHist.length > 0) {
+            .order('completed_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (latestHist) {
             await supabase
               .from('task_history')
               .update({ completed_at: completedAtIso })
-              .eq('task_id', editId);
+              .eq('id', (latestHist as any).id);
           } else {
             await supabase.from('task_history').insert({
               task_id: editId,
@@ -268,8 +272,18 @@ function AddTaskForm() {
             });
           }
         } else if (!isCompleted) {
-          // If unchecking completed, remove the history row(s).
-          await supabase.from('task_history').delete().eq('task_id', editId);
+          // Unchecking completed: only remove the most recent history
+          // row, preserving older recurring completions.
+          const { data: latest } = await supabase
+            .from('task_history')
+            .select('id')
+            .eq('task_id', editId)
+            .order('completed_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (latest) {
+            await supabase.from('task_history').delete().eq('id', (latest as any).id);
+          }
         }
 
         toast.success('Task updated');
@@ -419,6 +433,7 @@ function AddTaskForm() {
             onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g. Change HVAC filter"
             className="ios-input"
+            maxLength={120}
             autoFocus={!editId}
           />
         </div>
@@ -553,6 +568,7 @@ function AddTaskForm() {
             <label className="text-xs font-semibold text-ink-secondary uppercase tracking-wide mb-1.5 block">Est. Time (min)</label>
             <input
               type="number"
+              min="0"
               value={estimatedMinutes}
               onChange={(e) => setEstimatedMinutes(e.target.value)}
               placeholder="30"
@@ -563,6 +579,7 @@ function AddTaskForm() {
             <label className="text-xs font-semibold text-ink-secondary uppercase tracking-wide mb-1.5 block">Est. Cost ($)</label>
             <input
               type="number"
+              min="0"
               step="0.01"
               value={estimatedCost}
               onChange={(e) => setEstimatedCost(e.target.value)}
@@ -642,7 +659,15 @@ function AddTaskForm() {
 
         {/* Save */}
         {(!editId || editMode) && (
-          <button onClick={handleSave} disabled={saving || !title.trim()} className="ios-button">
+          <button
+            onClick={handleSave}
+            disabled={
+              saving ||
+              !title.trim() ||
+              (recurrence === 'custom' && (!recurrenceDays || parseInt(recurrenceDays) <= 0))
+            }
+            className="ios-button"
+          >
             {saving ? 'Saving...' : editId ? 'Update Task' : 'Create Task'}
           </button>
         )}
