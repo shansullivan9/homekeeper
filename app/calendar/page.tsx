@@ -56,8 +56,11 @@ export default function CalendarPage() {
       if (!t.due_date) return;
       place(t.due_date, sectionColorForTask(t.due_date, t.status));
     });
+    // Completed tasks land on the day they were completed only — never
+    // also on their original due date — so a task can't appear on two
+    // calendar days.
     completedTasks.forEach((t) => {
-      const key = t.completed_at ? t.completed_at.slice(0, 10) : t.due_date;
+      const key = t.completed_at ? t.completed_at.slice(0, 10) : null;
       if (!key) return;
       place(key, SECTION_COLORS.completed);
     });
@@ -67,10 +70,9 @@ export default function CalendarPage() {
   const selectedTasks = useMemo(() => {
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const active = activeTasks.filter((t) => t.due_date === dateStr);
-    const completed = completedTasks.filter((t) => {
-      const key = t.completed_at ? t.completed_at.slice(0, 10) : t.due_date;
-      return key === dateStr;
-    });
+    const completed = completedTasks.filter(
+      (t) => t.completed_at && t.completed_at.slice(0, 10) === dateStr
+    );
     return [...active, ...completed];
   }, [selectedDate, activeTasks, completedTasks]);
 

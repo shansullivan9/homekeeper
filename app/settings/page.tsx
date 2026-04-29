@@ -6,12 +6,17 @@ import PageHeader from '@/components/layout/PageHeader';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import {
-  Users, Copy, Plus, LogOut, Bell, Home, ChevronRight,
-  UserCircle2, Palette, Package, Clock3, Banknote,
+  Users, Copy, Plus, LogOut, Home, ChevronRight,
+  UserCircle2, Package, Clock3, Banknote, Share2,
+  RefreshCw, X, LogOut as LeaveIcon,
 } from 'lucide-react';
 
+// "abcdef012345" → "abcd-ef01-2345"
+const formatInviteCode = (raw: string | null | undefined): string =>
+  (raw || '').replace(/[^A-Za-z0-9]/g, '').match(/.{1,4}/g)?.join('-') || (raw || '');
+
 export default function SettingsPage() {
-  const { user, home, members, setUser } = useStore();
+  const { user, home, members, setUser, setHome, setMembers } = useStore();
   const supabase = createClient();
   const router = useRouter();
   const [joinCode, setJoinCode] = useState('');
@@ -19,6 +24,9 @@ export default function SettingsPage() {
   const [showJoin, setShowJoin] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState('');
+  const [rotating, setRotating] = useState(false);
+
+  const isOwner = members.find((m) => (m as any).user_id === user?.id)?.role === 'owner';
 
   const saveName = async () => {
     if (!user || !nameDraft.trim()) return;
@@ -40,19 +48,63 @@ export default function SettingsPage() {
 
   const copyInviteCode = () => {
     if (!home?.invite_code) return;
-    navigator.clipboard.writeText(home.invite_code);
+    navigator.clipboard.writeText(formatInviteCode(home.invite_code));
     toast.success('Invite code copied!');
+  };
+
+  const shareInvite = async () => {
+    if (!home?.invite_code) return;
+    const code = formatInviteCode(home.invite_code);
+    const message = `Join "${home.name}" on HomeKeeper. Open the app, go to Settings → Join Another Home, and enter code: ${code}`;
+    // Use the system share sheet when available (mobile); otherwise
+    // fall back to clipboard.
+    if (typeof navigator !== 'undefined' && (navigator as any).share) {
+      try {
+        await (navigator as any).share({ title: 'HomeKeeper invite', text: message });
+        return;
+      } catch {
+        // user cancelled or share failed — fall through to clipboard
+      }
+    }
+    navigator.clipboard.writeText(message);
+    toast.success('Invite copied to clipboard');
+  };
+
+  const rotateInviteCode = async () => {
+    if (!home || !isOwner) return;
+    if (!confirm('Generate a new invite code? The old code will stop working.')) return;
+    setRotating(true);
+    try {
+      // Random 12 hex chars to mirror the schema default.
+      const fresh = Array.from({ length: 12 })
+        .map(() => Math.floor(Math.random() * 16).toString(16))
+        .join('');
+      const { data, error } = await supabase
+        .from('homes')
+        .update({ invite_code: fresh })
+        .eq('id', home.id)
+        .select()
+        .single();
+      if (error) throw error;
+      if (data) setHome(data as any);
+      toast.success('New invite code generated');
+    } catch (err: any) {
+      toast.error(err.message || 'Could not rotate code');
+    } finally {
+      setRotating(false);
+    }
   };
 
   const handleJoinHome = async () => {
     if (!joinCode.trim() || !user) return;
     setJoining(true);
     try {
-      // Find home by invite code
+      // Strip hyphens / whitespace so users can paste either format.
+      const code = joinCode.replace(/[^A-Za-z0-9]/g, '');
       const { data: targetHome, error: findErr } = await supabase
         .from('homes')
         .select('id')
-        .eq('invite_code', joinCode.trim())
+        .eq('invite_code', code)
         .single();
 
       if (findErr || !targetHome) {
@@ -61,7 +113,7 @@ export default function SettingsPage() {
       }
 
       const { error } = await supabase.from('home_members').insert({
-        home_id: targetHome.id,
+        home_id: (targetHome as any).id,
         user_id: user.id,
         role: 'member',
       });
@@ -80,11 +132,49 @@ export default function SettingsPage() {
     }
   };
 
+  const handleLeaveHousehold = async () => {
+    if (!user || !home) return;
+    if (
+      !confirm(
+        isOwner
+          ? `Leave "${home.name}"? You're the owner — leaving will remove you from this household.`
+          : `Leave "${home.name}"? You'll lose access to its tasks and documents.`
+      )
+    ) return;
+    const myRow = members.find((m) => (m as any).user_id === user.id);
+    if (!myRow) return;
+    const { error } = await supabase
+      .from('home_members')
+      .delete()
+      .eq('id', myRow.id);
+    if (error) {
+      toast.error(error.message || 'Could not leave');
+      return;
+    }
+    toast.success('Left household');
+    // Force a reload — the user may have other memberships, or none.
+    window.location.reload();
+  };
+
+  const handleRemoveMember = async (memberRow: any) => {
+    if (!isOwner) return;
+    const name = memberRow.display_name || memberRow.email || 'this member';
+    if (!confirm(`Remove ${name} from "${home?.name}"?`)) return;
+    const { error } = await supabase
+      .from('home_members')
+      .delete()
+      .eq('id', memberRow.id);
+    if (error) {
+      toast.error(error.message || 'Could not remove member');
+      return;
+    }
+    setMembers(members.filter((m) => m.id !== memberRow.id));
+    toast.success(`${name} removed`);
+  };
+
   const handleSignOut = async () => {
     if (!confirm('Sign out of HomeKeeper?')) return;
     await supabase.auth.signOut();
-    // Reset the in-memory store so the next user on this device doesn't
-    // see a flash of the previous user's data.
     useStore.setState({
       user: null, home: null, members: [], tasks: [], categories: [],
       appliances: [], history: [], documents: [],
@@ -155,40 +245,75 @@ export default function SettingsPage() {
                 <span className="text-sm font-medium text-ink-secondary">Members</span>
               </div>
               {members.map((m) => {
+                const anyM = m as any;
                 const name =
-                  (m as any).display_name ||
-                  (m as any).profiles?.display_name ||
-                  (m as any).email ||
-                  (m as any).profiles?.email ||
+                  anyM.display_name ||
+                  anyM.profiles?.display_name ||
+                  anyM.email ||
+                  anyM.profiles?.email ||
                   'Member';
                 const initial = name.trim()[0]?.toUpperCase() || 'M';
-                const isMe = (m as any).user_id === user?.id;
+                const isMe = anyM.user_id === user?.id;
                 return (
                   <div key={m.id} className="flex items-center gap-2 py-1.5">
                     <div className="w-7 h-7 rounded-full bg-brand-50 flex items-center justify-center text-xs font-bold text-brand-500">
                       {initial}
                     </div>
-                    <span className="text-sm">{isMe ? `${name} (you)` : name}</span>
+                    <span className="text-sm flex-1 truncate">
+                      {isMe ? `${name} (you)` : name}
+                    </span>
                     {m.role === 'owner' && (
                       <span className="text-[10px] bg-brand-50 text-brand-500 px-1.5 py-0.5 rounded-full font-medium">Owner</span>
+                    )}
+                    {isOwner && !isMe && m.role !== 'owner' && (
+                      <button
+                        onClick={() => handleRemoveMember(anyM)}
+                        title={`Remove ${name}`}
+                        className="text-ink-tertiary hover:text-status-red transition-colors p-1"
+                      >
+                        <X size={14} />
+                      </button>
                     )}
                   </div>
                 );
               })}
             </div>
 
-            {/* Invite Code */}
+            {/* Invite Code — promoted to a full Share + copy + rotate row */}
             {home?.invite_code && (
-              <button onClick={copyInviteCode} className="ios-list-item w-full">
-                <div className="flex items-center gap-3">
-                  <Copy size={16} className="text-ink-secondary" />
-                  <div>
-                    <span className="text-sm text-ink-secondary">Invite Code</span>
-                    <p className="text-xs font-mono text-brand-500">{home.invite_code}</p>
-                  </div>
+              <div className="px-4 py-3 border-b border-gray-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <Share2 size={16} className="text-ink-secondary" />
+                  <span className="text-sm font-medium text-ink-secondary">Invite Code</span>
                 </div>
-                <span className="text-xs text-brand-500 font-medium">Copy</span>
-              </button>
+                <div className="flex items-center gap-2 mb-2">
+                  <button
+                    onClick={copyInviteCode}
+                    title="Tap to copy"
+                    className="flex-1 px-3 py-2 rounded-ios bg-surface-secondary font-mono text-[15px] text-brand-600 text-center tracking-wider md:hover:bg-gray-100 active:bg-gray-100 transition-colors"
+                  >
+                    {formatInviteCode(home.invite_code)}
+                  </button>
+                  <button
+                    onClick={shareInvite}
+                    title="Share"
+                    className="px-3 py-2 rounded-ios bg-brand-500 text-white text-sm font-semibold flex items-center gap-1.5 active:bg-brand-600 md:hover:bg-brand-600 transition-colors"
+                  >
+                    <Share2 size={14} />
+                    Invite
+                  </button>
+                </div>
+                {isOwner && (
+                  <button
+                    onClick={rotateInviteCode}
+                    disabled={rotating}
+                    className="text-xs text-ink-secondary flex items-center gap-1 active:text-brand-500 md:hover:text-brand-500 transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw size={12} className={rotating ? 'animate-spin' : ''} />
+                    Generate new code
+                  </button>
+                )}
+              </div>
             )}
 
             {/* Join Another Home */}
@@ -206,14 +331,22 @@ export default function SettingsPage() {
                   type="text"
                   value={joinCode}
                   onChange={(e) => setJoinCode(e.target.value)}
-                  placeholder="Enter invite code"
-                  className="ios-input mb-2"
+                  placeholder="abcd-ef01-2345"
+                  className="ios-input mb-2 font-mono"
                 />
                 <button onClick={handleJoinHome} disabled={joining} className="ios-button text-sm">
                   {joining ? 'Joining...' : 'Join Home'}
                 </button>
               </div>
             )}
+
+            {/* Leave Household */}
+            <button onClick={handleLeaveHousehold} className="ios-list-item w-full">
+              <div className="flex items-center gap-3">
+                <LeaveIcon size={16} className="text-status-red" />
+                <span className="text-sm text-status-red">Leave Household</span>
+              </div>
+            </button>
           </div>
         </div>
 

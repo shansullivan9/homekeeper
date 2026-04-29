@@ -9,6 +9,16 @@ import { Plus, X, Package, ChevronRight, FileText } from 'lucide-react';
 import { format, parseISO, isPast, differenceInDays } from 'date-fns';
 import toast from 'react-hot-toast';
 
+const APPLIANCE_CATEGORIES = [
+  'Kitchen',
+  'Laundry',
+  'HVAC',
+  'Plumbing',
+  'Outdoor',
+  'Garage',
+  'Other',
+];
+
 export default function AppliancesPage() {
   const { appliances, home, setAppliances, documents } = useStore();
   const supabase = createClient();
@@ -23,6 +33,17 @@ export default function AppliancesPage() {
     category: '', location: '', installation_date: '', warranty_expiration: '',
     purchase_price: '', notes: '',
   });
+
+  // Existing locations across this home, used to populate the
+  // location autocomplete so users see "Kitchen" as a real option
+  // instead of recreating "kitchen", "Kitchen ", etc.
+  const knownLocations = Array.from(
+    new Set(
+      appliances
+        .map((a) => (a.location || '').trim())
+        .filter((s) => s.length > 0)
+    )
+  ).sort();
 
   useEffect(() => {
     const raw = sessionStorage.getItem('appliancePrefill');
@@ -83,6 +104,30 @@ export default function AppliancesPage() {
     });
     setManualDocId(a.manual_document_id || null);
     setShowForm(true);
+    setEditMode(false);
+  };
+
+  // Reset the form back to the loaded appliance values and exit edit
+  // mode. Used by the Cancel button so users can back out of an edit
+  // without silently discarding changes via the back arrow.
+  const cancelEdit = () => {
+    if (!editing) {
+      resetForm();
+      return;
+    }
+    setForm({
+      name: editing.name,
+      manufacturer: editing.manufacturer || '',
+      model_number: editing.model_number || '',
+      serial_number: editing.serial_number || '',
+      category: editing.category || '',
+      location: editing.location || '',
+      installation_date: editing.installation_date || '',
+      warranty_expiration: editing.warranty_expiration || '',
+      purchase_price: editing.purchase_price?.toString() || '',
+      notes: editing.notes || '',
+    });
+    setManualDocId(editing.manual_document_id || null);
     setEditMode(false);
   };
 
@@ -298,9 +343,41 @@ export default function AppliancesPage() {
               <input type="text" value={form.serial_number} onChange={(e) => u('serial_number', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-60 disabled:cursor-not-allowed" />
             </div>
           </div>
-          <div>
-            <label className="text-xs text-ink-secondary mb-1 block">Category</label>
-            <input type="text" value={form.category} onChange={(e) => u('category', e.target.value)} disabled={!!editing && !editMode} className="ios-input disabled:opacity-60 disabled:cursor-not-allowed" />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-ink-secondary mb-1 block">Category</label>
+              <select
+                value={form.category}
+                onChange={(e) => u('category', e.target.value)}
+                disabled={!!editing && !editMode}
+                className="ios-input disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                <option value="">Select…</option>
+                {APPLIANCE_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+                {form.category && !APPLIANCE_CATEGORIES.includes(form.category) && (
+                  <option value={form.category}>{form.category}</option>
+                )}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-ink-secondary mb-1 block">Location</label>
+              <input
+                type="text"
+                value={form.location}
+                onChange={(e) => u('location', e.target.value)}
+                disabled={!!editing && !editMode}
+                list="appliance-locations"
+                placeholder="e.g. Kitchen"
+                className="ios-input disabled:opacity-60 disabled:cursor-not-allowed"
+              />
+              <datalist id="appliance-locations">
+                {knownLocations.map((loc) => (
+                  <option key={loc} value={loc} />
+                ))}
+              </datalist>
+            </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -327,9 +404,17 @@ export default function AppliancesPage() {
             </button>
           )}
           {editing && editMode && (
-            <button onClick={handleDelete} className="w-full py-3 text-status-red font-semibold text-sm">
-              Delete Appliance
-            </button>
+            <>
+              <button
+                onClick={cancelEdit}
+                className="w-full py-3 text-ink-secondary font-medium text-sm md:hover:text-ink-primary transition-colors"
+              >
+                Cancel
+              </button>
+              <button onClick={handleDelete} className="w-full py-3 text-status-red font-semibold text-sm">
+                Delete Appliance
+              </button>
+            </>
           )}
         </div>
       </div>

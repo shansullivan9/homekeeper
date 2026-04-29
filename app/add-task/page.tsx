@@ -215,7 +215,11 @@ function AddTaskForm() {
       home_id: home.id,
       title: title.trim(),
       category_id: categoryId || null,
-      due_date: dueDate || null,
+      // When the user is logging an "already done" task, the dueDate
+      // state is unused — clear it so the saved record doesn't carry a
+      // stale future date. The next occurrence (for recurring tasks)
+      // is inserted separately with its own due_date below.
+      due_date: isCompleted ? null : (dueDate || null),
       recurrence,
       recurrence_days: recurrence === 'custom' && recurrenceDays ? parseInt(recurrenceDays) : null,
       notes: notes || null,
@@ -473,41 +477,53 @@ function AddTaskForm() {
 
         {isCompleted ? (
           <div>
-            <label className="text-xs font-semibold text-ink-secondary uppercase tracking-wide mb-1.5 block">Completed On</label>
-            <div className="relative">
-              <CalendarIcon
-                size={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-500 pointer-events-none"
-              />
-              <input
-                type="date"
-                value={completedOn}
-                onChange={(e) => setCompletedOn(e.target.value)}
-                className="ios-input pl-10 cursor-pointer"
-              />
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold text-ink-secondary uppercase tracking-wide">
+                Completed On
+              </label>
+              <span className="text-[15px] font-medium">
+                {completedOn
+                  ? format(parseISO(completedOn), 'MMM d, yyyy')
+                  : <span className="text-ink-tertiary">Pick a date</span>}
+              </span>
             </div>
             <InlineCalendar
               value={completedOn}
               onChange={setCompletedOn}
               maxDate={new Date().toISOString().slice(0, 10)}
             />
+            {completedOn && (
+              <button
+                type="button"
+                onClick={() => setCompletedOn('')}
+                className="mt-2 text-xs text-ink-secondary md:hover:text-brand-500 active:text-brand-500 transition-colors"
+              >
+                Clear date
+              </button>
+            )}
           </div>
         ) : (
           <div>
-            <label className="text-xs font-semibold text-ink-secondary uppercase tracking-wide mb-1.5 block">Due Date</label>
-            <div className="relative">
-              <CalendarIcon
-                size={18}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-500 pointer-events-none"
-              />
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="ios-input pl-10 cursor-pointer"
-              />
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold text-ink-secondary uppercase tracking-wide">
+                Due Date
+              </label>
+              <span className="text-[15px] font-medium">
+                {dueDate
+                  ? format(parseISO(dueDate), 'MMM d, yyyy')
+                  : <span className="text-ink-tertiary">No date</span>}
+              </span>
             </div>
             <InlineCalendar value={dueDate} onChange={setDueDate} />
+            {dueDate && (
+              <button
+                type="button"
+                onClick={() => setDueDate('')}
+                className="mt-2 text-xs text-ink-secondary md:hover:text-brand-500 active:text-brand-500 transition-colors"
+              >
+                Clear date
+              </button>
+            )}
           </div>
         )}
 

@@ -7,20 +7,69 @@ import { formatCurrency, CATEGORY_ICONS } from '@/lib/constants';
 import { TaskHistory } from '@/lib/types';
 import { parseISO, getYear } from 'date-fns';
 import { X, ChevronRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 
 export default function ExpensesPage() {
   const { history, setHistory, tasks, setTasks, categories } = useStore();
   const supabase = createClient();
+  const router = useRouter();
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
   const [editing, setEditing] = useState<TaskHistory | null>(null);
+  const [costDraft, setCostDraft] = useState<string>('');
   const [saving, setSaving] = useState(false);
+
+  const openEditor = (h: TaskHistory) => {
+    setEditing(h);
+    setCostDraft(h.cost != null ? h.cost.toString() : '');
+  };
 
   const activeCategories = useMemo(
     () => categories.filter((c) => c.is_default || !c.home_id),
     [categories]
   );
+
+  const saveCost = async () => {
+    if (!editing) return;
+    const parsed = costDraft.trim() === '' ? null : parseFloat(costDraft);
+    if (parsed != null && (isNaN(parsed) || parsed < 0)) {
+      toast.error('Enter a valid cost');
+      return;
+    }
+    setSaving(true);
+    try {
+      const { error: hErr } = await supabase
+        .from('task_history')
+        .update({ cost: parsed })
+        .eq('id', editing.id);
+      if (hErr) throw hErr;
+
+      // Mirror to the underlying task's estimated_cost so completing
+      // the task again next cycle picks up the corrected value.
+      if (editing.task_id) {
+        await supabase
+          .from('tasks')
+          .update({ estimated_cost: parsed, updated_at: new Date().toISOString() })
+          .eq('id', editing.task_id);
+        setTasks(
+          tasks.map((t) =>
+            t.id === editing.task_id ? { ...t, estimated_cost: parsed } : t
+          )
+        );
+      }
+
+      setHistory(
+        history.map((h) => (h.id === editing.id ? { ...h, cost: parsed } : h))
+      );
+      toast.success('Cost updated');
+      setEditing(null);
+    } catch (err: any) {
+      toast.error(err.message || 'Could not update');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const setCategory = async (categoryName: string | null) => {
     if (!editing) return;
@@ -155,7 +204,15 @@ export default function ExpensesPage() {
           <div className="text-center py-12">
             <div className="text-4xl mb-3">💰</div>
             <p className="text-ink-secondary text-sm">No expenses recorded for {year}</p>
-            <p className="text-xs text-ink-tertiary mt-1">Costs are logged when you complete tasks</p>
+            <p className="text-xs text-ink-tertiary mt-1 mb-3">
+              Costs are logged when you complete a task that has an estimated cost.
+            </p>
+            <button
+              onClick={() => router.push('/history')}
+              className="text-brand-500 text-sm font-semibold"
+            >
+              View task history →
+            </button>
           </div>
         )}
 
@@ -167,7 +224,7 @@ export default function ExpensesPage() {
               {yearData.items.map((h) => (
                 <button
                   key={h.id}
-                  onClick={() => setEditing(h)}
+                  onClick={() => openEditor(h)}
                   className="ios-list-item w-full text-left"
                 >
                   <div className="flex-1 min-w-0">
@@ -195,12 +252,12 @@ export default function ExpensesPage() {
       {editing && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4" onClick={() => !saving && setEditing(null)}>
           <div
-            className="bg-white rounded-ios-lg w-full max-w-md p-4 shadow-xl"
+            className="bg-white rounded-ios-lg w-full max-w-md p-4 shadow-xl space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between">
               <div className="min-w-0">
-                <p className="text-xs text-ink-tertiary uppercase tracking-wide font-semibold">Set category</p>
+                <p className="text-xs text-ink-tertiary uppercase tracking-wide font-semibold">Edit Expense</p>
                 <p className="text-[15px] font-medium truncate">{editing.title}</p>
               </div>
               <button
@@ -211,35 +268,68 @@ export default function ExpensesPage() {
                 <X size={20} />
               </button>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => setCategory(null)}
-                disabled={saving}
-                className={`px-3 py-2 rounded-ios text-sm font-medium transition-colors ${
-                  !editing.category_name
-                    ? 'bg-brand-500 text-white'
-                    : 'bg-surface-secondary text-ink-secondary active:bg-surface-tertiary'
-                }`}
-              >
-                Uncategorized
-              </button>
-              {activeCategories.map((cat) => {
-                const selected = editing.category_name === cat.name;
-                return (
-                  <button
-                    key={cat.id}
-                    onClick={() => setCategory(cat.name)}
-                    disabled={saving}
-                    className={`px-3 py-2 rounded-ios text-sm font-medium transition-colors ${
-                      selected
-                        ? 'bg-brand-500 text-white'
-                        : 'bg-surface-secondary text-ink-secondary active:bg-surface-tertiary'
-                    }`}
-                  >
-                    {CATEGORY_ICONS[cat.icon] || '🔧'} {cat.name}
-                  </button>
-                );
-              })}
+
+            {/* Cost */}
+            <div>
+              <label className="text-xs font-semibold text-ink-secondary uppercase tracking-wide mb-1.5 block">
+                Cost ($)
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={costDraft}
+                  onChange={(e) => setCostDraft(e.target.value)}
+                  placeholder="0.00"
+                  disabled={saving}
+                  className="ios-input flex-1"
+                />
+                <button
+                  onClick={saveCost}
+                  disabled={saving}
+                  className="px-4 py-2.5 rounded-ios bg-brand-500 text-white text-sm font-semibold active:bg-brand-600 md:hover:bg-brand-600 transition-colors disabled:opacity-50"
+                >
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+
+            {/* Category */}
+            <div>
+              <p className="text-xs font-semibold text-ink-secondary uppercase tracking-wide mb-1.5">
+                Category
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => setCategory(null)}
+                  disabled={saving}
+                  className={`px-3 py-2 rounded-ios text-sm font-medium transition-colors ${
+                    !editing.category_name
+                      ? 'bg-brand-500 text-white'
+                      : 'bg-surface-secondary text-ink-secondary active:bg-surface-tertiary md:hover:bg-surface-tertiary'
+                  }`}
+                >
+                  Uncategorized
+                </button>
+                {activeCategories.map((cat) => {
+                  const selected = editing.category_name === cat.name;
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => setCategory(cat.name)}
+                      disabled={saving}
+                      className={`px-3 py-2 rounded-ios text-sm font-medium transition-colors ${
+                        selected
+                          ? 'bg-brand-500 text-white'
+                          : 'bg-surface-secondary text-ink-secondary active:bg-surface-tertiary md:hover:bg-surface-tertiary'
+                      }`}
+                    >
+                      {CATEGORY_ICONS[cat.icon] || '🔧'} {cat.name}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
