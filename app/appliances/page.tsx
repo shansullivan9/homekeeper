@@ -145,13 +145,18 @@ export default function AppliancesPage() {
     }
     return Array.from(ids)
       .map((id) => documents.find((d) => d.id === id))
-      .filter(Boolean) as typeof documents;
+      .filter(Boolean)
+      .sort((a: any, b: any) =>
+        (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' })
+      ) as typeof documents;
   })();
 
   const attachableDocuments = editing
-    ? documents.filter(
-        (d: any) => d.appliance_id !== editing.id && d.id !== manualDocId
-      )
+    ? documents
+        .filter((d: any) => d.appliance_id !== editing.id && d.id !== manualDocId)
+        .sort((a: any, b: any) =>
+          (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' })
+        )
     : [];
 
   const attachDocument = async (docId: string) => {
