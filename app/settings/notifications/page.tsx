@@ -10,15 +10,34 @@ interface Prefs {
   remind_days_before: number;
   remind_on_due: boolean;
   remind_when_overdue: boolean;
+  timezone: string;
+  reminder_hour_local: number;
 }
+
+const detectTimezone = (): string => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'America/New_York';
+  } catch {
+    return 'America/New_York';
+  }
+};
 
 const DEFAULTS: Prefs = {
   remind_days_before: 3,
   remind_on_due: true,
   remind_when_overdue: true,
+  timezone: 'America/New_York',
+  reminder_hour_local: 12,
 };
 
 const DAYS_OPTIONS = [0, 1, 2, 3, 5, 7, 14];
+
+// Format an hour 0-23 as friendly 12-hour string ("12pm", "9am", "7pm").
+const fmtHour = (h: number): string => {
+  if (h === 0) return '12am';
+  if (h === 12) return '12pm';
+  return h < 12 ? `${h}am` : `${h - 12}pm`;
+};
 
 type PushState = 'default' | 'granted' | 'denied' | 'unsupported';
 
@@ -61,10 +80,11 @@ export default function NotificationsPage() {
       try {
         const { data } = await supabase
           .from('notification_preferences')
-          .select('remind_days_before, remind_on_due, remind_when_overdue')
+          .select('remind_days_before, remind_on_due, remind_when_overdue, timezone, reminder_hour_local')
           .eq('user_id', user.id)
           .maybeSingle();
         if (cancelled) return;
+        const browserTz = detectTimezone();
         if (data) {
           const d = data as any;
           setPrefs({
@@ -80,7 +100,14 @@ export default function NotificationsPage() {
               typeof d.remind_when_overdue === 'boolean'
                 ? d.remind_when_overdue
                 : DEFAULTS.remind_when_overdue,
+            timezone: d.timezone || browserTz,
+            reminder_hour_local:
+              typeof d.reminder_hour_local === 'number'
+                ? d.reminder_hour_local
+                : DEFAULTS.reminder_hour_local,
           });
+        } else {
+          setPrefs((p) => ({ ...p, timezone: browserTz }));
         }
       } catch (err) {
         console.error('notification prefs load:', err);
@@ -105,6 +132,8 @@ export default function NotificationsPage() {
             remind_days_before: next.remind_days_before,
             remind_on_due: next.remind_on_due,
             remind_when_overdue: next.remind_when_overdue,
+            timezone: next.timezone,
+            reminder_hour_local: next.reminder_hour_local,
             updated_at: new Date().toISOString(),
           } as any,
           { onConflict: 'user_id' } as any
@@ -359,6 +388,30 @@ export default function NotificationsPage() {
         <div>
           <p className="section-header">Reminders</p>
           <div className="mx-4 ios-card overflow-hidden">
+            {/* Time of day picker — runs in the user's local zone via
+                the function's timezone-aware dispatcher. */}
+            <div className="px-4 py-3 border-b border-gray-100">
+              <p className="text-[15px] font-medium">When to send reminders</p>
+              <p className="text-xs text-ink-secondary mb-2">
+                What time of day. We'll deliver in your local time
+                ({prefs.timezone || detectTimezone()}).
+              </p>
+              <select
+                value={prefs.reminder_hour_local}
+                onChange={(e) =>
+                  updatePref({ reminder_hour_local: parseInt(e.target.value, 10) })
+                }
+                disabled={saving || !loaded}
+                className="ios-input"
+              >
+                {Array.from({ length: 24 }).map((_, h) => (
+                  <option key={h} value={h}>
+                    {fmtHour(h)}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="px-4 py-3 border-b border-gray-100">
               <p className="text-[15px] font-medium">Remind me before due</p>
               <p className="text-xs text-ink-secondary mb-2">
