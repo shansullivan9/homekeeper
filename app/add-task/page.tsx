@@ -508,15 +508,22 @@ function AddTaskForm() {
           className="m-0 p-0 border-0 min-w-0 space-y-4 disabled:opacity-100"
         >
 
-        {/* Title */}
+        {/* Title — the form's hero input. Promoted with larger
+            type, semibold weight, and a brighter focus ring so it
+            reads as the primary field instead of one input among many. */}
         <div>
-          <label className="text-xs font-semibold text-ink-secondary uppercase tracking-wide mb-1.5 block">Task Name *</label>
+          <label className="text-micro font-semibold text-ink-secondary uppercase tracking-wider mb-2 block">
+            Task Name *
+          </label>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="e.g. Change HVAC filter"
-            className="ios-input"
+            className="w-full px-4 py-3.5 bg-white rounded-ios text-title font-semibold text-ink-primary
+                       placeholder:text-ink-tertiary placeholder:font-normal
+                       outline-none transition-shadow shadow-card
+                       focus:ring-2 focus:ring-brand-400/60 focus:shadow-card-hover"
             maxLength={120}
             autoFocus={!editId}
           />
