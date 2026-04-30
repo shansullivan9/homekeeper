@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase-browser';
 import { useStore } from '@/lib/store';
 import { useAppInit } from '@/hooks/useAppInit';
 import PageHeader from '@/components/layout/PageHeader';
-import { RECURRENCE_LABELS, CATEGORY_ICONS } from '@/lib/constants';
+import { RECURRENCE_LABELS, CATEGORY_ICONS, categoryFromTitle, recurrenceFromTitle } from '@/lib/constants';
 import { Recurrence, Priority, Task } from '@/lib/types';
 import { Trash2, FileText, ChevronRight, Calendar as CalendarIcon, ChevronLeft } from 'lucide-react';
 import {
@@ -123,6 +123,13 @@ function AddTaskForm() {
   const [editMode, setEditMode] = useState(true);
   const [dirty, setDirty] = useState(false);
 
+  // Track whether the user has manually picked the category or
+  // recurrence. Until they do, we auto-fill those fields from the
+  // task title — but the moment they touch them, we stop overriding
+  // their choice. Saves a couple of taps per task for power users.
+  const [userTouchedCategory, setUserTouchedCategory] = useState(false);
+  const [userTouchedRecurrence, setUserTouchedRecurrence] = useState(false);
+
   useEffect(() => {
     setEditMode(!editId);
   }, [editId]);
@@ -179,6 +186,24 @@ function AddTaskForm() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId]);
+
+  // Auto-detect category + recurrence from title keywords. Stops the
+  // moment the user manually overrides either field, and never runs
+  // when editing an existing task (we trust whatever they saved).
+  useEffect(() => {
+    if (editId) return;
+    if (!userTouchedCategory) {
+      const guess = categoryFromTitle(title, categories);
+      if (guess && guess !== categoryId) setCategoryId(guess);
+    }
+    if (!userTouchedRecurrence) {
+      const guess = recurrenceFromTitle(title);
+      if (guess && guess !== recurrence) setRecurrence(guess);
+    }
+    // categories list is stable; intentionally not in deps to avoid
+    // re-running on unrelated store updates.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, userTouchedCategory, userTouchedRecurrence, editId]);
 
   // Load existing task for editing
   useEffect(() => {
@@ -260,7 +285,7 @@ function AddTaskForm() {
     return next.toISOString().slice(0, 10);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (opts: { addAnother?: boolean } = {}) => {
     if (!title.trim() || !home) return;
     setSaving(true);
 
@@ -419,6 +444,31 @@ function AddTaskForm() {
         }
         toast.success(isCompleted ? 'Logged completed task' : 'Task created');
         await loadData();
+        if (opts.addAnother) {
+          // Power-user batch entry — clear the form and refocus the
+          // title input instead of routing away.
+          setTitle('');
+          setNotes('');
+          setEstimatedMinutes('');
+          setEstimatedCost('');
+          setApplianceId('');
+          setSourceDocumentId(null);
+          setIsCompleted(false);
+          setCompletedOn('');
+          setUserTouchedCategory(false);
+          setUserTouchedRecurrence(false);
+          setRecurrence('one_time');
+          setPriority('medium');
+          // Keep the due date so a string of related tasks stay aligned.
+          if (typeof window !== 'undefined') {
+            const titleInput = document.querySelector<HTMLInputElement>(
+              'input[type="text"][maxlength="120"]'
+            );
+            titleInput?.focus();
+          }
+          setSaving(false);
+          return;
+        }
         // For a freshly created task, drop the user back on the
         // dashboard so they see the new row in context. For edits we
         // already returned earlier (edit mode flips to view in place).
@@ -536,7 +586,10 @@ function AddTaskForm() {
             {activeCategories.map((cat) => (
               <button
                 key={cat.id}
-                onClick={() => setCategoryId(categoryId === cat.id ? '' : cat.id)}
+                onClick={() => {
+                  setUserTouchedCategory(true);
+                  setCategoryId(categoryId === cat.id ? '' : cat.id);
+                }}
                 className={`px-3 py-2 rounded-ios text-sm font-medium transition-colors ${
                   categoryId === cat.id
                     ? 'bg-brand-500 text-white'
@@ -651,7 +704,10 @@ function AddTaskForm() {
             {(Object.entries(RECURRENCE_LABELS) as [Recurrence, string][]).map(([key, label]) => (
               <button
                 key={key}
-                onClick={() => setRecurrence(key)}
+                onClick={() => {
+                  setUserTouchedRecurrence(true);
+                  setRecurrence(key);
+                }}
                 className={`px-3 py-2.5 rounded-ios text-sm font-medium transition-colors ${
                   recurrence === key
                     ? 'bg-brand-500 text-white'
@@ -803,19 +859,35 @@ function AddTaskForm() {
 
         </fieldset>
 
-        {/* Save */}
+        {/* Save — primary plus an optional "and add another" for batch entry. */}
         {(!editId || editMode) && (
-          <button
-            onClick={handleSave}
-            disabled={
-              saving ||
-              !title.trim() ||
-              (recurrence === 'custom' && (!recurrenceDays || parseInt(recurrenceDays) <= 0))
-            }
-            className="ios-button"
-          >
-            {saving ? 'Saving...' : editId ? 'Update Task' : 'Create Task'}
-          </button>
+          <div className="space-y-2">
+            <button
+              onClick={() => handleSave()}
+              disabled={
+                saving ||
+                !title.trim() ||
+                (recurrence === 'custom' && (!recurrenceDays || parseInt(recurrenceDays) <= 0))
+              }
+              className="ios-button"
+            >
+              {saving ? 'Saving...' : editId ? 'Update Task' : 'Create Task'}
+            </button>
+            {!editId && (
+              <button
+                type="button"
+                onClick={() => handleSave({ addAnother: true })}
+                disabled={
+                  saving ||
+                  !title.trim() ||
+                  (recurrence === 'custom' && (!recurrenceDays || parseInt(recurrenceDays) <= 0))
+                }
+                className="w-full py-3 rounded-ios bg-brand-50 text-brand-600 text-body font-semibold active:bg-brand-100 active:scale-[0.98] md:hover:bg-brand-100 transition-all disabled:opacity-50"
+              >
+                Save & Add Another
+              </button>
+            )}
+          </div>
         )}
       </div>
     </div>

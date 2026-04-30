@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import BottomNav from '@/components/layout/BottomNav';
 import SideNav from '@/components/layout/SideNav';
 import ConfirmDialogHost from '@/components/ui/ConfirmDialog';
+import CommandPalette from '@/components/ui/CommandPalette';
 import { useRealtimeHome } from '@/hooks/useRealtimeHome';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -219,6 +220,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </main>
       <BottomNav />
       <ConfirmDialogHost />
+      <CommandPalette />
     </div>
   );
 }

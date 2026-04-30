@@ -153,7 +153,54 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
     );
     setCompleting(false);
     setShowCompleteSheet(false);
-    toast.success('Task completed!');
+
+    // Toast with an inline Undo so a misclick is one tap to recover —
+    // no second confirm dialog, no trip back through Task History.
+    const undo = async () => {
+      // Best-effort revert: flip the task back to pending and remove
+      // the just-created history row. We don't surface errors here
+      // because the user already has a "wrong" state from their POV.
+      await supabase
+        .from('tasks')
+        .update({
+          status: 'pending',
+          completed_at: null,
+          completed_by: null,
+          updated_at: new Date().toISOString(),
+        } as any)
+        .eq('id', task.id);
+      if (historyId) {
+        await supabase.from('task_history').delete().eq('id', historyId);
+      }
+      const s = useStore.getState();
+      s.setTasks(
+        s.tasks.map((t) =>
+          t.id === task.id
+            ? ({ ...t, status: 'pending', completed_at: null, completed_by: null } as any)
+            : t
+        )
+      );
+      onComplete?.();
+    };
+
+    toast.success(
+      (tt) => (
+        <span className="flex items-center gap-3">
+          <span>Task completed</span>
+          <button
+            onClick={() => {
+              toast.dismiss(tt.id);
+              undo();
+              toast('Undone', { icon: '↩️' });
+            }}
+            className="text-brand-600 font-semibold text-caption hover:text-brand-700"
+          >
+            Undo
+          </button>
+        </span>
+      ),
+      { duration: 5000 }
+    );
     onComplete?.();
   };
 
