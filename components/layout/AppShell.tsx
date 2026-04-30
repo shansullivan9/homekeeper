@@ -14,7 +14,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const store = useStore();
   const supabase = createClient();
-  const [ready, setReady] = useState(false);
+  // The store survives across page navigations (it's a Zustand singleton),
+  // but AppShell unmounts and remounts on every route change because it
+  // wraps every page's layout. Without this guard we'd flash the skeleton
+  // every navigation. If we already have a user + home in the store we
+  // know init has run at least once this session and the cached data is
+  // good enough to render immediately while we re-verify in the background.
+  const hasCachedSession = !!store.user && !!store.home;
+  const [ready, setReady] = useState(hasCachedSession);
   const [error, setError] = useState('');
 
   // Subscribe to Supabase Realtime once the home is loaded so changes
@@ -49,6 +56,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     async function init() {
+      // Already loaded earlier this session — skip the full re-fetch
+      // when AppShell remounts during a route change. Realtime keeps
+      // the store fresh, and a fresh fetch here would just stall the
+      // navigation behind a network round-trip.
+      if (hasCachedSession) {
+        setReady(true);
+        return;
+      }
       try {
         const { data: { session } } = await supabase.auth.getSession();
 
@@ -177,6 +192,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     init();
+    // hasCachedSession is captured at mount; we don't want to re-run
+    // init when the store updates mid-session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (error) {
