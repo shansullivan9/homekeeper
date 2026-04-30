@@ -353,7 +353,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Email row — no avatar; the Name row above carries it. */}
-          <div className="px-4 py-3 flex items-center gap-3">
+          <div className="px-4 py-3 flex items-center gap-3 border-b border-gray-100">
             <div className="flex-1 min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary">
                 Email
@@ -406,6 +406,19 @@ export default function SettingsPage() {
               </button>
             )}
           </div>
+
+          {/* Notifications — per-user setting, lives with the
+              account fields rather than a one-row Preferences section. */}
+          <button
+            onClick={() => router.push('/settings/notifications')}
+            className="ios-list-item w-full"
+          >
+            <div className="flex items-center gap-3">
+              <Bell size={18} className="text-ink-secondary" />
+              <span className="text-[15px]">Notifications</span>
+            </div>
+            <ChevronRight size={16} className="text-ink-tertiary" />
+          </button>
         </div>
 
         {/* Other households — only shown when the user belongs to
@@ -625,23 +638,6 @@ export default function SettingsPage() {
                 <LeaveIcon size={16} className="text-status-red" />
                 <span className="text-sm text-status-red">Leave Household</span>
               </div>
-            </button>
-          </div>
-        </div>
-
-        {/* Account preferences */}
-        <div>
-          <p className="section-header">Preferences</p>
-          <div className="mx-4 ios-card overflow-hidden">
-            <button
-              onClick={() => router.push('/settings/notifications')}
-              className="ios-list-item w-full"
-            >
-              <div className="flex items-center gap-3">
-                <Bell size={18} className="text-ink-secondary" />
-                <span className="text-[15px]">Notifications</span>
-              </div>
-              <ChevronRight size={16} className="text-ink-tertiary" />
             </button>
           </div>
         </div>

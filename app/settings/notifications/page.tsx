@@ -504,8 +504,6 @@ export default function NotificationsPage() {
                     ? "This browser doesn't support web notifications."
                     : pushPermission === 'denied'
                     ? 'Blocked — enable in your browser settings.'
-                    : subscribing
-                    ? 'Working…'
                     : pushActive
                     ? 'On for this device.'
                     : pushPermission === 'default'
