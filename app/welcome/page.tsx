@@ -86,7 +86,7 @@ export default function WelcomePage() {
       realTasks.map((t) => t.title.trim().toLowerCase())
     );
 
-    return tasks.filter((t) => {
+    const survivors = tasks.filter((t) => {
       if (!t.is_suggestion || t.status !== 'pending') return false;
       if (realTitles.has(t.title.trim().toLowerCase())) return false;
       const sKw = keywords(t.title);
@@ -98,6 +98,34 @@ export default function WelcomePage() {
       );
       return !dup;
     });
+
+    // Dedupe suggestions against EACH OTHER. generate_suggestions can
+    // emit both "Annual HVAC Service" and "Bi-Annual HVAC Service" —
+    // same category, same {"hvac"} keyword set after stop-words — and
+    // we don't want the user to accept both. Prefer the longer/more
+    // specific title; break ties alphabetically.
+    const ranked = [...survivors].sort((a, b) => {
+      const lenDiff = b.title.length - a.title.length;
+      if (lenDiff !== 0) return lenDiff;
+      return a.title.localeCompare(b.title);
+    });
+    const keptIds = new Set<string>();
+    const keptKeywords: { kw: Set<string>; category: string | null }[] = [];
+    for (const s of ranked) {
+      const sKw = keywords(s.title);
+      const collides =
+        sKw.size > 0 &&
+        keptKeywords.some(
+          (k) =>
+            (!s.category_id || k.category === s.category_id) &&
+            overlaps(sKw, k.kw)
+        );
+      if (!collides) {
+        keptIds.add(s.id);
+        keptKeywords.push({ kw: sKw, category: s.category_id || null });
+      }
+    }
+    return survivors.filter((s) => keptIds.has(s.id));
   }, [tasks]);
 
   // When we land on step 3, default every suggestion to "keep".
