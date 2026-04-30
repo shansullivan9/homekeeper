@@ -455,7 +455,7 @@ export default function NotificationsPage() {
       return;
     }
     setSubscribing(false);
-    await subscribeToPush();
+    await subscribeToPush({ silent: true });
   };
 
   const togglePush = async () => {
