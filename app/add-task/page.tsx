@@ -355,7 +355,18 @@ function AddTaskForm() {
     if (!title.trim() || !home) return;
     setSaving(true);
 
-    const completedAtIso = isCompleted && completedOn ? `${completedOn}T12:00:00Z` : null;
+    // For "already done" logs we have a date but no time. Default to
+    // LOCAL noon (then convert to ISO/UTC) so the History row reads
+    // "12:00 PM" in the user's own zone, instead of UTC noon which
+    // would render as 8 AM EDT or 5 AM PDT — odd-looking precision
+    // for an entry the user just dated, not timestamped.
+    const completedAtIso = (() => {
+      if (!isCompleted || !completedOn) return null;
+      const [y, m, d] = completedOn.split('-').map((n) => parseInt(n, 10));
+      // Date constructor with explicit args uses local time; toISOString
+      // converts to UTC for storage in the timestamp-with-tz column.
+      return new Date(y, m - 1, d, 12, 0, 0).toISOString();
+    })();
 
     const payload: any = {
       home_id: home.id,

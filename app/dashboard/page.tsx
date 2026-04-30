@@ -565,10 +565,18 @@ export default function DashboardPage() {
             it stays visible even when active buckets are empty. */}
         {recentlyCompleted.length > 0 && (
           <div>
-            <p className="section-header">
-              <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#8E8E93' }} />
-              Recently Completed ({recentlyCompleted.length})
-            </p>
+            <div className="section-header flex items-center justify-between !pr-2">
+              <span className="flex items-center">
+                <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#8E8E93' }} />
+                Recently Completed ({recentlyCompleted.length})
+              </span>
+              <button
+                onClick={() => router.push('/history')}
+                className="text-brand-500 text-caption font-semibold normal-case tracking-normal active:text-brand-600 md:hover:text-brand-600"
+              >
+                View all
+              </button>
+            </div>
             <div className="mx-4 ios-card overflow-hidden">
               {recentlyCompleted.map((t) => (
                 <TaskCard key={t.id} task={t} compact sectionColor="#8E8E93" />
