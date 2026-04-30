@@ -144,6 +144,22 @@ export default function DashboardPage() {
       else if (isBefore(d, sixWeeksOut)) upcoming.push(t);
       else later.push(t);
     }
+    // Sort each bucket by due date ascending so the most-imminent tasks
+    // surface first within their section. Overdue is sorted oldest →
+    // newest (most overdue at the top so it can't be missed). Tasks
+    // without a due date land last, alphabetically.
+    const byDueAsc = (a: any, b: any) =>
+      (a.due_date || '￿').localeCompare(b.due_date || '￿');
+    overdue.sort(byDueAsc);
+    dueThisWeek.sort(byDueAsc);
+    dueThisMonth.sort(byDueAsc);
+    upcoming.sort(byDueAsc);
+    later.sort((a, b) => {
+      if (a.due_date && b.due_date) return byDueAsc(a, b);
+      if (a.due_date) return -1;
+      if (b.due_date) return 1;
+      return (a.title || '').localeCompare(b.title || '');
+    });
     return { overdue, dueThisWeek, dueThisMonth, upcoming, later };
   }, [filteredTasks, now, weekEnd, monthEnd, sixWeeksOut]);
 

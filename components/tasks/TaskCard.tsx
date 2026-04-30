@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Task } from '@/lib/types';
 import { getTaskUrgency, urgencyColor, sectionColorForTask, CATEGORY_ICONS, RECURRENCE_LABELS, formatCurrency, emojiForTaskTitle } from '@/lib/constants';
 import { format, isToday, isTomorrow, isPast, parseISO } from 'date-fns';
-import { Check, ChevronRight, RotateCcw, UserPlus, User, Trash2, X } from 'lucide-react';
+import { Check, ChevronRight, RotateCcw, UserPlus, User, Trash2, X, Plus } from 'lucide-react';
 import { createClient } from '@/lib/supabase-browser';
 import { useStore } from '@/lib/store';
 import toast from 'react-hot-toast';
@@ -498,23 +498,37 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
               />
             </div>
             {/* Photos — optional. Stored in the public 'photos' bucket
-                with the URLs written to task_history.photos. */}
+                with the URLs written to task_history.photos. The bare
+                <input type="file"> is hidden and a styled button + the
+                file count play stand-in for it. */}
             <div>
-              <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1 block">
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary mb-1.5 block">
                 Photos (optional)
               </label>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(e) => setCompletePhotos(Array.from(e.target.files || []))}
-                className="text-xs"
-              />
-              {completePhotos.length > 0 && (
-                <p className="text-[11px] text-ink-tertiary mt-1">
-                  {completePhotos.length} photo{completePhotos.length === 1 ? '' : 's'} ready to upload.
-                </p>
-              )}
+              <label className="ios-card flex items-center gap-3 px-3 py-2.5 cursor-pointer active:bg-gray-50 md:hover:bg-gray-50 transition-colors">
+                <div className="w-9 h-9 rounded-lg bg-brand-50 text-brand-500 flex items-center justify-center flex-shrink-0">
+                  <Plus size={18} strokeWidth={2.4} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-body font-medium">
+                    {completePhotos.length === 0
+                      ? 'Choose photos'
+                      : `${completePhotos.length} photo${completePhotos.length === 1 ? '' : 's'} ready`}
+                  </p>
+                  <p className="text-caption text-ink-tertiary">
+                    {completePhotos.length === 0
+                      ? 'Tap to pick or take a photo'
+                      : 'Tap to change'}
+                  </p>
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => setCompletePhotos(Array.from(e.target.files || []))}
+                  className="hidden"
+                />
+              </label>
             </div>
           </div>
           <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex gap-2">
