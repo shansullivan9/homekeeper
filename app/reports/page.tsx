@@ -101,39 +101,56 @@ export default function ReportsPage() {
           ))}
         </div>
 
-        {/* Cover */}
-        <div className="ios-card p-6 text-center print:shadow-none print:border print:border-gray-200">
-          <p className="text-xs uppercase tracking-wider text-ink-secondary font-semibold mb-1">
-            Home Maintenance Report
-          </p>
-          <h2 className="text-3xl font-bold mb-1">{year}</h2>
-          <p className="text-sm text-ink-secondary">{home?.name || 'My Home'}</p>
-          {yearItems.length > 0 ? (
-            <div className="mt-4 grid grid-cols-3 gap-3">
-              <div>
-                <p className="text-2xl font-bold text-brand-600">{yearItems.length}</p>
-                <p className="text-[11px] text-ink-secondary uppercase tracking-wide font-medium">
-                  Tasks done
-                </p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-emerald-600">{formatCurrency(total)}</p>
-                <p className="text-[11px] text-ink-secondary uppercase tracking-wide font-medium">
-                  Spent
-                </p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-purple-600">{byCategory.length}</p>
-                <p className="text-[11px] text-ink-secondary uppercase tracking-wide font-medium">
-                  Categories
-                </p>
-              </div>
-            </div>
-          ) : (
-            <p className="mt-4 text-xs text-ink-tertiary">
-              Complete tasks during {year} to see them summarized here.
+        {/* Cover — branded hero on screen, simple bordered card on print. */}
+        <div className="relative rounded-ios-xl bg-gradient-hero shadow-float overflow-hidden print:shadow-none print:bg-white print:rounded-none print:border print:border-gray-200">
+          <div
+            className="absolute -top-20 -right-20 w-72 h-72 rounded-full opacity-20 print:hidden"
+            style={{ background: 'radial-gradient(circle at center, #ffffff 0%, transparent 70%)' }}
+            aria-hidden="true"
+          />
+          <div className="relative px-6 py-7 text-center print:text-left print:py-4">
+            <p className="text-white/80 text-micro font-semibold uppercase tracking-wider mb-1 print:text-ink-secondary">
+              Home Maintenance Report
             </p>
-          )}
+            <h2 className="text-mega font-bold text-white tracking-[-0.03em] print:text-ink-primary">
+              {year}
+            </h2>
+            <p className="text-white/85 text-body mt-0.5 print:text-ink-secondary">
+              {home?.name || 'My Home'}
+            </p>
+            {yearItems.length > 0 ? (
+              <div className="mt-5 grid grid-cols-3 gap-2 print:gap-4">
+                <div className="rounded-ios bg-white/12 backdrop-blur-sm py-2.5 print:bg-transparent print:py-0">
+                  <p className="text-headline font-bold text-white print:text-brand-600">
+                    {yearItems.length}
+                  </p>
+                  <p className="text-micro text-white/80 uppercase tracking-wider font-medium mt-1 print:text-ink-secondary">
+                    Tasks done
+                  </p>
+                </div>
+                <div className="rounded-ios bg-white/12 backdrop-blur-sm py-2.5 print:bg-transparent print:py-0">
+                  <p className="text-headline font-bold text-white print:text-emerald-600">
+                    {formatCurrency(total)}
+                  </p>
+                  <p className="text-micro text-white/80 uppercase tracking-wider font-medium mt-1 print:text-ink-secondary">
+                    Spent
+                  </p>
+                </div>
+                <div className="rounded-ios bg-white/12 backdrop-blur-sm py-2.5 print:bg-transparent print:py-0">
+                  <p className="text-headline font-bold text-white print:text-purple-600">
+                    {byCategory.length}
+                  </p>
+                  <p className="text-micro text-white/80 uppercase tracking-wider font-medium mt-1 print:text-ink-secondary">
+                    Categories
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-4 text-caption text-white/80 print:text-ink-tertiary">
+                Complete tasks during {year} to see them summarized here.
+              </p>
+            )}
+          </div>
         </div>
 
         {/* By category */}

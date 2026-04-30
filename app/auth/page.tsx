@@ -74,15 +74,26 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col justify-center px-6 bg-white">
-      <div className="mx-auto w-full max-w-sm animate-fade-in">
+    <div className="min-h-screen flex flex-col justify-center px-6 bg-gradient-hero-soft relative overflow-hidden">
+      {/* Decorative ambient gradient blobs — pure visual, no behavior. */}
+      <div
+        className="absolute -top-32 -left-32 w-96 h-96 rounded-full opacity-40 pointer-events-none"
+        style={{ background: 'radial-gradient(circle, #36adf6 0%, transparent 70%)' }}
+        aria-hidden="true"
+      />
+      <div
+        className="absolute -bottom-32 -right-32 w-96 h-96 rounded-full opacity-30 pointer-events-none"
+        style={{ background: 'radial-gradient(circle, #FB923C 0%, transparent 70%)' }}
+        aria-hidden="true"
+      />
+      <div className="mx-auto w-full max-w-sm animate-fade-in relative">
         {/* Logo */}
         <div className="flex flex-col items-center mb-10">
-          <div className="w-20 h-20 rounded-[22px] bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-lg mb-4">
+          <div className="w-20 h-20 rounded-ios-xl bg-gradient-hero flex items-center justify-center shadow-float mb-5 animate-scale-in">
             <span className="text-4xl">🏠</span>
           </div>
-          <h1 className="text-2xl font-bold text-ink-primary">HomeKeeper</h1>
-          <p className="text-ink-secondary text-sm mt-1">Home maintenance, simplified</p>
+          <h1 className="text-display font-bold text-ink-primary tracking-[-0.025em]">HomeKeeper</h1>
+          <p className="text-ink-secondary text-body mt-1">Home maintenance, simplified</p>
         </div>
 
         {/* Form */}
