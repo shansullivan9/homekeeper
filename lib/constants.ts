@@ -1,14 +1,17 @@
 import { Recurrence } from './types';
 
+// Recurrence labels — single "Every X" pattern across the board so the
+// chip rail reads consistently. Ordered shortest → longest interval.
 export const RECURRENCE_LABELS: Record<Recurrence, string> = {
-  one_time: 'One Time',
-  weekly: 'Weekly',
-  bi_monthly: 'Every 2 Months',
-  monthly: 'Monthly',
+  one_time:  'One Time',
+  weekly:    'Every Week',
+  monthly:   'Every Month',
+  bi_monthly:'Every 2 Months',
   quarterly: 'Every 3 Months',
   bi_annual: 'Every 6 Months',
-  yearly: 'Yearly',
-  custom: 'Custom',
+  yearly:    'Every Year',
+  bi_yearly: 'Every 2 Years',
+  custom:    'Custom',
 };
 
 
@@ -131,11 +134,12 @@ export function categoryFromTitle(
 // recurrence option so users don't have to repeat themselves.
 export function recurrenceFromTitle(
   title: string | null | undefined
-): 'one_time' | 'weekly' | 'bi_monthly' | 'monthly' | 'quarterly' | 'bi_annual' | 'yearly' | null {
+): Recurrence | null {
   if (!title) return null;
   const t = title.toLowerCase();
-  // Order matters: more specific phrases first so "bi-annual" doesn't
-  // get caught by the plain /annual/ rule below.
+  // Order matters: more specific phrases first so "bi-yearly" doesn't
+  // get caught by the plain /yearly/ rule below.
+  if (/\bbiennial|every 2 years|every other year|every two years\b/.test(t)) return 'bi_yearly';
   if (/\bbi[-\s]?annual|semi[-\s]?annual|every 6 months|twice a year\b/.test(t)) return 'bi_annual';
   if (/\bquarterly|every 3 months\b/.test(t)) return 'quarterly';
   if (/\bbi[-\s]?monthly|every 2 months\b/.test(t)) return 'bi_monthly';

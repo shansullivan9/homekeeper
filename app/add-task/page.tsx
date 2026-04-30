@@ -250,11 +250,12 @@ function AddTaskForm() {
     if (userTouchedDueDate || dueDate) return;
     const offset: Record<string, number> = {
       weekly: 7,
-      bi_monthly: 60,
       monthly: 30,
+      bi_monthly: 60,
       quarterly: 91,
       bi_annual: 182,
       yearly: 365,
+      bi_yearly: 730,
     };
     const days = offset[recurrence];
     if (!days) return;
@@ -330,11 +331,12 @@ function AddTaskForm() {
     let next: Date;
     switch (rec) {
       case 'weekly': next = new Date(base.getTime() + 7 * 86400000); break;
-      case 'bi_monthly': next = addMonths(base, 2); break;
       case 'monthly': next = addMonths(base, 1); break;
+      case 'bi_monthly': next = addMonths(base, 2); break;
       case 'quarterly': next = addMonths(base, 3); break;
       case 'bi_annual': next = addMonths(base, 6); break;
       case 'yearly': next = addMonths(base, 12); break;
+      case 'bi_yearly': next = addMonths(base, 24); break;
       case 'custom': {
         const days = recurrenceDays ? parseInt(recurrenceDays) : 0;
         if (!days) return null;
