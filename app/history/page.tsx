@@ -151,11 +151,12 @@ export default function HistoryPage() {
       const recurrence = (source as any)?.recurrence || 'one_time';
       const offsetDays: Record<string, number> = {
         weekly: 7,
-        bi_monthly: 60,
         monthly: 30,
+        bi_monthly: 60,
         quarterly: 91,
         bi_annual: 182,
         yearly: 365,
+        bi_yearly: 730,
       };
       const days = offsetDays[recurrence];
       let dueDate: string | null = null;

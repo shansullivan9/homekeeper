@@ -49,7 +49,7 @@ export interface Category {
   is_default: boolean;
   sort_order: number;
 }
-export type Recurrence = 'one_time' | 'weekly' | 'bi_monthly' | 'monthly' | 'quarterly' | 'bi_annual' | 'yearly' | 'custom';
+export type Recurrence = 'one_time' | 'weekly' | 'monthly' | 'bi_monthly' | 'quarterly' | 'bi_annual' | 'yearly' | 'bi_yearly' | 'custom';
 export type TaskStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
 export type Priority = 'low' | 'medium' | 'high';
 

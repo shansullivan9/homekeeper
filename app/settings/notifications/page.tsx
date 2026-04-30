@@ -34,11 +34,12 @@ const DEFAULTS: Prefs = {
 
 const DAYS_OPTIONS = [0, 1, 2, 3, 5, 7, 14];
 
-// Format an hour 0-23 as friendly 12-hour string ("12pm", "9am", "7pm").
+// Format an hour 0-23 as a friendly 12-hour string with a proper :00
+// suffix and an uppercase AM/PM, e.g. "12:00 PM" or "9:00 AM".
 const fmtHour = (h: number): string => {
-  if (h === 0) return '12am';
-  if (h === 12) return '12pm';
-  return h < 12 ? `${h}am` : `${h - 12}pm`;
+  const period = h < 12 ? 'AM' : 'PM';
+  const display = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${display}:00 ${period}`;
 };
 
 type PushState = 'default' | 'granted' | 'denied' | 'unsupported';
@@ -539,23 +540,89 @@ export default function NotificationsPage() {
           <p className="section-header">Reminders</p>
           <div className="mx-4 ios-card overflow-hidden">
             {/* Time of day picker — runs in the user's local zone via
-                the function's timezone-aware dispatcher. */}
+                the function's timezone-aware dispatcher. The current
+                hour appears as a big, friendly readout; the native
+                <select> is layered on top invisibly to keep the iOS
+                wheel UX while letting us style the visible value. */}
             <div className="px-4 py-3 border-b border-gray-100">
-              <p className="text-[15px] font-medium mb-2">Time of day</p>
-              <select
-                value={prefs.reminder_hour_local}
-                onChange={(e) =>
-                  updatePref({ reminder_hour_local: parseInt(e.target.value, 10) })
+              <div className="flex items-baseline justify-between mb-1.5">
+                <p className="text-[15px] font-medium">Time of day</p>
+                <span className="text-[11px] text-ink-tertiary uppercase tracking-wider font-semibold">
+                  Local time
+                </span>
+              </div>
+              <div className="relative">
+                <div className="px-4 py-3 rounded-ios bg-surface-secondary flex items-center justify-between">
+                  <span className="text-headline font-semibold text-ink-primary tabular-nums">
+                    {fmtHour(prefs.reminder_hour_local)}
+                  </span>
+                  <span className="text-ink-tertiary text-caption">Tap to change</span>
+                </div>
+                <select
+                  value={prefs.reminder_hour_local}
+                  onChange={(e) =>
+                    updatePref({ reminder_hour_local: parseInt(e.target.value, 10) })
+                  }
+                  disabled={saving || !loaded}
+                  aria-label="Reminder hour"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                >
+                  {Array.from({ length: 24 }).map((_, h) => (
+                    <option key={h} value={h}>
+                      {fmtHour(h)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Timezone confirmation: show the detected zone, the
+                  current real-time clock, and a one-tap fix when the
+                  saved zone differs from the device's. */}
+              {(() => {
+                const browserTz = detectTimezone();
+                const savedTz = prefs.timezone || browserTz;
+                const mismatch = browserTz && savedTz && browserTz !== savedTz;
+                let nowReadout = '';
+                try {
+                  nowReadout = new Intl.DateTimeFormat('en-US', {
+                    timeZone: savedTz,
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                  }).format(new Date());
+                } catch {
+                  /* invalid tz — fall through */
                 }
-                disabled={saving || !loaded}
-                className="ios-input"
-              >
-                {Array.from({ length: 24 }).map((_, h) => (
-                  <option key={h} value={h}>
-                    {fmtHour(h)}
-                  </option>
-                ))}
-              </select>
+                return (
+                  <div className="mt-2.5 flex items-center justify-between gap-3 text-caption">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-ink-secondary truncate">
+                        Time zone:{' '}
+                        <span className="text-ink-primary font-medium">{savedTz}</span>
+                      </p>
+                      {nowReadout && (
+                        <p className="text-ink-tertiary text-[11px] mt-0.5">
+                          Right now there: {nowReadout}
+                        </p>
+                      )}
+                    </div>
+                    {mismatch ? (
+                      <button
+                        onClick={() => updatePref({ timezone: browserTz })}
+                        disabled={saving}
+                        className="text-brand-500 font-semibold flex-shrink-0 active:text-brand-600"
+                      >
+                        Use {browserTz}
+                      </button>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-status-green font-medium flex-shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-status-green" />
+                        Confirmed
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="px-4 py-3 border-b border-gray-100">
