@@ -1,5 +1,6 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { ListTodo, FileText, Package, X } from 'lucide-react';
 
@@ -11,6 +12,14 @@ export default function QuickAddMenu({
   onClose: () => void;
 }) {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  // Hydration guard for the portal target. Without this, server
+  // render and first client render disagree about whether the menu
+  // has anywhere to mount.
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Close on Escape so keyboard users aren't trapped.
   useEffect(() => {
@@ -22,7 +31,7 @@ export default function QuickAddMenu({
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
   const go = (path: string) => {
     onClose();
@@ -53,7 +62,12 @@ export default function QuickAddMenu({
     },
   ];
 
-  return (
+  // Render through a portal so the dialog escapes BottomNav's
+  // backdrop-filter stacking context. Without this, position:fixed
+  // children of an element with backdrop-filter get clipped to that
+  // element's box on iOS Safari — meaning the backdrop only covers
+  // the bottom-nav strip and the rest of the page reads undimmed.
+  return createPortal(
     <div
       className="fixed inset-0 z-[60] flex items-end md:items-center justify-center p-4"
       onClick={onClose}
@@ -110,6 +124,7 @@ export default function QuickAddMenu({
           })}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
