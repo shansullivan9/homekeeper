@@ -8,7 +8,7 @@ import { format, parseISO } from 'date-fns';
 import { CheckCircle2, Search, RotateCcw, RotateCw, Trash2, StickyNote } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { formatCurrency } from '@/lib/constants';
+import { formatCurrency, recurrenceFromTitle } from '@/lib/constants';
 import { confirm } from '@/lib/confirm';
 import { useStoredState } from '@/lib/useStoredState';
 
@@ -148,7 +148,12 @@ export default function HistoryPage() {
     setBusyId(h.id);
     try {
       const source = h.task_id ? tasks.find((t) => t.id === h.task_id) : null;
-      const recurrence = (source as any)?.recurrence || 'one_time';
+      // Prefer the source task's saved recurrence; if the source was
+      // already deleted, fall back to inferring from the title (so
+      // "Annual Termite Inspection" still schedules a year out even
+      // when the original row is gone).
+      const recurrence =
+        (source as any)?.recurrence || recurrenceFromTitle(h.title) || 'one_time';
       const offsetDays: Record<string, number> = {
         weekly: 7,
         monthly: 30,
