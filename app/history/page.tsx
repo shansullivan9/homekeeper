@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase-browser';
 import { TaskHistory } from '@/lib/types';
 import PageHeader from '@/components/layout/PageHeader';
 import { format, parseISO } from 'date-fns';
-import { CheckCircle2, Search, RotateCcw, RotateCw, Trash2 } from 'lucide-react';
+import { CheckCircle2, Search, RotateCcw, RotateCw, Trash2, StickyNote } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { formatCurrency } from '@/lib/constants';
@@ -359,7 +359,14 @@ export default function HistoryPage() {
                       )}
                     </div>
                     {h.notes && (
-                      <p className="text-xs text-ink-tertiary mt-1 line-clamp-2">{h.notes}</p>
+                      <div className="mt-1.5 flex items-start gap-1.5 text-xs text-ink-secondary">
+                        <StickyNote
+                          size={11}
+                          className="mt-0.5 text-ink-tertiary flex-shrink-0"
+                          aria-hidden="true"
+                        />
+                        <p className="italic line-clamp-2 leading-snug">{h.notes}</p>
+                      </div>
                     )}
                     {h.photos && h.photos.length > 0 && (
                       <div className="flex gap-1.5 mt-2">
