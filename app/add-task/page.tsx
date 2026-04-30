@@ -129,6 +129,7 @@ function AddTaskForm() {
   // their choice. Saves a couple of taps per task for power users.
   const [userTouchedCategory, setUserTouchedCategory] = useState(false);
   const [userTouchedRecurrence, setUserTouchedRecurrence] = useState(false);
+  const [userTouchedDueDate, setUserTouchedDueDate] = useState(false);
   const [showTitleSuggestions, setShowTitleSuggestions] = useState(false);
 
   // Pool of past titles — both pending tasks and completed history
@@ -238,6 +239,32 @@ function AddTaskForm() {
     // re-running on unrelated store updates.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [title, userTouchedCategory, userTouchedRecurrence, editId]);
+
+  // Smart default due date based on recurrence. When the user picks
+  // a recurring cadence and hasn't already chosen a date, we suggest
+  // one full cycle from today — a "Yearly" task lands in 12 months,
+  // a "Quarterly" task in 3, etc. Saves a step for the very common
+  // case of "schedule the next one of these".
+  useEffect(() => {
+    if (editId || isCompleted) return;
+    if (userTouchedDueDate || dueDate) return;
+    const offset: Record<string, number> = {
+      weekly: 7,
+      bi_monthly: 60,
+      monthly: 30,
+      quarterly: 91,
+      bi_annual: 182,
+      yearly: 365,
+    };
+    const days = offset[recurrence];
+    if (!days) return;
+    const target = new Date();
+    target.setDate(target.getDate() + days);
+    setDueDate(target.toISOString().slice(0, 10));
+    // Mark untouched so further recurrence changes can keep updating
+    // it. (touched flag flips only when the user clicks a date chip
+    // or the calendar.)
+  }, [recurrence, editId, isCompleted, userTouchedDueDate, dueDate]);
 
   // Load existing task for editing
   useEffect(() => {
@@ -491,6 +518,7 @@ function AddTaskForm() {
           setCompletedOn('');
           setUserTouchedCategory(false);
           setUserTouchedRecurrence(false);
+          setUserTouchedDueDate(false);
           setRecurrence('one_time');
           setPriority('medium');
           // Keep the due date so a string of related tasks stay aligned.
@@ -735,7 +763,10 @@ function AddTaskForm() {
                   <button
                     key={label}
                     type="button"
-                    onClick={() => setDueDate(targetStr)}
+                    onClick={() => {
+                      setUserTouchedDueDate(true);
+                      setDueDate(targetStr);
+                    }}
                     className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
                       active
                         ? 'bg-brand-500 text-white'
@@ -747,11 +778,20 @@ function AddTaskForm() {
                 );
               })}
             </div>
-            <InlineCalendar value={dueDate} onChange={setDueDate} />
+            <InlineCalendar
+              value={dueDate}
+              onChange={(d: string) => {
+                setUserTouchedDueDate(true);
+                setDueDate(d);
+              }}
+            />
             {dueDate && (
               <button
                 type="button"
-                onClick={() => setDueDate('')}
+                onClick={() => {
+                  setUserTouchedDueDate(true);
+                  setDueDate('');
+                }}
                 className="mt-2 text-xs text-ink-secondary md:hover:text-brand-500 active:text-brand-500 transition-colors"
               >
                 Clear date

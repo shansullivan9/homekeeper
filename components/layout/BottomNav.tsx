@@ -1,8 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { LayoutDashboard, Calendar, PlusCircle, Clock, Settings } from 'lucide-react';
 import QuickAddMenu from '@/components/layout/QuickAddMenu';
+import { useStore } from '@/lib/store';
 
 const tabs = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -16,6 +17,22 @@ export default function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const tasks = useStore((s) => s.tasks);
+
+  // Live overdue counter for the Dashboard tab badge — visible from
+  // any page so users always know how many tasks are past due
+  // without needing to nav back to the dashboard.
+  const overdueCount = useMemo(() => {
+    const todayIso = new Date().toISOString().slice(0, 10);
+    return tasks.filter(
+      (t) =>
+        !t.is_suggestion &&
+        t.status !== 'completed' &&
+        t.status !== 'skipped' &&
+        t.due_date &&
+        t.due_date < todayIso
+    ).length;
+  }, [tasks]);
 
   return (
     <nav
@@ -45,7 +62,17 @@ export default function BottomNav() {
                 </div>
               ) : (
                 <>
-                  <Icon size={22} strokeWidth={active ? 2.4 : 1.6} />
+                  <div className="relative">
+                    <Icon size={22} strokeWidth={active ? 2.4 : 1.6} />
+                    {tab.href === '/dashboard' && overdueCount > 0 && (
+                      <span
+                        aria-label={`${overdueCount} overdue tasks`}
+                        className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-status-red text-white text-[9px] font-bold flex items-center justify-center"
+                      >
+                        {overdueCount > 9 ? '9+' : overdueCount}
+                      </span>
+                    )}
+                  </div>
                   <span className={`text-[10px] leading-none mt-0.5 ${active ? 'font-semibold' : 'font-medium'}`}>
                     {tab.label}
                   </span>

@@ -23,6 +23,7 @@ import {
 import { format, parseISO, addDays, addMonths, addYears } from 'date-fns';
 import toast from 'react-hot-toast';
 import { confirm } from '@/lib/confirm';
+import { useStoredState } from '@/lib/useStoredState';
 
 const CATEGORIES = [
   'Insurance',
@@ -78,7 +79,11 @@ export default function DocumentsPage() {
   const [editMode, setEditMode] = useState(true);
   const [filter, setFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name' | 'category'>('newest');
+  const [sortBy, setSortBy] = useStoredState<'newest' | 'oldest' | 'name' | 'category'>(
+    'documents.sortBy',
+    'newest',
+    user?.id
+  );
   const [uploading, setUploading] = useState(false);
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);

@@ -7,6 +7,7 @@ import BottomNav from '@/components/layout/BottomNav';
 import SideNav from '@/components/layout/SideNav';
 import ConfirmDialogHost from '@/components/ui/ConfirmDialog';
 import CommandPalette from '@/components/ui/CommandPalette';
+import ShortcutOverlay from '@/components/ui/ShortcutOverlay';
 import { useRealtimeHome } from '@/hooks/useRealtimeHome';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -242,6 +243,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <BottomNav />
       <ConfirmDialogHost />
       <CommandPalette />
+      <ShortcutOverlay />
     </div>
   );
 }
