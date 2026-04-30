@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase-browser';
 import PageHeader from '@/components/layout/PageHeader';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { confirm } from '@/lib/confirm';
 import {
   Users, Plus, LogOut, Home, ChevronRight,
   UserCircle2, Share2, RefreshCw, X, Bell,
@@ -150,7 +151,12 @@ export default function SettingsPage() {
 
   const rotateInviteCode = async () => {
     if (!home || !isOwner) return;
-    if (!confirm('Generate a new invite code? The old code will stop working.')) return;
+    const ok = await confirm({
+      title: 'Generate a new invite code?',
+      message: 'The old code will stop working immediately.',
+      confirmLabel: 'Generate',
+    });
+    if (!ok) return;
     setRotating(true);
     try {
       // Random 12 hex chars to mirror the schema default.
@@ -220,13 +226,15 @@ export default function SettingsPage() {
 
   const handleLeaveHousehold = async () => {
     if (!user || !home) return;
-    if (
-      !confirm(
-        isOwner
-          ? `Leave "${home.name}"? You're the owner — leaving will remove you from this household.`
-          : `Leave "${home.name}"? You'll lose access to its tasks and documents.`
-      )
-    ) return;
+    const ok = await confirm({
+      title: `Leave "${home.name}"?`,
+      message: isOwner
+        ? "You're the owner — leaving removes you from this household."
+        : "You'll lose access to its tasks and documents.",
+      confirmLabel: 'Leave',
+      destructive: true,
+    });
+    if (!ok) return;
     const myRow = members.find((m) => (m as any).user_id === user.id);
     if (!myRow) return;
     const { error } = await supabase
@@ -249,7 +257,13 @@ export default function SettingsPage() {
   const handleRemoveMember = async (memberRow: any) => {
     if (!isOwner) return;
     const name = memberRow.display_name || memberRow.email || 'this member';
-    if (!confirm(`Remove ${name} from "${home?.name}"?`)) return;
+    const ok = await confirm({
+      title: `Remove ${name}?`,
+      message: `They'll lose access to "${home?.name}".`,
+      confirmLabel: 'Remove',
+      destructive: true,
+    });
+    if (!ok) return;
     const { error } = await supabase
       .from('home_members')
       .delete()
@@ -263,7 +277,12 @@ export default function SettingsPage() {
   };
 
   const handleSignOut = async () => {
-    if (!confirm('Sign out of HomeKeeper?')) return;
+    const ok = await confirm({
+      title: 'Sign out of HomeKeeper?',
+      confirmLabel: 'Sign Out',
+      destructive: true,
+    });
+    if (!ok) return;
     await supabase.auth.signOut();
     useStore.setState({
       user: null, home: null, members: [], tasks: [], categories: [],

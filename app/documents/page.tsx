@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { format, parseISO, addDays, addMonths, addYears } from 'date-fns';
 import toast from 'react-hot-toast';
+import { confirm } from '@/lib/confirm';
 
 const CATEGORIES = [
   'Insurance',
@@ -918,7 +919,13 @@ export default function DocumentsPage() {
 
   const handleDelete = async () => {
     if (!editing) return;
-    if (!confirm('Delete this document? This cannot be undone.')) return;
+    const ok = await confirm({
+      title: 'Delete this document?',
+      message: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
     // Remove the storage object first, then the DB row. If the storage
     // delete fails we surface the error and bail without orphaning the
     // file (the DB row is still pointing at it). Inverse of the old

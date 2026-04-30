@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase-browser';
 import { useStore } from '@/lib/store';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
+import { confirm } from '@/lib/confirm';
 
 interface TaskCardProps {
   task: Task;
@@ -154,7 +155,12 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
     // For "take over from someone else", prompt because that's a more
     // significant change.
     if (isClaimed && !isMine) {
-      if (!confirm(`Take over "${task.title}" from ${assigneeLabel || 'the current owner'}?`)) return;
+      const ok = await confirm({
+        title: `Take over "${task.title}"?`,
+        message: `It's currently with ${assigneeLabel || 'the current owner'}.`,
+        confirmLabel: 'Take Over',
+      });
+      if (!ok) return;
     }
 
     const { data, error } = await supabase.rpc('toggle_task_claim', {
@@ -186,7 +192,12 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
   const handleUncomplete = async (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    if (!confirm(`Mark "${task.title}" as not completed?`)) return;
+    const ok = await confirm({
+      title: `Mark "${task.title}" as not completed?`,
+      message: 'It will go back to your task list.',
+      confirmLabel: 'Mark Pending',
+    });
+    if (!ok) return;
     const { error: tErr } = await supabase
       .from('tasks')
       .update({
@@ -219,7 +230,12 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    if (!confirm(`Delete "${task.title}"?`)) return;
+    const ok = await confirm({
+      title: `Delete "${task.title}"?`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
     const { error } = await supabase.from('tasks').delete().eq('id', task.id);
     if (error) {
       toast.error('Failed to delete');

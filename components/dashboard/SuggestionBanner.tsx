@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase-browser';
 import { useStore } from '@/lib/store';
 import { Sparkles, Check, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { confirm } from '@/lib/confirm';
 
 export default function SuggestionBanner() {
   const {
@@ -102,7 +103,12 @@ export default function SuggestionBanner() {
   };
 
   const dismissSuggestion = async (task: Task) => {
-    if (!confirm(`Dismiss the suggestion "${task.title}"?`)) return;
+    const ok = await confirm({
+      title: `Dismiss "${task.title}"?`,
+      message: "We won't suggest this again.",
+      confirmLabel: 'Dismiss',
+    });
+    if (!ok) return;
     if (!home) return;
 
     // Record the dismissal so generate_suggestions() re-creating the

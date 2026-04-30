@@ -8,6 +8,7 @@ import { format, parseISO } from 'date-fns';
 import { Plus, X, Download, Wrench, RefreshCw, Hammer, PaintBucket, ShoppingBag, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatCurrency } from '@/lib/constants';
+import { confirm } from '@/lib/confirm';
 
 const EVENT_TYPES = [
   { value: 'maintenance', label: 'Maintenance', icon: Wrench, color: '#007AFF' },
@@ -127,7 +128,12 @@ export default function TimelinePage() {
 
   const handleDelete = async () => {
     if (!editingId) return;
-    if (!confirm('Delete this event?')) return;
+    const ok = await confirm({
+      title: 'Delete this event?',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
     const { error } = await supabase
       .from('timeline_events')
       .delete()
