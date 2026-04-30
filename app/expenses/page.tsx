@@ -273,9 +273,18 @@ export default function ExpensesPage() {
       </div>
 
       {editing && (
-        <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xl flex items-end sm:items-center justify-center p-4 animate-fade-in" onClick={() => !saving && setEditing(null)}>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" onClick={() => !saving && setEditing(null)}>
           <div
-            className="bg-white rounded-ios-lg w-full max-w-md p-4 shadow-xl space-y-4"
+            aria-hidden="true"
+            className="absolute inset-0 animate-fade-in"
+            style={{
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              WebkitBackdropFilter: 'blur(20px)',
+              backdropFilter: 'blur(20px)',
+            }}
+          />
+          <div
+            className="relative bg-white rounded-ios-lg w-full max-w-md p-4 shadow-xl space-y-4"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">

@@ -1448,11 +1448,20 @@ export default function DocumentsPage() {
       {/* Bulk upload review */}
       {reviewBuckets && (
         <div
-          className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xl flex items-end sm:items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
           onClick={() => !uploading && setReviewBuckets(null)}
         >
           <div
-            className="bg-white rounded-ios-lg w-full max-w-md shadow-xl overflow-hidden"
+            aria-hidden="true"
+            className="absolute inset-0 animate-fade-in"
+            style={{
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              WebkitBackdropFilter: 'blur(20px)',
+              backdropFilter: 'blur(20px)',
+            }}
+          />
+          <div
+            className="relative bg-white rounded-ios-lg w-full max-w-md shadow-xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
