@@ -32,7 +32,7 @@ export default function ConfirmDialogHost() {
       className="fixed inset-0 z-[100] flex items-center justify-center px-6"
     >
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in"
+        className="absolute inset-0 bg-black/55 backdrop-blur-md animate-fade-in"
         onClick={() => resolve(false)}
       />
       <div className="relative bg-white rounded-ios-xl shadow-elevated w-full max-w-xs overflow-hidden animate-scale-in">

@@ -425,7 +425,7 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
         single tap of "Complete" still works for the common case. */}
     {showCompleteSheet && (
       <div
-        className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-4 animate-fade-in"
+        className="fixed inset-0 z-50 bg-black/55 backdrop-blur-md flex items-end sm:items-center justify-center p-4 animate-fade-in"
         onClick={() => !completing && setShowCompleteSheet(false)}
       >
         <div

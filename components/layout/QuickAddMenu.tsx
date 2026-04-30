@@ -55,7 +55,7 @@ export default function QuickAddMenu({
 
   return (
     <div
-      className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-end md:items-center justify-center p-4 animate-fade-in"
+      className="fixed inset-0 z-[60] bg-black/55 backdrop-blur-md flex items-end md:items-center justify-center p-4 animate-fade-in"
       onClick={onClose}
     >
       <div
