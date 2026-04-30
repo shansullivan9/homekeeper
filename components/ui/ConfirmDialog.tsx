@@ -32,14 +32,14 @@ export default function ConfirmDialogHost() {
       className="fixed inset-0 z-[100] flex items-center justify-center px-6"
     >
       <div
-        className="absolute inset-0 bg-black/40 animate-fade-in"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in"
         onClick={() => resolve(false)}
       />
-      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-xs overflow-hidden">
+      <div className="relative bg-white rounded-ios-xl shadow-elevated w-full max-w-xs overflow-hidden animate-scale-in">
         <div className="px-5 pt-5 pb-4 text-center">
-          <h3 className="text-base font-semibold">{opts.title}</h3>
+          <h3 className="text-title font-semibold tracking-[-0.01em]">{opts.title}</h3>
           {opts.message && (
-            <p className="text-[13px] text-ink-secondary mt-2 leading-snug">
+            <p className="text-caption text-ink-secondary mt-2 leading-snug">
               {opts.message}
             </p>
           )}
@@ -47,14 +47,14 @@ export default function ConfirmDialogHost() {
         <div className="grid grid-cols-2 border-t border-gray-200">
           <button
             onClick={() => resolve(false)}
-            className="py-3 text-[15px] text-ink-secondary border-r border-gray-200 active:bg-gray-100 md:hover:bg-gray-50 transition-colors"
+            className="py-3 text-body text-ink-secondary border-r border-gray-200 active:bg-gray-100 md:hover:bg-gray-50 transition-colors"
           >
             {opts.cancelLabel || 'Cancel'}
           </button>
           <button
             onClick={() => resolve(true)}
             autoFocus
-            className={`py-3 text-[15px] font-semibold active:bg-gray-100 md:hover:bg-gray-50 transition-colors ${
+            className={`py-3 text-body font-semibold active:bg-gray-100 md:hover:bg-gray-50 transition-colors ${
               opts.destructive ? 'text-status-red' : 'text-brand-500'
             }`}
           >

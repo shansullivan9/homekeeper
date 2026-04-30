@@ -171,10 +171,40 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   if (!ready) {
+    // Skeleton screen — mirrors the dashboard's hero + bucket layout
+    // so the transition into the real UI feels continuous instead of
+    // popping in from a generic spinner.
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-surface-secondary">
-        <div className="text-3xl animate-pulse">🏠</div>
-        <p className="text-ink-tertiary text-sm mt-2">Loading…</p>
+      <div className="min-h-screen bg-surface-secondary">
+        <div className="h-14 md:h-16 bg-white border-b border-gray-100" />
+        <div className="md:max-w-5xl md:mx-auto md:px-6 lg:px-10 px-4 py-4 space-y-3">
+          <div className="rounded-ios-xl bg-gradient-hero shadow-float overflow-hidden">
+            <div className="px-5 pt-5 pb-4 md:px-6 md:pt-6 md:pb-5 space-y-3">
+              <div className="h-3 w-24 rounded bg-white/30 animate-pulse" />
+              <div className="h-7 w-2/3 rounded bg-white/30 animate-pulse" />
+              <div className="grid grid-cols-3 gap-2 mt-4">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="rounded-ios bg-white/12 px-3 py-2.5">
+                    <div className="h-5 w-10 rounded bg-white/30 animate-pulse" />
+                    <div className="h-2.5 w-14 rounded bg-white/30 animate-pulse mt-2" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="ios-card overflow-hidden">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="px-4 py-3.5 border-b border-gray-100 last:border-b-0 flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg skeleton" />
+                <div className="flex-1 space-y-1.5">
+                  <div className="h-3 w-1/2 skeleton" />
+                  <div className="h-2.5 w-1/3 skeleton" />
+                </div>
+                <div className="h-3 w-6 skeleton" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
