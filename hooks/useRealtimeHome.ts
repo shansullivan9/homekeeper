@@ -2,7 +2,7 @@
 import { useEffect } from 'react';
 import { createClient } from '@/lib/supabase-browser';
 import { useStore } from '@/lib/store';
-import { Task, TaskHistory } from '@/lib/types';
+import { Task, TaskHistory, Appliance, Document } from '@/lib/types';
 
 /**
  * Subscribes the Zustand store to Supabase Realtime for the active
@@ -79,6 +79,11 @@ export function useRealtimeHome() {
                 const h = payload.new as TaskHistory;
                 if (store.history.some((existing) => existing.id === h.id)) return;
                 store.setHistory([h, ...store.history]);
+              } else if (payload.eventType === 'UPDATE') {
+                const h = payload.new as TaskHistory;
+                store.setHistory(
+                  store.history.map((existing) => (existing.id === h.id ? h : existing))
+                );
               } else if (payload.eventType === 'DELETE') {
                 const id = (payload.old as TaskHistory)?.id;
                 if (!id) return;
@@ -91,6 +96,80 @@ export function useRealtimeHome() {
         )
         .subscribe();
       channels.push(historyChannel);
+
+      // Documents — partners uploading manuals / receipts should appear
+      // live without a manual refresh.
+      const docsChannel = supabase
+        .channel(`hk-docs-${homeId}-${unique}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'documents',
+            filter: `home_id=eq.${homeId}`,
+          },
+          (payload: any) => {
+            const store = useStore.getState();
+            try {
+              if (payload.eventType === 'INSERT') {
+                const d = payload.new as Document;
+                if (store.documents.some((existing) => existing.id === d.id)) return;
+                store.setDocuments([d, ...store.documents]);
+              } else if (payload.eventType === 'UPDATE') {
+                const d = payload.new as Document;
+                store.setDocuments(
+                  store.documents.map((existing) => (existing.id === d.id ? d : existing))
+                );
+              } else if (payload.eventType === 'DELETE') {
+                const id = (payload.old as Document)?.id;
+                if (!id) return;
+                store.setDocuments(store.documents.filter((d) => d.id !== id));
+              }
+            } catch (err) {
+              console.warn('realtime documents handler error:', err);
+            }
+          }
+        )
+        .subscribe();
+      channels.push(docsChannel);
+
+      // Appliances — same rationale: a partner registering the new
+      // washer should show up on every connected device.
+      const appsChannel = supabase
+        .channel(`hk-appliances-${homeId}-${unique}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'appliances',
+            filter: `home_id=eq.${homeId}`,
+          },
+          (payload: any) => {
+            const store = useStore.getState();
+            try {
+              if (payload.eventType === 'INSERT') {
+                const a = payload.new as Appliance;
+                if (store.appliances.some((existing) => existing.id === a.id)) return;
+                store.setAppliances([a, ...store.appliances]);
+              } else if (payload.eventType === 'UPDATE') {
+                const a = payload.new as Appliance;
+                store.setAppliances(
+                  store.appliances.map((existing) => (existing.id === a.id ? a : existing))
+                );
+              } else if (payload.eventType === 'DELETE') {
+                const id = (payload.old as Appliance)?.id;
+                if (!id) return;
+                store.setAppliances(store.appliances.filter((a) => a.id !== id));
+              }
+            } catch (err) {
+              console.warn('realtime appliances handler error:', err);
+            }
+          }
+        )
+        .subscribe();
+      channels.push(appsChannel);
     } catch (err) {
       console.warn('realtime subscribe failed (non-fatal):', err);
     }
