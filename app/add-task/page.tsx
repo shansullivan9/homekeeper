@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, Suspense, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase-browser';
 import { useStore } from '@/lib/store';
 import { useAppInit } from '@/hooks/useAppInit';
@@ -939,13 +940,12 @@ function AddTaskForm() {
                 ))}
             </select>
             {applianceId && editId && !editMode && (
-              <button
-                type="button"
-                onClick={() => router.push(`/appliances?edit=${applianceId}`)}
-                className="text-xs text-brand-500 mt-1.5 md:hover:underline"
+              <Link
+                href={`/appliances?edit=${applianceId}`}
+                className="inline-block text-xs text-brand-500 mt-1.5 active:text-brand-600 md:hover:underline"
               >
                 Open this appliance →
-              </button>
+              </Link>
             )}
           </div>
         )}
