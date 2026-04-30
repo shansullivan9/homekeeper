@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase-browser';
 import PageHeader from '@/components/layout/PageHeader';
@@ -24,6 +24,16 @@ export default function ExpensesPage() {
     setEditing(h);
     setCostDraft(h.cost != null ? h.cost.toString() : '');
   };
+
+  // Esc closes the edit sheet (matches the backdrop tap behavior).
+  useEffect(() => {
+    if (!editing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !saving) setEditing(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [editing, saving]);
 
   const activeCategories = useMemo(
     () => categories.filter((c) => c.is_default || !c.home_id),

@@ -73,6 +73,7 @@ export default function ReportsPage() {
         rightAction={
           <button
             onClick={() => window.print()}
+            aria-label="Print or save as PDF"
             title="Print or save as PDF"
             className="text-brand-500 p-1 print:hidden"
           >
@@ -107,26 +108,32 @@ export default function ReportsPage() {
           </p>
           <h2 className="text-3xl font-bold mb-1">{year}</h2>
           <p className="text-sm text-ink-secondary">{home?.name || 'My Home'}</p>
-          <div className="mt-4 grid grid-cols-3 gap-3">
-            <div>
-              <p className="text-2xl font-bold text-brand-600">{yearItems.length}</p>
-              <p className="text-[11px] text-ink-secondary uppercase tracking-wide font-medium">
-                Tasks done
-              </p>
+          {yearItems.length > 0 ? (
+            <div className="mt-4 grid grid-cols-3 gap-3">
+              <div>
+                <p className="text-2xl font-bold text-brand-600">{yearItems.length}</p>
+                <p className="text-[11px] text-ink-secondary uppercase tracking-wide font-medium">
+                  Tasks done
+                </p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-emerald-600">{formatCurrency(total)}</p>
+                <p className="text-[11px] text-ink-secondary uppercase tracking-wide font-medium">
+                  Spent
+                </p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-purple-600">{byCategory.length}</p>
+                <p className="text-[11px] text-ink-secondary uppercase tracking-wide font-medium">
+                  Categories
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-emerald-600">{formatCurrency(total)}</p>
-              <p className="text-[11px] text-ink-secondary uppercase tracking-wide font-medium">
-                Spent
-              </p>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-purple-600">{byCategory.length}</p>
-              <p className="text-[11px] text-ink-secondary uppercase tracking-wide font-medium">
-                Categories
-              </p>
-            </div>
-          </div>
+          ) : (
+            <p className="mt-4 text-xs text-ink-tertiary">
+              Complete tasks during {year} to see them summarized here.
+            </p>
+          )}
         </div>
 
         {/* By category */}
