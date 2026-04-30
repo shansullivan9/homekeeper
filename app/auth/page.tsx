@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 
 export default function AuthPage() {
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [mode, setMode] = useState<'login' | 'signup' | 'reset'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -13,8 +13,35 @@ export default function AuthPage() {
   const router = useRouter();
   const supabase = createClient();
 
+  const handleResetPassword = async () => {
+    const target = email.trim();
+    if (!target) {
+      toast.error('Enter your email address first');
+      return;
+    }
+    setLoading(true);
+    try {
+      const redirectTo =
+        typeof window !== 'undefined' ? `${window.location.origin}/auth` : undefined;
+      const { error } = await supabase.auth.resetPasswordForEmail(target, {
+        redirectTo,
+      });
+      if (error) throw error;
+      toast.success('Check your email for a reset link');
+      setMode('login');
+    } catch (err: any) {
+      toast.error(err.message || 'Could not send reset email');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (mode === 'reset') {
+      await handleResetPassword();
+      return;
+    }
     setLoading(true);
 
     try {
@@ -79,29 +106,62 @@ export default function AuthPage() {
             required
             autoComplete="email"
           />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="ios-input"
-            required
-            minLength={6}
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-          />
+          {mode !== 'reset' && (
+            <input
+              type="password"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="ios-input"
+              required
+              minLength={6}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+            />
+          )}
           <button type="submit" disabled={loading} className="ios-button">
-            {loading ? 'Please wait...' : mode === 'login' ? 'Sign In' : 'Create Account'}
+            {loading
+              ? 'Please wait...'
+              : mode === 'login'
+              ? 'Sign In'
+              : mode === 'signup'
+              ? 'Create Account'
+              : 'Send Reset Link'}
           </button>
+          {mode === 'login' && (
+            <button
+              type="button"
+              onClick={() => setMode('reset')}
+              className="block w-full text-center text-xs text-ink-tertiary md:hover:text-brand-500 transition-colors"
+            >
+              Forgot password?
+            </button>
+          )}
         </form>
 
         <div className="mt-6 text-center">
-          <button
-            onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-            className="text-brand-500 text-sm font-medium"
-          >
-            {mode === 'login' ? "Don't have an account? Sign Up" : 'Already have an account? Sign In'}
-          </button>
+          {mode === 'reset' ? (
+            <button
+              onClick={() => setMode('login')}
+              className="text-brand-500 text-sm font-medium"
+            >
+              ← Back to sign in
+            </button>
+          ) : (
+            <button
+              onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+              className="text-brand-500 text-sm font-medium"
+            >
+              {mode === 'login' ? "Don't have an account? Sign Up" : 'Already have an account? Sign In'}
+            </button>
+          )}
         </div>
+
+        {mode === 'reset' && (
+          <p className="mt-4 text-[11px] text-ink-tertiary text-center px-4">
+            We'll email a link to reset your password. Use the email
+            address you signed up with.
+          </p>
+        )}
       </div>
     </div>
   );

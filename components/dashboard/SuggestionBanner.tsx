@@ -156,12 +156,16 @@ export default function SuggestionBanner() {
             <div className="flex items-center gap-1.5 flex-shrink-0">
               <button
                 onClick={() => acceptSuggestion(s)}
+                aria-label={`Accept suggestion: ${s.title}`}
+                title="Add to my tasks"
                 className="w-8 h-8 rounded-full bg-status-green/10 flex items-center justify-center text-status-green active:bg-status-green active:text-white transition-colors"
               >
                 <Check size={16} strokeWidth={2.5} />
               </button>
               <button
                 onClick={() => dismissSuggestion(s)}
+                aria-label={`Dismiss suggestion: ${s.title}`}
+                title="Don't suggest again"
                 className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-ink-tertiary active:bg-red-50 active:text-red-500 transition-colors"
               >
                 <X size={16} strokeWidth={2.5} />

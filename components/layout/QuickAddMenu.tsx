@@ -1,4 +1,5 @@
 'use client';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ListTodo, FileText, Package, X } from 'lucide-react';
 
@@ -10,6 +11,17 @@ export default function QuickAddMenu({
   onClose: () => void;
 }) {
   const router = useRouter();
+
+  // Close on Escape so keyboard users aren't trapped.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+
   if (!open) return null;
 
   const go = (path: string) => {
@@ -52,7 +64,11 @@ export default function QuickAddMenu({
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
           <p className="text-[15px] font-semibold">Add new</p>
-          <button onClick={onClose} className="p-1 -mr-1 text-ink-tertiary">
+          <button
+            onClick={onClose}
+            aria-label="Close add menu"
+            className="p-1 -mr-1 text-ink-tertiary"
+          >
             <X size={20} />
           </button>
         </div>

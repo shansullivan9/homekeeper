@@ -352,9 +352,8 @@ export default function SettingsPage() {
             )}
           </div>
 
-          {/* Email row */}
-          <div className="px-4 py-3.5 flex items-center gap-3">
-            <div className="w-10 h-10 flex items-center justify-center flex-shrink-0" />
+          {/* Email row — no avatar; the Name row above carries it. */}
+          <div className="px-4 py-3 flex items-center gap-3">
             <div className="flex-1 min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary">
                 Email

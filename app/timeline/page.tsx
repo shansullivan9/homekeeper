@@ -181,9 +181,22 @@ export default function TimelinePage() {
         rightAction={
           <div className="flex items-center gap-2">
             {visibleEvents.length > 0 && (
-              <button onClick={exportTimeline} className="text-brand-500 p-1"><Download size={20} /></button>
+              <button
+                onClick={exportTimeline}
+                aria-label="Export timeline as CSV"
+                title="Export as CSV"
+                className="text-brand-500 p-1"
+              >
+                <Download size={20} />
+              </button>
             )}
-            <button onClick={startNew} className="text-brand-500"><Plus size={24} /></button>
+            <button
+              onClick={startNew}
+              aria-label="Add timeline event"
+              className="text-brand-500"
+            >
+              <Plus size={24} />
+            </button>
           </div>
         }
       />
@@ -193,7 +206,13 @@ export default function TimelinePage() {
         <div className="mx-4 mt-4 ios-card p-4 space-y-3 animate-slide-up">
           <div className="flex items-center justify-between mb-1">
             <span className="text-sm font-semibold">{editingId ? 'Edit Event' : 'Add Event'}</span>
-            <button onClick={closeForm}><X size={18} className="text-ink-tertiary" /></button>
+            <button
+              onClick={closeForm}
+              aria-label="Close form"
+              className="p-1 -mr-1"
+            >
+              <X size={18} className="text-ink-tertiary" />
+            </button>
           </div>
           <input
             type="text"

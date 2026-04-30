@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Task } from '@/lib/types';
 import { getTaskUrgency, urgencyColor, sectionColorForTask, CATEGORY_ICONS, RECURRENCE_LABELS, formatCurrency, emojiForTaskTitle } from '@/lib/constants';
 import { format, isToday, isTomorrow, isPast, parseISO } from 'date-fns';
@@ -69,6 +69,16 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
   const [completeNotes, setCompleteNotes] = useState('');
   const [completePhotos, setCompletePhotos] = useState<File[]>([]);
   const [completing, setCompleting] = useState(false);
+
+  // Esc closes the complete sheet (matches the backdrop tap behavior).
+  useEffect(() => {
+    if (!showCompleteSheet) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !completing) setShowCompleteSheet(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showCompleteSheet, completing]);
 
   const openCompleteSheet = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -321,6 +331,7 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
         {!isDone && (
           <button
             onClick={handleClaim}
+            aria-label={isMine ? `Unclaim ${task.title}` : isClaimed ? `Take over ${task.title}` : `Claim ${task.title}`}
             title={isMine ? 'Unclaim' : isClaimed ? 'Take over' : 'Claim'}
             className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 transition-all ${
               isMine
@@ -334,6 +345,7 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
         {isDone ? (
           <button
             onClick={handleUncomplete}
+            aria-label={`Mark ${task.title} as not completed`}
             title="Mark as not completed"
             className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-status-green border-2 border-status-green text-white flex items-center justify-center active:opacity-80 transition-all"
           >
@@ -342,6 +354,7 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
         ) : (
           <button
             onClick={openCompleteSheet}
+            aria-label={`Mark ${task.title} complete`}
             title="Mark complete"
             className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-status-green text-status-green flex items-center justify-center active:bg-status-green active:text-white transition-all"
           >
@@ -350,6 +363,7 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
         )}
         <button
           onClick={handleDelete}
+          aria-label={`Delete ${task.title}`}
           title="Delete task"
           className="w-7 h-7 sm:w-8 sm:h-8 rounded-full border-2 border-status-red text-status-red flex items-center justify-center active:bg-status-red active:text-white transition-all"
         >

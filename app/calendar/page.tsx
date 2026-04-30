@@ -171,6 +171,26 @@ export default function CalendarPage() {
           );
         })}
       </div>
+
+      {/* Dot color legend — same colors the dashboard buckets use. */}
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-ink-tertiary">
+        {[
+          { color: SECTION_COLORS.overdue, label: 'Overdue' },
+          { color: SECTION_COLORS.thisWeek, label: 'This week' },
+          { color: SECTION_COLORS.thisMonth, label: 'This month' },
+          { color: SECTION_COLORS.upcoming, label: 'Upcoming' },
+          { color: SECTION_COLORS.later, label: 'Later' },
+          { color: SECTION_COLORS.completed, label: 'Done' },
+        ].map((k) => (
+          <div key={k.label} className="flex items-center gap-1">
+            <span
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ backgroundColor: k.color }}
+            />
+            <span>{k.label}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 

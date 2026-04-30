@@ -254,22 +254,24 @@ export default function HistoryPage() {
                     )}
                   </div>
                 </button>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-3 flex-shrink-0 pl-2">
                   <button
                     onClick={() => handleUndo(h)}
                     disabled={busyId === h.id}
                     title={h.task_id ? 'Mark as not completed' : 'Mark as not completed (recreates the task)'}
-                    className="w-8 h-8 rounded-full border-2 border-ink-tertiary text-ink-secondary flex items-center justify-center active:bg-gray-100 disabled:opacity-50 transition-all"
+                    aria-label="Mark as not completed"
+                    className="w-9 h-9 rounded-full border-2 border-ink-tertiary text-ink-secondary flex items-center justify-center active:bg-gray-100 disabled:opacity-50 transition-all"
                   >
-                    <RotateCcw size={14} strokeWidth={2.5} />
+                    <RotateCcw size={15} strokeWidth={2.5} />
                   </button>
                   <button
                     onClick={() => handleDelete(h)}
                     disabled={busyId === h.id}
                     title="Delete entry"
-                    className="w-8 h-8 rounded-full border-2 border-status-red text-status-red flex items-center justify-center active:bg-status-red active:text-white disabled:opacity-50 transition-all"
+                    aria-label="Delete history entry"
+                    className="w-9 h-9 rounded-full border-2 border-status-red text-status-red flex items-center justify-center active:bg-status-red active:text-white disabled:opacity-50 transition-all"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={15} />
                   </button>
                 </div>
               </div>
