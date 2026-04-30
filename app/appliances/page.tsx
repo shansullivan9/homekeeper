@@ -9,6 +9,7 @@ import { Plus, X, Package, ChevronRight, FileText } from 'lucide-react';
 import { format, parseISO, isPast, differenceInDays } from 'date-fns';
 import toast from 'react-hot-toast';
 import { confirm } from '@/lib/confirm';
+import { useStoredState } from '@/lib/useStoredState';
 
 const APPLIANCE_CATEGORIES = [
   'Kitchen',
@@ -21,13 +22,17 @@ const APPLIANCE_CATEGORIES = [
 ];
 
 export default function AppliancesPage() {
-  const { appliances, home, setAppliances, documents, tasks, history } = useStore();
+  const { appliances, home, setAppliances, documents, tasks, history, user } = useStore();
   const supabase = createClient();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Appliance | null>(null);
-  const [sortBy, setSortBy] = useState<'name' | 'category' | 'warranty' | 'newest'>('name');
+  const [sortBy, setSortBy] = useStoredState<'name' | 'category' | 'warranty' | 'newest'>(
+    'appliances.sortBy',
+    'name',
+    user?.id
+  );
   const [editMode, setEditMode] = useState(true);
   const [manualDocId, setManualDocId] = useState<string | null>(null);
   const [form, setForm] = useState({

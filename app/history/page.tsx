@@ -5,19 +5,24 @@ import { createClient } from '@/lib/supabase-browser';
 import { TaskHistory } from '@/lib/types';
 import PageHeader from '@/components/layout/PageHeader';
 import { format, parseISO } from 'date-fns';
-import { CheckCircle2, Search, RotateCcw, Trash2 } from 'lucide-react';
+import { CheckCircle2, Search, RotateCcw, RotateCw, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { formatCurrency } from '@/lib/constants';
 import { confirm } from '@/lib/confirm';
+import { useStoredState } from '@/lib/useStoredState';
 
 export default function HistoryPage() {
-  const { history, tasks, categories, setHistory, setTasks } = useStore();
+  const { history, tasks, categories, setHistory, setTasks, user } = useStore();
   const supabase = createClient();
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<'recent' | 'oldest' | 'cost-desc' | 'category'>('recent');
+  const [sortBy, setSortBy] = useStoredState<'recent' | 'oldest' | 'cost-desc' | 'category'>(
+    'history.sortBy',
+    'recent',
+    user?.id
+  );
 
   // Some history rows were written before category_name was being saved
   // properly, so fall back to the linked task's category if available.
@@ -126,6 +131,69 @@ export default function HistoryPage() {
       toast.success('Marked as not completed');
     } catch (err: any) {
       toast.error(err.message || 'Could not undo');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // "Do it again" — clone a completed entry as a fresh pending task.
+  // Smart-defaults the new due date based on the source task's
+  // recurrence so a yearly chore lands a year out, monthly lands a
+  // month out, etc. One-off completions default to no date.
+  const handleRepeat = async (h: TaskHistory) => {
+    if (!tasks && !h.task_id) {
+      toast.error('Original task missing — cannot repeat');
+      return;
+    }
+    setBusyId(h.id);
+    try {
+      const source = h.task_id ? tasks.find((t) => t.id === h.task_id) : null;
+      const recurrence = (source as any)?.recurrence || 'one_time';
+      const offsetDays: Record<string, number> = {
+        weekly: 7,
+        bi_monthly: 60,
+        monthly: 30,
+        quarterly: 91,
+        bi_annual: 182,
+        yearly: 365,
+      };
+      const days = offsetDays[recurrence];
+      let dueDate: string | null = null;
+      if (days) {
+        const target = new Date();
+        target.setDate(target.getDate() + days);
+        dueDate = target.toISOString().slice(0, 10);
+      }
+      const matchedCategory = h.category_name
+        ? categories.find((c) => c.name === h.category_name) || null
+        : null;
+      const { data, error } = await supabase
+        .from('tasks')
+        .insert({
+          home_id: h.home_id,
+          title: h.title,
+          notes: source?.notes || h.notes || null,
+          category_id: source?.category_id || matchedCategory?.id || null,
+          estimated_cost: h.cost ?? source?.estimated_cost ?? null,
+          estimated_minutes: h.duration_minutes ?? (source as any)?.estimated_minutes ?? null,
+          recurrence,
+          priority: (source as any)?.priority || 'medium',
+          status: 'pending',
+          due_date: dueDate,
+        } as any)
+        .select()
+        .single();
+      if (error) throw error;
+      if (data) {
+        setTasks([data as any, ...tasks]);
+        toast.success(
+          dueDate
+            ? `Scheduled "${h.title}" for ${format(parseISO(dueDate), 'MMM d')}`
+            : `Added "${h.title}" to your tasks`
+        );
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Could not repeat');
     } finally {
       setBusyId(null);
     }
@@ -316,6 +384,15 @@ export default function HistoryPage() {
                   </div>
                 </button>
                 <div className="flex items-center gap-3 flex-shrink-0 pl-2">
+                  <button
+                    onClick={() => handleRepeat(h)}
+                    disabled={busyId === h.id}
+                    title="Repeat — schedule this task again"
+                    aria-label={`Repeat ${h.title}`}
+                    className="w-9 h-9 rounded-full border-2 border-brand-500 text-brand-500 flex items-center justify-center active:bg-brand-500 active:text-white disabled:opacity-50 transition-all"
+                  >
+                    <RotateCw size={15} strokeWidth={2.5} />
+                  </button>
                   <button
                     onClick={() => handleUndo(h)}
                     disabled={busyId === h.id}

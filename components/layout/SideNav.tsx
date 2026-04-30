@@ -1,6 +1,7 @@
 'use client';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { useStore } from '@/lib/store';
 import {
   LayoutDashboard,
   Calendar,
@@ -37,6 +38,19 @@ export default function SideNav() {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const openPalette = useCommandStore((s) => s.setOpen);
+  const tasks = useStore((s) => s.tasks);
+
+  const overdueCount = useMemo(() => {
+    const todayIso = new Date().toISOString().slice(0, 10);
+    return tasks.filter(
+      (t) =>
+        !t.is_suggestion &&
+        t.status !== 'completed' &&
+        t.status !== 'skipped' &&
+        t.due_date &&
+        t.due_date < todayIso
+    ).length;
+  }, [tasks]);
 
   const renderTab = (tab: { href: string; label: string; icon: any }) => {
     const Icon = tab.icon;
@@ -54,7 +68,15 @@ export default function SideNav() {
         }`}
       >
         <Icon size={18} strokeWidth={active ? 2.2 : 1.7} />
-        <span>{tab.label}</span>
+        <span className="flex-1 text-left">{tab.label}</span>
+        {tab.href === '/dashboard' && overdueCount > 0 && (
+          <span
+            aria-label={`${overdueCount} overdue tasks`}
+            className="min-w-[18px] h-[18px] px-1 rounded-full bg-status-red text-white text-[10px] font-bold flex items-center justify-center"
+          >
+            {overdueCount > 99 ? '99+' : overdueCount}
+          </span>
+        )}
       </button>
     );
   };
