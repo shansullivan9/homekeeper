@@ -102,7 +102,7 @@ function AddTaskForm() {
   const editId = searchParams.get('edit');
   const router = useRouter();
   const supabase = createClient();
-  const { home, user, categories, tasks, appliances, documents, members } = useStore();
+  const { home, user, categories, tasks, appliances, documents, members, history } = useStore();
   const { loadData } = useAppInit();
 
   const [title, setTitle] = useState('');
@@ -129,6 +129,40 @@ function AddTaskForm() {
   // their choice. Saves a couple of taps per task for power users.
   const [userTouchedCategory, setUserTouchedCategory] = useState(false);
   const [userTouchedRecurrence, setUserTouchedRecurrence] = useState(false);
+  const [showTitleSuggestions, setShowTitleSuggestions] = useState(false);
+
+  // Pool of past titles — both pending tasks and completed history
+  // rows — for the title autocomplete. Deduped (case-insensitive)
+  // with the longer/more specific casing winning when there's a tie.
+  const titleSuggestions = useMemo(() => {
+    if (editId) return [] as string[];
+    const seen = new Map<string, string>();
+    const consider = (raw: string | null | undefined) => {
+      if (!raw) return;
+      const trimmed = raw.trim();
+      if (!trimmed) return;
+      const key = trimmed.toLowerCase();
+      const prev = seen.get(key);
+      if (!prev || prev.length < trimmed.length) seen.set(key, trimmed);
+    };
+    for (const t of tasks) consider(t.title);
+    for (const h of history) consider(h.title);
+    return Array.from(seen.values()).sort((a, b) => a.localeCompare(b));
+  }, [tasks, history, editId]);
+
+  // What we actually render under the input — filter to titles
+  // containing the current draft (case-insensitive), exclude exact
+  // match, cap at 5 to keep the dropdown calm.
+  const filteredSuggestions = useMemo(() => {
+    const q = title.trim().toLowerCase();
+    if (q.length < 2) return [];
+    return titleSuggestions
+      .filter((s) => {
+        const sl = s.toLowerCase();
+        return sl !== q && sl.includes(q);
+      })
+      .slice(0, 5);
+  }, [titleSuggestions, title]);
 
   useEffect(() => {
     setEditMode(!editId);
@@ -561,14 +595,21 @@ function AddTaskForm() {
         {/* Title — the form's hero input. Promoted with larger
             type, semibold weight, and a brighter focus ring so it
             reads as the primary field instead of one input among many. */}
-        <div>
+        <div className="relative">
           <label className="text-micro font-semibold text-ink-secondary uppercase tracking-wider mb-2 block">
             Task Name *
           </label>
           <input
             type="text"
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              setShowTitleSuggestions(true);
+            }}
+            onFocus={() => setShowTitleSuggestions(true)}
+            // Delay the close so a click on a suggestion still
+            // registers before blur tears the dropdown down.
+            onBlur={() => setTimeout(() => setShowTitleSuggestions(false), 120)}
             placeholder="e.g. Change HVAC filter"
             className="w-full px-4 py-3.5 bg-white rounded-ios text-title font-semibold text-ink-primary
                        placeholder:text-ink-tertiary placeholder:font-normal
@@ -577,6 +618,28 @@ function AddTaskForm() {
             maxLength={120}
             autoFocus={!editId}
           />
+          {/* Title autocomplete — past task titles you've used. Saves
+              repeated typing for recurring chores or near-duplicates. */}
+          {showTitleSuggestions && filteredSuggestions.length > 0 && (
+            <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-ios shadow-elevated border border-gray-100 overflow-hidden z-20 animate-slide-down">
+              {filteredSuggestions.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  // Use mousedown so the suggestion fires before the
+                  // input's blur handler closes the dropdown.
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setTitle(s);
+                    setShowTitleSuggestions(false);
+                  }}
+                  className="w-full px-4 py-2.5 text-left text-body text-ink-primary border-b border-gray-50 last:border-b-0 active:bg-gray-50 md:hover:bg-gray-50 transition-colors truncate"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Category */}
