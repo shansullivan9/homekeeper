@@ -32,8 +32,14 @@ export default function ConfirmDialogHost() {
       className="fixed inset-0 z-[100] flex items-center justify-center px-6"
     >
       <div
-        className="absolute inset-0 bg-black/65 backdrop-blur-xl animate-fade-in"
+        aria-hidden="true"
+        className="absolute inset-0 animate-fade-in"
         onClick={() => resolve(false)}
+        style={{
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          WebkitBackdropFilter: 'blur(20px)',
+          backdropFilter: 'blur(20px)',
+        }}
       />
       <div className="relative bg-white rounded-ios-xl shadow-elevated w-full max-w-xs overflow-hidden animate-scale-in">
         <div className="px-5 pt-5 pb-4 text-center">

@@ -55,11 +55,23 @@ export default function QuickAddMenu({
 
   return (
     <div
-      className="fixed inset-0 z-[60] bg-black/65 backdrop-blur-xl flex items-end md:items-center justify-center p-4 animate-fade-in"
+      className="fixed inset-0 z-[60] flex items-end md:items-center justify-center p-4"
       onClick={onClose}
     >
+      {/* Backdrop as its own layer — inline styles guarantee the dim
+          even if a CDN cache or PWA service worker is serving older
+          CSS without the bg-black/65 utility class. */}
       <div
-        className="bg-white rounded-ios-xl w-full max-w-sm shadow-elevated overflow-hidden animate-slide-up"
+        aria-hidden="true"
+        className="absolute inset-0 animate-fade-in"
+        style={{
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          WebkitBackdropFilter: 'blur(20px)',
+          backdropFilter: 'blur(20px)',
+        }}
+      />
+      <div
+        className="relative bg-white rounded-ios-xl w-full max-w-sm shadow-elevated overflow-hidden animate-slide-up"
         onClick={(e) => e.stopPropagation()}
         style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
