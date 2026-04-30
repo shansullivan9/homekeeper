@@ -4,7 +4,7 @@ import { useStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase-browser';
 import PageHeader from '@/components/layout/PageHeader';
 import toast from 'react-hot-toast';
-import { Bell, Check } from 'lucide-react';
+import { Bell } from 'lucide-react';
 
 interface Prefs {
   remind_days_before: number;
@@ -12,6 +12,7 @@ interface Prefs {
   remind_when_overdue: boolean;
   timezone: string;
   reminder_hour_local: number;
+  notifications_paused: boolean;
 }
 
 const detectTimezone = (): string => {
@@ -28,6 +29,7 @@ const DEFAULTS: Prefs = {
   remind_when_overdue: true,
   timezone: 'America/New_York',
   reminder_hour_local: 12,
+  notifications_paused: false,
 };
 
 const DAYS_OPTIONS = [0, 1, 2, 3, 5, 7, 14];
@@ -80,7 +82,7 @@ export default function NotificationsPage() {
       try {
         const { data } = await supabase
           .from('notification_preferences')
-          .select('remind_days_before, remind_on_due, remind_when_overdue, timezone, reminder_hour_local')
+          .select('remind_days_before, remind_on_due, remind_when_overdue, timezone, reminder_hour_local, notifications_paused')
           .eq('user_id', user.id)
           .maybeSingle();
         if (cancelled) return;
@@ -105,6 +107,10 @@ export default function NotificationsPage() {
               typeof d.reminder_hour_local === 'number'
                 ? d.reminder_hour_local
                 : DEFAULTS.reminder_hour_local,
+            notifications_paused:
+              typeof d.notifications_paused === 'boolean'
+                ? d.notifications_paused
+                : DEFAULTS.notifications_paused,
           });
         } else {
           setPrefs((p) => ({ ...p, timezone: browserTz }));
@@ -134,6 +140,7 @@ export default function NotificationsPage() {
             remind_when_overdue: next.remind_when_overdue,
             timezone: next.timezone,
             reminder_hour_local: next.reminder_hour_local,
+            notifications_paused: next.notifications_paused,
             updated_at: new Date().toISOString(),
           } as any,
           { onConflict: 'user_id' } as any
@@ -153,12 +160,13 @@ export default function NotificationsPage() {
     save(merged);
   };
 
-  // Once permission is granted, silently make sure the subscription
-  // is registered with our backend. Re-runs on every visit so a
-  // browser-rotated endpoint or fresh device gets re-saved without
-  // the user having to do anything.
+  // Once permission is granted (and the user hasn't paused), silently
+  // make sure the subscription is registered with our backend. Re-runs
+  // on every visit so a browser-rotated endpoint or fresh device gets
+  // re-saved without the user having to do anything.
   useEffect(() => {
     if (pushPermission !== 'granted') return;
+    if (!loaded || prefs.notifications_paused) return;
     if (!user?.id) return;
     let cancelled = false;
     const ensureSubscribed = async () => {
@@ -201,7 +209,7 @@ export default function NotificationsPage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pushPermission, user?.id]);
+  }, [pushPermission, user?.id, loaded, prefs.notifications_paused]);
   const urlBase64ToUint8Array = (base64String: string): Uint8Array | null => {
     try {
       const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -386,53 +394,146 @@ export default function NotificationsPage() {
     }
   };
 
+  // Pause: unsubscribe the browser PushSubscription on this device
+  // and null it out in the DB so the edge function stops sending.
+  // Browser-level permission stays "granted" — we just go silent.
+  const pausePush = async () => {
+    if (!user?.id) return;
+    setSubscribing(true);
+    try {
+      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const r of regs) {
+          try {
+            const existing = await r.pushManager.getSubscription();
+            if (existing) await existing.unsubscribe();
+          } catch {
+            /* ignore individual reg errors */
+          }
+        }
+      }
+      const { error } = await supabase
+        .from('notification_preferences')
+        .upsert(
+          {
+            user_id: user.id,
+            notifications_paused: true,
+            push_subscription: null,
+            updated_at: new Date().toISOString(),
+          } as any,
+          { onConflict: 'user_id' } as any
+        );
+      if (error) throw error;
+      setPrefs((p) => ({ ...p, notifications_paused: true }));
+      toast.success('Notifications paused');
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not pause notifications');
+    } finally {
+      setSubscribing(false);
+    }
+  };
+
+  const resumePush = async () => {
+    if (!user?.id) return;
+    setSubscribing(true);
+    try {
+      const { error } = await supabase
+        .from('notification_preferences')
+        .upsert(
+          {
+            user_id: user.id,
+            notifications_paused: false,
+            updated_at: new Date().toISOString(),
+          } as any,
+          { onConflict: 'user_id' } as any
+        );
+      if (error) throw error;
+      setPrefs((p) => ({ ...p, notifications_paused: false }));
+    } catch (err: any) {
+      toast.error(err?.message || 'Could not resume notifications');
+      setSubscribing(false);
+      return;
+    }
+    setSubscribing(false);
+    await subscribeToPush();
+  };
+
+  const togglePush = async () => {
+    if (subscribing) return;
+    if (pushPermission === 'unsupported' || pushPermission === 'denied') return;
+    if (pushPermission === 'default') {
+      await requestPushPermission();
+      return;
+    }
+    if (prefs.notifications_paused) {
+      await resumePush();
+    } else {
+      await pausePush();
+    }
+  };
+
+  const pushActive = pushPermission === 'granted' && !prefs.notifications_paused;
+
   return (
     <div>
       <PageHeader title="Notifications" back />
 
       <div className="py-4 space-y-5 md:max-w-2xl">
-        {/* Permission status — only loud when action is needed.
-            When granted, a slim confirmation pill is enough. */}
-        {pushPermission === 'granted' ? (
-          <div className="mx-4 flex items-center gap-2 text-xs text-ink-secondary">
-            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-status-green/10">
-              <Check size={12} className="text-status-green" strokeWidth={3} />
-            </span>
-            <span>Push enabled on this device</span>
-          </div>
-        ) : (
-          <div className="mx-4 ios-card overflow-hidden">
-            <div className="ios-list-item">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                <Bell size={18} className="text-brand-500" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[15px] font-medium">Push notifications</p>
-                  <p className="text-xs text-ink-secondary">
-                    {pushPermission === 'denied'
-                      ? 'Blocked — enable in your browser settings.'
-                      : pushPermission === 'unsupported'
-                      ? "This browser doesn't support web notifications."
-                      : 'Tap Enable to start receiving reminders.'}
-                  </p>
-                </div>
+        {/* Unified push master toggle. The toggle handles: first-time
+            permission request, pausing (unsubscribes from this device
+            and nulls the DB row so the edge function stops sending),
+            and resuming. Browsers that flat-out can't do push show a
+            disabled, explanatory row. */}
+        <div className="mx-4 ios-card overflow-hidden">
+          <button
+            type="button"
+            onClick={togglePush}
+            disabled={
+              subscribing ||
+              pushPermission === 'unsupported' ||
+              pushPermission === 'denied'
+            }
+            className="ios-list-item w-full disabled:opacity-100"
+          >
+            <div className="flex items-center gap-3 flex-1 min-w-0 text-left">
+              <Bell size={18} className="text-brand-500" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[15px] font-medium">Push notifications</p>
+                <p className="text-xs text-ink-secondary">
+                  {pushPermission === 'unsupported'
+                    ? "This browser doesn't support web notifications."
+                    : pushPermission === 'denied'
+                    ? 'Blocked — enable in your browser settings.'
+                    : subscribing
+                    ? 'Working…'
+                    : pushActive
+                    ? 'On for this device.'
+                    : pushPermission === 'default'
+                    ? 'Tap to receive reminders.'
+                    : 'Paused. Tap to resume.'}
+                </p>
               </div>
-              {pushPermission === 'default' && (
-                <button
-                  onClick={requestPushPermission}
-                  disabled={subscribing}
-                  className="text-brand-500 text-sm font-semibold disabled:opacity-50"
-                >
-                  {subscribing ? 'Enabling…' : 'Enable'}
-                </button>
-              )}
             </div>
-            {pushPermission === 'unsupported' && (
-              <p className="text-[11px] text-ink-tertiary px-4 pb-3">
-                On iPhone, tap Share in Safari → Add to Home Screen, then
-                open the app from your home screen and try again.
-              </p>
+            {(pushPermission === 'default' || pushPermission === 'granted') && (
+              <div
+                className={`w-12 h-7 rounded-full transition-colors relative shrink-0 ${
+                  pushActive ? 'bg-status-green' : 'bg-gray-200'
+                }`}
+              >
+                <div
+                  className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${
+                    pushActive ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}
+                />
+              </div>
             )}
-          </div>
+          </button>
+        </div>
+        {pushPermission === 'unsupported' && (
+          <p className="text-[11px] text-ink-tertiary mx-4 -mt-3">
+            On iPhone, tap Share in Safari → Add to Home Screen, then open
+            the app from your home screen and try again.
+          </p>
         )}
 
         {/* Reminder rules */}
