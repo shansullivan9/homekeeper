@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { isBefore, startOfDay, endOfDay, addDays, endOfMonth, subDays } from 'date-fns';
 import TaskCard from '@/components/tasks/TaskCard';
@@ -7,15 +7,99 @@ import SuggestionBanner from '@/components/dashboard/SuggestionBanner';
 import PageHeader from '@/components/layout/PageHeader';
 import { useRouter } from 'next/navigation';
 import { useAppInit } from '@/hooks/useAppInit';
-import { Home as HomeIcon, Users, ChevronRight, Package, Clock3, Banknote, FileText, BarChart3 } from 'lucide-react';
+import { Home as HomeIcon, Users, ChevronRight, ChevronUp, ChevronDown, Package, Clock3, Banknote, FileText, BarChart3 } from 'lucide-react';
 
 type ClaimFilter = 'all' | 'unclaimed' | 'mine' | 'theirs';
+
+// Quick-link items — single source of truth. Default presentation
+// is alphabetical by label; user can override via Edit mode and the
+// chosen order persists in localStorage scoped to the signed-in user.
+const QUICK_LINKS = [
+  { label: 'Appliances & Systems', icon: Package, href: '/appliances', color: 'text-purple-500' },
+  { label: 'Documents', icon: FileText, href: '/documents', color: 'text-sky-500' },
+  { label: 'Expenses', icon: Banknote, href: '/expenses', color: 'text-emerald-500' },
+  { label: 'Home Profile', icon: HomeIcon, href: '/home-profile', color: 'text-brand-500' },
+  { label: 'Home Timeline', icon: Clock3, href: '/timeline', color: 'text-amber-500' },
+  { label: 'Annual Report', icon: BarChart3, href: '/reports', color: 'text-rose-500' },
+] as const;
+
+const linkOrderKey = (uid: string | null | undefined) =>
+  `hk:dashboard-quick-links-order:${uid || 'anon'}`;
 
 export default function DashboardPage() {
   const { tasks, home, user, members, history, appliances, documents } = useStore();
   const { loadData } = useAppInit();
   const router = useRouter();
   const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
+
+  // null = use alphabetical default; array of hrefs = custom user order.
+  // Only hrefs that exist in QUICK_LINKS are honored, and any hrefs added
+  // to QUICK_LINKS after a user customized get appended alphabetically.
+  const [linkOrder, setLinkOrder] = useState<string[] | null>(null);
+  const [editingLinks, setEditingLinks] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(linkOrderKey(user?.id));
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr) && arr.every((x) => typeof x === 'string')) {
+          setLinkOrder(arr);
+          return;
+        }
+      }
+      setLinkOrder(null);
+    } catch {
+      setLinkOrder(null);
+    }
+  }, [user?.id]);
+
+  const orderedLinks = useMemo(() => {
+    const alpha = [...QUICK_LINKS].sort((a, b) =>
+      a.label.localeCompare(b.label)
+    );
+    if (!linkOrder) return alpha;
+    const byHref = new Map<string, (typeof QUICK_LINKS)[number]>(
+      QUICK_LINKS.map((l) => [l.href as string, l])
+    );
+    const seen = new Set<string>();
+    const result: typeof alpha = [];
+    for (const href of linkOrder) {
+      const found = byHref.get(href);
+      if (found && !seen.has(href)) {
+        result.push(found);
+        seen.add(href);
+      }
+    }
+    // Append any links not in the saved order, alphabetically.
+    for (const link of alpha) {
+      if (!seen.has(link.href)) result.push(link);
+    }
+    return result;
+  }, [linkOrder]);
+
+  const persistOrder = (next: string[] | null) => {
+    setLinkOrder(next);
+    if (typeof window === 'undefined') return;
+    try {
+      const key = linkOrderKey(user?.id);
+      if (next === null) localStorage.removeItem(key);
+      else localStorage.setItem(key, JSON.stringify(next));
+    } catch {
+      /* localStorage may be disabled — UI still works in-memory */
+    }
+  };
+
+  const moveLink = (idx: number, dir: -1 | 1) => {
+    const target = idx + dir;
+    if (target < 0 || target >= orderedLinks.length) return;
+    const hrefs = orderedLinks.map((l) => l.href);
+    [hrefs[idx], hrefs[target]] = [hrefs[target], hrefs[idx]];
+    persistOrder(hrefs);
+  };
+
+  const resetLinkOrder = () => persistOrder(null);
 
   const activeTasks = useMemo(() => {
     return tasks.filter((t) => t.status !== 'completed' && t.status !== 'skipped' && !t.is_suggestion);
@@ -227,33 +311,88 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Quick Links — only on the unfiltered view */}
+        {/* Quick Links — only on the unfiltered view. Alphabetical
+            by default; long-tap or hit Edit to reorder. */}
         {claimFilter === 'all' && (
           <div className="mx-4 mb-4">
-            <div className="ios-card overflow-hidden">
-              {[
-                { label: 'Appliances & Systems', icon: Package, href: '/appliances', color: 'text-purple-500', count: appliances.length },
-                { label: 'Documents', icon: FileText, href: '/documents', color: 'text-sky-500', count: documents.length },
-                { label: 'Expenses', icon: Banknote, href: '/expenses', color: 'text-emerald-500', count: null as number | null },
-                { label: 'Home Profile', icon: HomeIcon, href: '/home-profile', color: 'text-brand-500', count: null as number | null },
-                { label: 'Home Timeline', icon: Clock3, href: '/timeline', color: 'text-amber-500', count: null as number | null },
-                { label: 'Annual Report', icon: BarChart3, href: '/reports', color: 'text-rose-500', count: null as number | null },
-              ].map(({ label, icon: Icon, href, color, count }) => (
-                <button key={href} onClick={() => router.push(href)} className="ios-list-item w-full">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center ${color}`}>
-                      <Icon size={18} />
-                    </div>
-                    <span className="text-[15px] font-medium">{label}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {count !== null && count > 0 && (
-                      <span className="text-xs text-ink-tertiary tabular-nums">{count}</span>
-                    )}
-                    <ChevronRight size={16} className="text-ink-tertiary" />
-                  </div>
+            <div className="flex items-center justify-end gap-3 mb-1.5 px-1">
+              {editingLinks && linkOrder && (
+                <button
+                  onClick={resetLinkOrder}
+                  className="text-xs font-medium text-ink-tertiary md:hover:text-ink-secondary"
+                >
+                  Reset
                 </button>
-              ))}
+              )}
+              <button
+                onClick={() => setEditingLinks((v) => !v)}
+                className="text-xs font-semibold text-brand-500"
+              >
+                {editingLinks ? 'Done' : 'Edit'}
+              </button>
+            </div>
+            <div className="ios-card overflow-hidden">
+              {orderedLinks.map((link, idx) => {
+                const Icon = link.icon;
+                const count =
+                  link.href === '/appliances'
+                    ? appliances.length
+                    : link.href === '/documents'
+                    ? documents.length
+                    : null;
+                const isFirst = idx === 0;
+                const isLast = idx === orderedLinks.length - 1;
+                if (editingLinks) {
+                  return (
+                    <div key={link.href} className="ios-list-item w-full">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center ${link.color}`}>
+                          <Icon size={18} />
+                        </div>
+                        <span className="text-[15px] font-medium">{link.label}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => moveLink(idx, -1)}
+                          disabled={isFirst}
+                          aria-label={`Move ${link.label} up`}
+                          className="w-8 h-8 rounded-md flex items-center justify-center text-ink-secondary disabled:opacity-30 active:bg-surface-tertiary"
+                        >
+                          <ChevronUp size={18} />
+                        </button>
+                        <button
+                          onClick={() => moveLink(idx, 1)}
+                          disabled={isLast}
+                          aria-label={`Move ${link.label} down`}
+                          className="w-8 h-8 rounded-md flex items-center justify-center text-ink-secondary disabled:opacity-30 active:bg-surface-tertiary"
+                        >
+                          <ChevronDown size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <button
+                    key={link.href}
+                    onClick={() => router.push(link.href)}
+                    className="ios-list-item w-full"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center ${link.color}`}>
+                        <Icon size={18} />
+                      </div>
+                      <span className="text-[15px] font-medium">{link.label}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {count !== null && count > 0 && (
+                        <span className="text-xs text-ink-tertiary tabular-nums">{count}</span>
+                      )}
+                      <ChevronRight size={16} className="text-ink-tertiary" />
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
