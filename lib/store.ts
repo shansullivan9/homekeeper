@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Profile, Home, Task, Category, Appliance, TaskHistory, HomeMember, Document } from './types';
+import { Profile, Home, Task, Category, Appliance, TaskHistory, HomeMember, Document, Contractor } from './types';
 
 interface AppState {
   user: Profile | null;
@@ -10,6 +10,7 @@ interface AppState {
   appliances: Appliance[];
   history: TaskHistory[];
   documents: Document[];
+  contractors: Contractor[];
   /**
    * Lower-cased suggestion titles the user has dismissed for this home.
    * The dashboard's SuggestionBanner uses this to keep dismissed
@@ -31,6 +32,7 @@ interface AppState {
   setAppliances: (appliances: Appliance[]) => void;
   setHistory: (history: TaskHistory[]) => void;
   setDocuments: (documents: Document[]) => void;
+  setContractors: (contractors: Contractor[]) => void;
   setDismissedSuggestions: (titles: string[]) => void;
   setUserMemberships: (memberships: HomeMember[]) => void;
   setLoading: (loading: boolean) => void;
@@ -48,6 +50,7 @@ export const useStore = create<AppState>((set) => ({
   appliances: [],
   history: [],
   documents: [],
+  contractors: [],
   dismissedSuggestions: [],
   userMemberships: [],
   loading: true,
@@ -59,6 +62,7 @@ export const useStore = create<AppState>((set) => ({
   setAppliances: (appliances) => set({ appliances }),
   setHistory: (history) => set({ history }),
   setDocuments: (documents) => set({ documents }),
+  setContractors: (contractors) => set({ contractors }),
   setDismissedSuggestions: (titles) => set({ dismissedSuggestions: titles }),
   setUserMemberships: (memberships) => set({ userMemberships: memberships }),
   setLoading: (loading) => set({ loading }),
