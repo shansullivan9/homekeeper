@@ -48,15 +48,17 @@ function InlineCalendar({
         <button
           type="button"
           onClick={() => setMonth(subMonths(month, 1))}
-          className="p-1.5 text-ink-secondary active:text-brand-500"
+          aria-label="Previous month"
+          className="w-8 h-8 rounded-full text-ink-secondary active:text-brand-500 active:bg-gray-100 active:scale-95 md:hover:bg-gray-100 transition-all flex items-center justify-center"
         >
           <ChevronLeft size={18} />
         </button>
-        <span className="text-sm font-semibold">{format(month, 'MMMM yyyy')}</span>
+        <span className="text-body font-bold tracking-[-0.01em]">{format(month, 'MMMM yyyy')}</span>
         <button
           type="button"
           onClick={() => setMonth(addMonths(month, 1))}
-          className="p-1.5 text-ink-secondary active:text-brand-500"
+          aria-label="Next month"
+          className="w-8 h-8 rounded-full text-ink-secondary active:text-brand-500 active:bg-gray-100 active:scale-95 md:hover:bg-gray-100 transition-all flex items-center justify-center"
         >
           <ChevronRight size={18} />
         </button>
@@ -81,12 +83,12 @@ function InlineCalendar({
               type="button"
               disabled={disabled}
               onClick={() => onChange(dateStr)}
-              className={`relative flex items-center justify-center py-2 rounded-lg text-sm transition-colors ${
+              className={`relative flex items-center justify-center py-2 rounded-lg text-sm font-semibold transition-all active:scale-[0.94] ${
                 isSelected
-                  ? 'bg-brand-500 text-white font-semibold'
+                  ? 'bg-gradient-hero text-white shadow-card'
                   : today
-                  ? 'bg-brand-50 text-brand-600 font-semibold'
-                  : 'active:bg-gray-100'
+                  ? 'bg-brand-50 text-brand-600 ring-1 ring-brand-200'
+                  : 'text-ink-primary active:bg-gray-100 md:hover:bg-gray-100'
               } ${!inMonth ? 'opacity-30' : ''} ${disabled ? 'opacity-30 cursor-not-allowed' : ''}`}
             >
               {format(day, 'd')}
@@ -353,7 +355,18 @@ function AddTaskForm() {
     if (!title.trim() || !home) return;
     setSaving(true);
 
-    const completedAtIso = isCompleted && completedOn ? `${completedOn}T12:00:00Z` : null;
+    // For "already done" logs we have a date but no time. Default to
+    // LOCAL noon (then convert to ISO/UTC) so the History row reads
+    // "12:00 PM" in the user's own zone, instead of UTC noon which
+    // would render as 8 AM EDT or 5 AM PDT — odd-looking precision
+    // for an entry the user just dated, not timestamped.
+    const completedAtIso = (() => {
+      if (!isCompleted || !completedOn) return null;
+      const [y, m, d] = completedOn.split('-').map((n) => parseInt(n, 10));
+      // Date constructor with explicit args uses local time; toISOString
+      // converts to UTC for storage in the timestamp-with-tz column.
+      return new Date(y, m - 1, d, 12, 0, 0).toISOString();
+    })();
 
     const payload: any = {
       home_id: home.id,

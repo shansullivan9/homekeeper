@@ -8,7 +8,7 @@ import { format, parseISO } from 'date-fns';
 import { CheckCircle2, Search, RotateCcw, RotateCw, Trash2, StickyNote } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { formatCurrency } from '@/lib/constants';
+import { formatCurrency, recurrenceFromTitle } from '@/lib/constants';
 import { confirm } from '@/lib/confirm';
 import { useStoredState } from '@/lib/useStoredState';
 
@@ -18,9 +18,16 @@ export default function HistoryPage() {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useStoredState<'recent' | 'oldest' | 'cost-desc' | 'category'>(
+  const [sortBy, setSortBy] = useStoredState<'recent' | 'oldest' | 'cost-desc'>(
     'history.sortBy',
     'recent',
+    user?.id
+  );
+  // Category filter — picks a single category to narrow the list, or
+  // 'all' for no filter. Persisted per user just like the sort.
+  const [categoryFilter, setCategoryFilter] = useStoredState<string>(
+    'history.categoryFilter',
+    'all',
     user?.id
   );
 
@@ -148,7 +155,12 @@ export default function HistoryPage() {
     setBusyId(h.id);
     try {
       const source = h.task_id ? tasks.find((t) => t.id === h.task_id) : null;
-      const recurrence = (source as any)?.recurrence || 'one_time';
+      // Prefer the source task's saved recurrence; if the source was
+      // already deleted, fall back to inferring from the title (so
+      // "Annual Termite Inspection" still schedules a year out even
+      // when the original row is gone).
+      const recurrence =
+        (source as any)?.recurrence || recurrenceFromTitle(h.title) || 'one_time';
       const offsetDays: Record<string, number> = {
         weekly: 7,
         monthly: 30,
@@ -230,6 +242,28 @@ export default function HistoryPage() {
     }
   };
 
+  // Distinct category names that appear in history, sorted alphabetically
+  // and tagged with their counts so the filter chips can show "Cleaning · 3".
+  const categoryOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    let uncategorized = 0;
+    for (const h of history) {
+      const name = h.category_name?.trim();
+      if (!name) {
+        uncategorized += 1;
+        continue;
+      }
+      counts.set(name, (counts.get(name) || 0) + 1);
+    }
+    const arr = Array.from(counts.entries())
+      .map(([name, count]) => ({ key: name, label: name, count }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+    if (uncategorized > 0) {
+      arr.push({ key: '__uncategorized__', label: 'Uncategorized', count: uncategorized });
+    }
+    return arr;
+  }, [history]);
+
   const filtered = useMemo(() => {
     const base = !search.trim()
       ? history
@@ -242,22 +276,26 @@ export default function HistoryPage() {
             h.notes?.toLowerCase().includes(q)
           );
         });
+    // Apply the category filter (set by the chip rail).
+    const afterCategory =
+      categoryFilter === 'all'
+        ? base
+        : categoryFilter === '__uncategorized__'
+        ? base.filter((h) => !h.category_name?.trim())
+        : base.filter(
+            (h) =>
+              (h.category_name || '').trim().toLowerCase() ===
+              categoryFilter.toLowerCase()
+          );
     // Apply the selected sort. Fall through to "recent" for unknown
     // values so a stale URL/state never lands on an empty list.
-    const sorted = [...base];
+    const sorted = [...afterCategory];
     if (sortBy === 'oldest') {
       sorted.sort(
         (a, b) => parseISO(a.completed_at).getTime() - parseISO(b.completed_at).getTime()
       );
     } else if (sortBy === 'cost-desc') {
       sorted.sort((a, b) => (b.cost || 0) - (a.cost || 0));
-    } else if (sortBy === 'category') {
-      sorted.sort((a, b) => {
-        const ca = (a.category_name || '~').toLowerCase();
-        const cb = (b.category_name || '~').toLowerCase();
-        if (ca !== cb) return ca.localeCompare(cb);
-        return parseISO(b.completed_at).getTime() - parseISO(a.completed_at).getTime();
-      });
     } else {
       // recent
       sorted.sort(
@@ -265,12 +303,12 @@ export default function HistoryPage() {
       );
     }
     return sorted;
-  }, [history, search, sortBy]);
+  }, [history, search, sortBy, categoryFilter]);
 
   // Month grouping only makes sense for the chronological sorts.
   const grouped = useMemo(() => {
     if (sortBy !== 'recent' && sortBy !== 'oldest') {
-      return { '': filtered };
+      return { '': filtered } as Record<string, typeof history>;
     }
     const groups: Record<string, typeof history> = {};
     filtered.forEach((h) => {
@@ -303,15 +341,14 @@ export default function HistoryPage() {
             className="ios-input pl-9"
           />
         </div>
-        {/* Sort chips — chronology by default, with cost/category for
-            quick auditing. Skipping when there's nothing to sort. */}
+        {/* Sort chips. Category became a real filter (below) — these
+            three are pure ordering options. */}
         {history.length > 1 && (
           <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4">
             {([
               { key: 'recent', label: 'Recent' },
               { key: 'oldest', label: 'Oldest' },
               { key: 'cost-desc', label: 'Cost' },
-              { key: 'category', label: 'Category' },
             ] as const).map(({ key, label }) => (
               <button
                 key={key}
@@ -325,6 +362,40 @@ export default function HistoryPage() {
                 {label}
               </button>
             ))}
+          </div>
+        )}
+        {/* Category filter — narrows the visible list to a single
+            category. Only renders when there are at least two distinct
+            categories present, so a fresh account doesn't see a noisy
+            empty rail. */}
+        {categoryOptions.length > 1 && (
+          <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4 pt-1">
+            <button
+              onClick={() => setCategoryFilter('all')}
+              className={`px-3 py-1.5 rounded-full text-caption font-semibold whitespace-nowrap transition-all active:scale-95 ${
+                categoryFilter === 'all'
+                  ? 'bg-brand-50 text-brand-600 ring-1 ring-brand-200'
+                  : 'bg-white text-ink-secondary shadow-card md:hover:bg-gray-50 active:bg-gray-50'
+              }`}
+            >
+              All categories
+            </button>
+            {categoryOptions.map((c) => {
+              const active = categoryFilter === c.key;
+              return (
+                <button
+                  key={c.key}
+                  onClick={() => setCategoryFilter(c.key)}
+                  className={`px-3 py-1.5 rounded-full text-caption font-semibold whitespace-nowrap transition-all active:scale-95 ${
+                    active
+                      ? 'bg-brand-50 text-brand-600 ring-1 ring-brand-200'
+                      : 'bg-white text-ink-secondary shadow-card md:hover:bg-gray-50 active:bg-gray-50'
+                  }`}
+                >
+                  {c.label} <span className="opacity-75">· {c.count}</span>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

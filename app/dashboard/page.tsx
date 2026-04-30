@@ -144,6 +144,22 @@ export default function DashboardPage() {
       else if (isBefore(d, sixWeeksOut)) upcoming.push(t);
       else later.push(t);
     }
+    // Sort each bucket by due date ascending so the most-imminent tasks
+    // surface first within their section. Overdue is sorted oldest →
+    // newest (most overdue at the top so it can't be missed). Tasks
+    // without a due date land last, alphabetically.
+    const byDueAsc = (a: any, b: any) =>
+      (a.due_date || '￿').localeCompare(b.due_date || '￿');
+    overdue.sort(byDueAsc);
+    dueThisWeek.sort(byDueAsc);
+    dueThisMonth.sort(byDueAsc);
+    upcoming.sort(byDueAsc);
+    later.sort((a, b) => {
+      if (a.due_date && b.due_date) return byDueAsc(a, b);
+      if (a.due_date) return -1;
+      if (b.due_date) return 1;
+      return (a.title || '').localeCompare(b.title || '');
+    });
     return { overdue, dueThisWeek, dueThisMonth, upcoming, later };
   }, [filteredTasks, now, weekEnd, monthEnd, sixWeeksOut]);
 
@@ -565,10 +581,18 @@ export default function DashboardPage() {
             it stays visible even when active buckets are empty. */}
         {recentlyCompleted.length > 0 && (
           <div>
-            <p className="section-header">
-              <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#8E8E93' }} />
-              Recently Completed ({recentlyCompleted.length})
-            </p>
+            <div className="section-header flex items-center justify-between !pr-2">
+              <span className="flex items-center">
+                <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#8E8E93' }} />
+                Recently Completed ({recentlyCompleted.length})
+              </span>
+              <button
+                onClick={() => router.push('/history')}
+                className="text-brand-500 text-caption font-semibold normal-case tracking-normal active:text-brand-600 md:hover:text-brand-600"
+              >
+                View all
+              </button>
+            </div>
             <div className="mx-4 ios-card overflow-hidden">
               {recentlyCompleted.map((t) => (
                 <TaskCard key={t.id} task={t} compact sectionColor="#8E8E93" />
