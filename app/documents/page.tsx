@@ -78,6 +78,7 @@ export default function DocumentsPage() {
   const [editMode, setEditMode] = useState(true);
   const [filter, setFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name' | 'category'>('newest');
   const [uploading, setUploading] = useState(false);
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
@@ -1025,8 +1026,32 @@ export default function DocumentsPage() {
         return words.every((w) => haystack.includes(w));
       });
     }
-    return list;
-  }, [documents, filter, search]);
+    // Apply selected sort. Defaults to newest first which matches what
+    // the page used to show implicitly (documents are loaded ordered).
+    const sorted = [...list];
+    const ts = (d: Document) => {
+      const t = (d as any).created_at || (d as any).updated_at;
+      return t ? new Date(t).getTime() : 0;
+    };
+    if (sortBy === 'oldest') {
+      sorted.sort((a, b) => ts(a) - ts(b));
+    } else if (sortBy === 'name') {
+      sorted.sort((a, b) =>
+        (a.title || a.file_name || '').localeCompare(b.title || b.file_name || '')
+      );
+    } else if (sortBy === 'category') {
+      sorted.sort((a, b) => {
+        const ca = (a.category || '~').toLowerCase();
+        const cb = (b.category || '~').toLowerCase();
+        if (ca !== cb) return ca.localeCompare(cb);
+        return ts(b) - ts(a);
+      });
+    } else {
+      // newest
+      sorted.sort((a, b) => ts(b) - ts(a));
+    }
+    return sorted;
+  }, [documents, filter, search, sortBy]);
 
   const activeChips = useMemo(() => {
     const others = Object.keys(categoryCounts)
@@ -1309,26 +1334,53 @@ export default function DocumentsPage() {
       )}
 
       {documents.length > 0 && (
-        <div className="px-4 pb-2 flex gap-2 overflow-x-auto no-scrollbar">
-          {activeChips.map((key) => {
-            const label = key === 'all' ? 'All' : key;
-            const count = categoryCounts[key] || 0;
-            const active = filter === key;
-            return (
-              <button
-                key={key}
-                onClick={() => setFilter(key)}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
-                  active
-                    ? 'bg-brand-500 text-white'
-                    : 'bg-gray-100 text-ink-secondary active:bg-gray-200'
-                }`}
-              >
-                {label} {count > 0 && <span className="opacity-75">· {count}</span>}
-              </button>
-            );
-          })}
-        </div>
+        <>
+          <div className="px-4 pb-2 flex gap-2 overflow-x-auto no-scrollbar">
+            {activeChips.map((key) => {
+              const label = key === 'all' ? 'All' : key;
+              const count = categoryCounts[key] || 0;
+              const active = filter === key;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setFilter(key)}
+                  className={`px-3 py-1.5 rounded-full text-caption font-semibold whitespace-nowrap transition-all active:scale-95 ${
+                    active
+                      ? 'bg-brand-500 text-white shadow-card'
+                      : 'bg-white text-ink-secondary shadow-card md:hover:bg-gray-50 active:bg-gray-50'
+                  }`}
+                >
+                  {label} {count > 0 && <span className="opacity-75">· {count}</span>}
+                </button>
+              );
+            })}
+          </div>
+          {documents.length > 1 && (
+            <div className="px-4 pb-2 flex items-center gap-2 text-micro text-ink-tertiary">
+              <span className="font-semibold uppercase tracking-wider">Sort</span>
+              <div className="flex gap-1">
+                {([
+                  { key: 'newest', label: 'Newest' },
+                  { key: 'oldest', label: 'Oldest' },
+                  { key: 'name', label: 'Name' },
+                  { key: 'category', label: 'Category' },
+                ] as const).map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setSortBy(key)}
+                    className={`px-2.5 py-1 rounded-full text-caption font-medium transition-colors ${
+                      sortBy === key
+                        ? 'bg-brand-50 text-brand-600'
+                        : 'text-ink-secondary md:hover:bg-gray-100 active:bg-gray-100'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <div className="py-2">

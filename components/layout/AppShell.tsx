@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import BottomNav from '@/components/layout/BottomNav';
 import SideNav from '@/components/layout/SideNav';
 import ConfirmDialogHost from '@/components/ui/ConfirmDialog';
+import CommandPalette from '@/components/ui/CommandPalette';
 import { useRealtimeHome } from '@/hooks/useRealtimeHome';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -19,6 +20,32 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // Subscribe to Supabase Realtime once the home is loaded so changes
   // from another device or housemate flow into the local store.
   useRealtimeHome();
+
+  // Global keyboard shortcuts. `n` jumps to the new-task form. We bail
+  // when the user is typing in any input/textarea/contenteditable so
+  // it never hijacks normal keystrokes. Cmd+K is owned by the
+  // CommandPalette component itself.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.key === 'n' || e.key === 'N') {
+        e.preventDefault();
+        router.push('/add-task');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [router]);
 
   useEffect(() => {
     async function init() {
@@ -219,6 +246,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       </main>
       <BottomNav />
       <ConfirmDialogHost />
+      <CommandPalette />
     </div>
   );
 }

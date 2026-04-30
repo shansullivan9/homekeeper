@@ -12,8 +12,10 @@ import {
   FileText,
   Banknote,
   Clock3,
+  Search as SearchIcon,
 } from 'lucide-react';
 import QuickAddMenu from '@/components/layout/QuickAddMenu';
+import { useCommandStore } from '@/components/ui/CommandPalette';
 
 const primaryTabs = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -34,6 +36,7 @@ export default function SideNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const openPalette = useCommandStore((s) => s.setOpen);
 
   const renderTab = (tab: { href: string; label: string; icon: any }) => {
     const Icon = tab.icon;
@@ -69,13 +72,26 @@ export default function SideNav() {
         </div>
       </button>
 
-      <div className="px-3 py-4">
+      <div className="px-3 py-4 space-y-2">
         <button
           onClick={() => setMenuOpen(true)}
           className="w-full flex items-center gap-2 justify-center bg-brand-500 text-white rounded-ios py-2.5 text-[14px] font-semibold shadow-md shadow-brand-500/20 hover:bg-brand-600 transition-colors"
         >
           <PlusCircle size={18} strokeWidth={2.2} />
           New
+        </button>
+        <button
+          onClick={() => openPalette(true)}
+          className="w-full flex items-center gap-2 justify-between px-3 py-2 rounded-ios bg-surface-secondary text-ink-secondary hover:bg-surface-tertiary text-[13px] transition-colors"
+          title="Open command palette"
+        >
+          <span className="flex items-center gap-2">
+            <SearchIcon size={14} />
+            Search
+          </span>
+          <kbd className="font-mono text-[10px] text-ink-tertiary border border-gray-300 rounded px-1.5 py-0.5">
+            ⌘K
+          </kbd>
         </button>
       </div>
 

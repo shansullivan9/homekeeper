@@ -17,6 +17,7 @@ export default function HistoryPage() {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<'recent' | 'oldest' | 'cost-desc' | 'category'>('recent');
 
   // Some history rows were written before category_name was being saved
   // properly, so fall back to the linked task's category if available.
@@ -161,18 +162,47 @@ export default function HistoryPage() {
   };
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return history;
-    const q = search.toLowerCase();
-    return history.filter(
-      (h) =>
-        h.title.toLowerCase().includes(q) ||
-        h.category_name?.toLowerCase().includes(q) ||
-        h.completed_by_name?.toLowerCase().includes(q) ||
-        h.notes?.toLowerCase().includes(q)
-    );
-  }, [history, search]);
+    const base = !search.trim()
+      ? history
+      : history.filter((h) => {
+          const q = search.toLowerCase();
+          return (
+            h.title.toLowerCase().includes(q) ||
+            h.category_name?.toLowerCase().includes(q) ||
+            h.completed_by_name?.toLowerCase().includes(q) ||
+            h.notes?.toLowerCase().includes(q)
+          );
+        });
+    // Apply the selected sort. Fall through to "recent" for unknown
+    // values so a stale URL/state never lands on an empty list.
+    const sorted = [...base];
+    if (sortBy === 'oldest') {
+      sorted.sort(
+        (a, b) => parseISO(a.completed_at).getTime() - parseISO(b.completed_at).getTime()
+      );
+    } else if (sortBy === 'cost-desc') {
+      sorted.sort((a, b) => (b.cost || 0) - (a.cost || 0));
+    } else if (sortBy === 'category') {
+      sorted.sort((a, b) => {
+        const ca = (a.category_name || '~').toLowerCase();
+        const cb = (b.category_name || '~').toLowerCase();
+        if (ca !== cb) return ca.localeCompare(cb);
+        return parseISO(b.completed_at).getTime() - parseISO(a.completed_at).getTime();
+      });
+    } else {
+      // recent
+      sorted.sort(
+        (a, b) => parseISO(b.completed_at).getTime() - parseISO(a.completed_at).getTime()
+      );
+    }
+    return sorted;
+  }, [history, search, sortBy]);
 
+  // Month grouping only makes sense for the chronological sorts.
   const grouped = useMemo(() => {
+    if (sortBy !== 'recent' && sortBy !== 'oldest') {
+      return { '': filtered };
+    }
     const groups: Record<string, typeof history> = {};
     filtered.forEach((h) => {
       const key = format(parseISO(h.completed_at), 'MMMM yyyy');
@@ -180,7 +210,7 @@ export default function HistoryPage() {
       groups[key].push(h);
     });
     return groups;
-  }, [filtered]);
+  }, [filtered, sortBy]);
 
   return (
     <div>
@@ -193,7 +223,7 @@ export default function HistoryPage() {
         }
       />
 
-      <div className="px-4 pt-3 pb-2 md:max-w-md">
+      <div className="px-4 pt-3 pb-2 md:max-w-md space-y-2">
         <div className="relative">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-tertiary" />
           <input
@@ -204,11 +234,35 @@ export default function HistoryPage() {
             className="ios-input pl-9"
           />
         </div>
+        {/* Sort chips — chronology by default, with cost/category for
+            quick auditing. Skipping when there's nothing to sort. */}
+        {history.length > 1 && (
+          <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4">
+            {([
+              { key: 'recent', label: 'Recent' },
+              { key: 'oldest', label: 'Oldest' },
+              { key: 'cost-desc', label: 'Cost' },
+              { key: 'category', label: 'Category' },
+            ] as const).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setSortBy(key)}
+                className={`px-3 py-1.5 rounded-full text-caption font-semibold whitespace-nowrap transition-all active:scale-95 ${
+                  sortBy === key
+                    ? 'bg-brand-500 text-white shadow-card'
+                    : 'bg-white text-ink-secondary shadow-card md:hover:bg-gray-50 active:bg-gray-50'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {Object.entries(grouped).map(([month, items]) => (
-        <div key={month}>
-          <p className="section-header">{month}</p>
+        <div key={month || 'all'}>
+          {month && <p className="section-header">{month}</p>}
           <div className="mx-4 ios-card overflow-hidden">
             {items.map((h) => (
               <div key={h.id} className="ios-list-item">

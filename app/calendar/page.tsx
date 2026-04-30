@@ -1,5 +1,5 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import PageHeader from '@/components/layout/PageHeader';
@@ -9,6 +9,7 @@ import { sectionColorForTask, SECTION_COLORS } from '@/lib/constants';
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday,
+  addDays, subDays, addWeeks, subWeeks,
 } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -18,6 +19,39 @@ export default function CalendarPage() {
   const router = useRouter();
   const { tasks } = useStore();
   const { loadData } = useAppInit();
+
+  // Keyboard navigation: arrow keys move the selection one day or
+  // one week at a time, T jumps to today. Ignored while focus is in
+  // any input so it never hijacks normal typing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      let next: Date | null = null;
+      if (e.key === 'ArrowLeft') next = subDays(selectedDate, 1);
+      else if (e.key === 'ArrowRight') next = addDays(selectedDate, 1);
+      else if (e.key === 'ArrowUp') next = subWeeks(selectedDate, 1);
+      else if (e.key === 'ArrowDown') next = addWeeks(selectedDate, 1);
+      else if (e.key === 't' || e.key === 'T') next = new Date();
+      if (!next) return;
+      e.preventDefault();
+      setSelectedDate(next);
+      // If the new selection drifts into a different month, slide
+      // the visible grid along with it.
+      if (!isSameMonth(next, currentMonth)) setCurrentMonth(next);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedDate, currentMonth]);
 
   const activeTasks = tasks.filter((t) => t.status !== 'completed' && t.status !== 'skipped' && !t.is_suggestion);
   const completedTasks = tasks.filter((t) => t.status === 'completed' && !t.is_suggestion);
