@@ -6,6 +6,7 @@ import PageHeader from '@/components/layout/PageHeader';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { ExternalLink, ChevronDown } from 'lucide-react';
+import { confirm } from '@/lib/confirm';
 
 // Native <select> always shows the option's full text once chosen, so we
 // build a small custom dropdown: closed state shows just the 2-letter
@@ -140,12 +141,18 @@ export default function HomeProfilePage() {
     setDirty(true);
   };
 
-  const confirmBack = () => {
+  const confirmBack = async () => {
     if (!dirty || !editMode) {
       router.back();
       return;
     }
-    if (confirm('Discard changes? Anything you edited will be lost.')) {
+    const ok = await confirm({
+      title: 'Discard changes?',
+      message: 'Anything you edited will be lost.',
+      confirmLabel: 'Discard',
+      destructive: true,
+    });
+    if (ok) {
       router.back();
     }
   };

@@ -14,6 +14,7 @@ import {
   parseISO,
 } from 'date-fns';
 import toast from 'react-hot-toast';
+import { confirm } from '@/lib/confirm';
 
 function InlineCalendar({
   value,
@@ -150,12 +151,18 @@ function AddTaskForm() {
     setDirty(hasContent);
   }, [title, notes, estimatedMinutes, estimatedCost, categoryId, assignedTo, applianceId, dueDate, completedOn, isCompleted, recurrence, priority, editMode, editId]);
 
-  const confirmBack = () => {
+  const confirmBack = async () => {
     if (!dirty) {
       router.back();
       return;
     }
-    if (confirm('Discard changes? Anything you typed will be lost.')) {
+    const ok = await confirm({
+      title: 'Discard changes?',
+      message: "Anything you typed will be lost.",
+      confirmLabel: 'Discard',
+      destructive: true,
+    });
+    if (ok) {
       router.back();
     }
   };
@@ -429,7 +436,12 @@ function AddTaskForm() {
 
   const handleDelete = async () => {
     if (!editId) return;
-    if (!confirm('Delete this task?')) return;
+    const ok = await confirm({
+      title: 'Delete this task?',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
 
     const { error } = await supabase.from('tasks').delete().eq('id', editId);
     if (error) {

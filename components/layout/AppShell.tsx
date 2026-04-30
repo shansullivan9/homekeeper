@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import { useRouter, usePathname } from 'next/navigation';
 import BottomNav from '@/components/layout/BottomNav';
 import SideNav from '@/components/layout/SideNav';
+import ConfirmDialogHost from '@/components/ui/ConfirmDialog';
 import { useRealtimeHome } from '@/hooks/useRealtimeHome';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -187,6 +188,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </main>
       <BottomNav />
+      <ConfirmDialogHost />
     </div>
   );
 }

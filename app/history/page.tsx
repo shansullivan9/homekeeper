@@ -9,6 +9,7 @@ import { CheckCircle2, Search, RotateCcw, Trash2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { formatCurrency } from '@/lib/constants';
+import { confirm } from '@/lib/confirm';
 
 export default function HistoryPage() {
   const { history, tasks, categories, setHistory, setTasks } = useStore();
@@ -40,10 +41,19 @@ export default function HistoryPage() {
             !t.is_suggestion &&
             t.title.trim().toLowerCase() === h.title.trim().toLowerCase()
         );
-    const promptMsg = futureSibling
-      ? `"${h.title}" already has an upcoming occurrence. Just delete this history entry instead?`
-      : `Mark "${h.title}" as not completed? It will go back to your task list.`;
-    if (!confirm(promptMsg)) return;
+    const ok = futureSibling
+      ? await confirm({
+          title: `"${h.title}" already has an upcoming occurrence`,
+          message: 'Delete this history entry instead?',
+          confirmLabel: 'Delete Entry',
+          destructive: true,
+        })
+      : await confirm({
+          title: `Mark "${h.title}" as not completed?`,
+          message: 'It will go back to your task list.',
+          confirmLabel: 'Mark Pending',
+        });
+    if (!ok) return;
     if (futureSibling) {
       return handleDelete(h);
     }
@@ -121,12 +131,13 @@ export default function HistoryPage() {
   };
 
   const handleDelete = async (h: TaskHistory) => {
-    if (
-      !confirm(
-        `Delete this history entry for "${h.title}"? The task itself will also be removed.`
-      )
-    )
-      return;
+    const ok = await confirm({
+      title: `Delete history entry for "${h.title}"?`,
+      message: 'The task itself will also be removed.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
     setBusyId(h.id);
     try {
       const { error: hErr } = await supabase

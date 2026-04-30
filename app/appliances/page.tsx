@@ -8,6 +8,7 @@ import { Appliance } from '@/lib/types';
 import { Plus, X, Package, ChevronRight, FileText } from 'lucide-react';
 import { format, parseISO, isPast, differenceInDays } from 'date-fns';
 import toast from 'react-hot-toast';
+import { confirm } from '@/lib/confirm';
 
 const APPLIANCE_CATEGORIES = [
   'Kitchen',
@@ -229,7 +230,13 @@ export default function AppliancesPage() {
 
   const handleDelete = async () => {
     if (!editing) return;
-    if (!confirm(`Delete "${editing.name}"? This cannot be undone.`)) return;
+    const ok = await confirm({
+      title: `Delete "${editing.name}"?`,
+      message: 'This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) return;
     const { error } = await supabase.from('appliances').delete().eq('id', editing.id);
     if (error) {
       toast.error('Failed to delete');
@@ -291,7 +298,12 @@ export default function AppliancesPage() {
                       e.stopPropagation();
                       e.preventDefault();
                       if (!editing) return;
-                      if (!confirm(`Unlink "${d.title}" from this appliance?`)) return;
+                      const ok = await confirm({
+                        title: `Unlink "${d.title}"?`,
+                        message: 'It stays in Documents — just no longer attached to this appliance.',
+                        confirmLabel: 'Unlink',
+                      });
+                      if (!ok) return;
                       const isManual = manualDocId === d.id;
                       const { error } = await supabase
                         .from('documents')
