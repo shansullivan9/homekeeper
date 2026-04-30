@@ -175,7 +175,7 @@ export default function CommandPalette() {
       className="fixed inset-0 z-[110] flex items-start justify-center pt-[10vh] px-4"
     >
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm animate-fade-in"
+        className="absolute inset-0 bg-black/55 backdrop-blur-md animate-fade-in"
         onClick={() => setOpen(false)}
       />
       <div className="relative w-full max-w-lg bg-white rounded-ios-xl shadow-elevated overflow-hidden animate-scale-in">
