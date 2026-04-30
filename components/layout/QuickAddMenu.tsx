@@ -55,38 +55,43 @@ export default function QuickAddMenu({
 
   return (
     <div
-      className="fixed inset-0 z-[60] bg-black/40 flex items-end md:items-center justify-center p-4 animate-fade-in"
+      className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-end md:items-center justify-center p-4 animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-ios-lg w-full max-w-sm shadow-xl overflow-hidden animate-slide-up"
+        className="bg-white rounded-ios-xl w-full max-w-sm shadow-elevated overflow-hidden animate-slide-up"
         onClick={(e) => e.stopPropagation()}
+        style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-          <p className="text-[15px] font-semibold">Add new</p>
+        {/* Drag handle on mobile so it visually reads as a sheet. */}
+        <div className="flex justify-center pt-2.5 md:hidden">
+          <div className="w-9 h-1 rounded-full bg-gray-300" />
+        </div>
+        <div className="flex items-center justify-between px-4 pt-3 pb-2">
+          <p className="text-title font-semibold">Add new</p>
           <button
             onClick={onClose}
             aria-label="Close add menu"
-            className="p-1 -mr-1 text-ink-tertiary"
+            className="p-1 -mr-1 text-ink-tertiary tap-shrink"
           >
             <X size={20} />
           </button>
         </div>
-        <div className="divide-y divide-gray-50">
+        <div className="px-2 pb-2">
           {items.map((item) => {
             const Icon = item.icon;
             return (
               <button
                 key={item.path}
                 onClick={() => go(item.path)}
-                className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-gray-50 md:hover:bg-gray-50 transition-colors"
+                className="w-full flex items-center gap-3 px-3 py-3 rounded-ios text-left active:bg-gray-50 active:scale-[0.99] md:hover:bg-gray-50 transition-all"
               >
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${item.tone}`}>
-                  <Icon size={18} />
+                <div className={`w-10 h-10 rounded-ios flex items-center justify-center ${item.tone}`}>
+                  <Icon size={20} />
                 </div>
                 <div className="flex-1">
-                  <p className="text-[15px] font-medium">{item.label}</p>
-                  <p className="text-xs text-ink-tertiary">{item.hint}</p>
+                  <p className="text-body font-semibold">{item.label}</p>
+                  <p className="text-caption text-ink-tertiary">{item.hint}</p>
                 </div>
               </button>
             );

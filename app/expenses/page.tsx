@@ -176,11 +176,24 @@ export default function ExpensesPage() {
           ))}
         </div>
 
-        {/* Total */}
-        <div className="mx-4 ios-card p-5 md:p-7 text-center mb-4">
-          <p className="text-xs text-ink-secondary uppercase tracking-wide font-semibold mb-1">Total Spent in {year}</p>
-          <p className="text-3xl md:text-4xl font-bold text-ink-primary">{formatCurrency(yearData.total)}</p>
-          <p className="text-xs text-ink-tertiary mt-1">{yearData.items.length} expenses logged</p>
+        {/* Total — emphasised hero so the year's spend reads instantly. */}
+        <div className="mx-4 mb-4 relative rounded-ios-xl bg-gradient-hero shadow-float overflow-hidden">
+          <div
+            className="absolute -top-16 -right-16 w-56 h-56 rounded-full opacity-25"
+            style={{ background: 'radial-gradient(circle, #ffffff 0%, transparent 70%)' }}
+            aria-hidden="true"
+          />
+          <div className="relative px-6 py-6 md:py-7 text-center">
+            <p className="text-white/80 text-micro font-semibold uppercase tracking-wider mb-1">
+              Total Spent in {year}
+            </p>
+            <p className="text-mega md:text-[42px] font-bold text-white tracking-[-0.03em]">
+              {formatCurrency(yearData.total)}
+            </p>
+            <p className="text-caption text-white/85 mt-1">
+              {yearData.items.length} {yearData.items.length === 1 ? 'expense' : 'expenses'} logged
+            </p>
+          </div>
         </div>
 
         <div className="md:grid md:grid-cols-2 md:gap-6">

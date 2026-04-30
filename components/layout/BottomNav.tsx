@@ -19,7 +19,7 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-lg border-t border-gray-200/60 shadow-nav"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-xl border-t border-gray-200/60 shadow-nav"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 8px)' }}
       aria-label="Primary"
     >
@@ -35,18 +35,18 @@ export default function BottomNav() {
               onClick={() => (isAdd ? setMenuOpen(true) : router.push(tab.href))}
               aria-label={tab.label}
               aria-current={!isAdd && active ? 'page' : undefined}
-              className={`flex flex-col items-center justify-center gap-0.5 flex-1 min-w-[56px] py-1 transition-colors ${
-                isAdd ? '' : active ? 'text-brand-500' : 'text-ink-tertiary'
+              className={`flex flex-col items-center justify-center gap-0.5 flex-1 min-w-[56px] py-1 transition-all active:scale-95 ${
+                isAdd ? '' : active ? 'text-brand-500' : 'text-ink-tertiary md:hover:text-ink-secondary'
               }`}
             >
               {isAdd ? (
-                <div className="w-12 h-12 -mt-5 rounded-full bg-brand-500 flex items-center justify-center shadow-lg shadow-brand-500/30 active:scale-95 transition-transform">
-                  <Icon size={24} className="text-white" strokeWidth={2} />
+                <div className="w-12 h-12 -mt-5 rounded-full bg-gradient-hero flex items-center justify-center shadow-float active:scale-95 transition-transform ring-4 ring-white">
+                  <Icon size={24} className="text-white" strokeWidth={2.2} />
                 </div>
               ) : (
                 <>
-                  <Icon size={22} strokeWidth={active ? 2.2 : 1.6} />
-                  <span className={`text-[10px] leading-none ${active ? 'font-semibold' : 'font-medium'}`}>
+                  <Icon size={22} strokeWidth={active ? 2.4 : 1.6} />
+                  <span className={`text-[10px] leading-none mt-0.5 ${active ? 'font-semibold' : 'font-medium'}`}>
                     {tab.label}
                   </span>
                 </>

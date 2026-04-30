@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '@/lib/store';
-import { isBefore, startOfDay, endOfDay, addDays, endOfMonth, subDays } from 'date-fns';
+import { format, isBefore, startOfDay, endOfDay, addDays, endOfMonth, subDays } from 'date-fns';
 import TaskCard from '@/components/tasks/TaskCard';
 import SuggestionBanner from '@/components/dashboard/SuggestionBanner';
 import PageHeader from '@/components/layout/PageHeader';
@@ -201,10 +201,10 @@ export default function DashboardPage() {
   const FilterChip = ({ value, label, count }: { value: ClaimFilter; label: string; count: number }) => (
     <button
       onClick={() => setClaimFilter(value)}
-      className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
+      className={`px-3.5 py-1.5 rounded-full text-caption font-semibold whitespace-nowrap transition-all active:scale-95 ${
         claimFilter === value
-          ? 'bg-brand-500 text-white'
-          : 'bg-gray-100 text-ink-secondary active:bg-gray-200'
+          ? 'bg-brand-500 text-white shadow-card'
+          : 'bg-white text-ink-secondary shadow-card active:bg-gray-50 md:hover:bg-gray-50'
       }`}
     >
       {label} {count > 0 && <span className="opacity-75">· {count}</span>}
@@ -222,15 +222,15 @@ export default function DashboardPage() {
     later.length === 0;
 
   const emptyState = (
-    <div className="mx-4 mt-6 mb-6 ios-card p-6 text-center">
-      <div className="text-5xl mb-3">🎉</div>
-      <p className="text-lg font-semibold text-ink-primary">
-        {claimFilter === 'all' ? 'All caught up!' : 'Nothing in this view'}
+    <div className="mx-4 mt-6 mb-6 rounded-ios-xl bg-gradient-warm p-7 text-center animate-scale-in">
+      <div className="text-6xl mb-4 animate-scale-in" aria-hidden="true">🎉</div>
+      <p className="text-headline font-bold text-ink-primary tracking-[-0.02em]">
+        {claimFilter === 'all' ? "You're all caught up" : 'Nothing in this view'}
       </p>
-      <p className="text-sm text-ink-secondary mt-1 mb-4">
+      <p className="text-caption text-ink-secondary mt-1.5 mb-5 max-w-sm mx-auto">
         {claimFilter === 'all'
           ? activeTasks.length === 0
-            ? 'No tasks yet. Add one or complete your home profile to get suggestions tailored to your house.'
+            ? 'Add your first task or complete your home profile and we\'ll suggest tasks tailored to your house.'
             : 'You have no pending tasks. Nice work.'
           : 'Try switching filters to see other tasks.'}
       </p>
@@ -238,13 +238,13 @@ export default function DashboardPage() {
         <div className="flex flex-col sm:flex-row gap-2 justify-center">
           <button
             onClick={() => router.push('/add-task')}
-            className="px-4 py-2.5 rounded-ios bg-brand-500 text-white text-sm font-semibold active:bg-brand-600 md:hover:bg-brand-600 transition-colors"
+            className="px-5 py-2.5 rounded-ios bg-brand-500 text-white text-body font-semibold active:bg-brand-600 active:scale-[0.98] md:hover:bg-brand-600 transition-all shadow-card"
           >
             Add a task
           </button>
           <button
             onClick={() => router.push('/home-profile')}
-            className="px-4 py-2.5 rounded-ios bg-brand-50 text-brand-600 text-sm font-semibold active:bg-brand-100 md:hover:bg-brand-100 transition-colors"
+            className="px-5 py-2.5 rounded-ios bg-white/70 backdrop-blur-sm text-brand-600 text-body font-semibold active:bg-white active:scale-[0.98] md:hover:bg-white transition-all"
           >
             Complete home profile
           </button>
@@ -253,48 +253,121 @@ export default function DashboardPage() {
     </div>
   );
 
+  // Time-of-day greeting drives the hero copy. Kept simple — the
+  // home name still anchors identity in the subtitle.
+  const greetingHour = now.getHours();
+  const greeting =
+    greetingHour < 5  ? 'Good evening' :
+    greetingHour < 12 ? 'Good morning' :
+    greetingHour < 18 ? 'Good afternoon' :
+                        'Good evening';
+  const firstName = (user?.display_name || '').trim().split(/\s+/)[0] || '';
+  const dueTodayCount = useMemo(() => {
+    const today = format(now, 'yyyy-MM-dd');
+    return activeTasks.filter((t) => t.due_date === today).length;
+  }, [activeTasks, now]);
+  const spentDisplay =
+    spentThisYear >= 10000
+      ? `$${(spentThisYear / 1000).toFixed(1)}k`
+      : new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
+          maximumFractionDigits: 0,
+        }).format(spentThisYear);
+
   return (
     <div>
       <PageHeader
         title={home?.name || 'HomeKeeper'}
         subtitle={
           claimFilter === 'all'
-            ? `${activeTasks.length} active tasks`
+            ? undefined
             : `${filteredTasks.length} of ${activeTasks.length} active`
         }
         rightAction={
-          <button onClick={() => router.push('/settings')} className="text-brand-500 text-sm font-semibold">
+          <button
+            onClick={() => router.push('/settings')}
+            aria-label="Members and settings"
+            className="text-brand-500 p-1.5 -mr-1.5 rounded-full active:bg-brand-50 md:hover:bg-brand-50 transition-colors"
+          >
             <Users size={22} />
           </button>
         }
       />
 
       <div className="pb-4">
-        {/* Quick Stats — only on the unfiltered view */}
+        {/* Hero — the headline of the dashboard. Greeting + the three
+            numbers users care about (overdue, due today, spent this
+            year). Replaces the older standalone tile row. */}
         {claimFilter === 'all' && (
-          <div className="grid grid-cols-3 gap-3 px-4 pt-4 pb-2">
-            <button onClick={() => router.push('/history')} className="tap-card p-3 md:p-4 text-center">
-              <div className="text-2xl md:text-3xl font-bold text-brand-600">{completedThisYear}</div>
-              <div className="text-[10px] md:text-xs text-ink-secondary font-medium mt-0.5 leading-tight">
-                Tasks Completed<br /><span className="text-ink-tertiary">{currentYear}</span>
+          <div className="mx-4 mt-4 mb-3 animate-scale-in">
+            <div className="relative rounded-ios-xl bg-gradient-hero shadow-float overflow-hidden">
+              {/* Decorative blob to give the hero some depth without
+                  pulling focus from the content. */}
+              <div
+                className="absolute -top-16 -right-16 w-56 h-56 rounded-full opacity-25"
+                style={{ background: 'radial-gradient(circle at center, #ffffff 0%, transparent 70%)' }}
+                aria-hidden="true"
+              />
+              <div className="relative px-5 pt-5 pb-4 md:px-6 md:pt-6 md:pb-5">
+                <p className="text-white/85 text-caption font-medium">
+                  {greeting}{firstName ? `, ${firstName}` : ''}
+                </p>
+                <h2 className="text-white text-display font-bold mt-0.5 leading-tight">
+                  {activeTasks.length === 0
+                    ? "You're all caught up"
+                    : `${activeTasks.length} active task${activeTasks.length === 1 ? '' : 's'}`}
+                </h2>
+
+                <div className="grid grid-cols-3 gap-2 mt-4">
+                  <button
+                    onClick={() => {
+                      // Smooth-scroll to the Overdue section instead of
+                      // routing — the bucket is right below the hero.
+                      if (typeof window !== 'undefined') {
+                        const el = document.getElementById('bucket-overdue');
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
+                    }}
+                    className="text-left rounded-ios bg-white/12 backdrop-blur-sm px-3 py-2.5 active:bg-white/20 md:hover:bg-white/20 transition-colors"
+                  >
+                    <p className="text-white text-headline font-bold leading-none animate-count-up">
+                      {overdue.length}
+                    </p>
+                    <p className="text-white/80 text-micro font-medium uppercase tracking-wider mt-1">
+                      Overdue
+                    </p>
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (typeof window !== 'undefined') {
+                        const el = document.getElementById('bucket-this-week');
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
+                    }}
+                    className="text-left rounded-ios bg-white/12 backdrop-blur-sm px-3 py-2.5 active:bg-white/20 md:hover:bg-white/20 transition-colors"
+                  >
+                    <p className="text-white text-headline font-bold leading-none animate-count-up">
+                      {dueTodayCount}
+                    </p>
+                    <p className="text-white/80 text-micro font-medium uppercase tracking-wider mt-1">
+                      Due Today
+                    </p>
+                  </button>
+                  <button
+                    onClick={() => router.push('/expenses')}
+                    className="text-left rounded-ios bg-white/12 backdrop-blur-sm px-3 py-2.5 active:bg-white/20 md:hover:bg-white/20 transition-colors"
+                  >
+                    <p className="text-white text-headline font-bold leading-none animate-count-up">
+                      {spentDisplay}
+                    </p>
+                    <p className="text-white/80 text-micro font-medium uppercase tracking-wider mt-1">
+                      {currentYear}
+                    </p>
+                  </button>
+                </div>
               </div>
-            </button>
-            <button onClick={() => router.push('/settings')} className="tap-card p-3 md:p-4 text-center">
-              <div className="text-2xl md:text-3xl font-bold text-purple-600">{members.length}</div>
-              <div className="text-[10px] md:text-xs text-ink-secondary font-medium mt-0.5 leading-tight">
-                HomeKeeper<br /><span className="text-ink-tertiary">{members.length === 1 ? 'Member' : 'Members'}</span>
-              </div>
-            </button>
-            <button onClick={() => router.push('/expenses')} className="tap-card p-3 md:p-4 text-center">
-              <div className="text-2xl md:text-3xl font-bold text-emerald-600">
-                {spentThisYear >= 10000
-                  ? `$${(spentThisYear / 1000).toFixed(1)}k`
-                  : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(spentThisYear)}
-              </div>
-              <div className="text-[10px] md:text-xs text-ink-secondary font-medium mt-0.5 leading-tight">
-                Spent<br /><span className="text-ink-tertiary">{currentYear}</span>
-              </div>
-            </button>
+            </div>
           </div>
         )}
 
@@ -403,7 +476,7 @@ export default function DashboardPage() {
             When everything is empty we show the hero above instead. */}
         <div className={`md:grid md:grid-cols-2 md:gap-x-4 md:px-0 ${everythingEmpty ? 'hidden' : ''}`}>
           {/* Overdue */}
-          <div>
+          <div id="bucket-overdue" className="scroll-mt-20">
             <p className="section-header">
               <span className="inline-block w-2 h-2 rounded-full bg-status-red mr-1.5" />
               Overdue ({overdue.length})
@@ -420,7 +493,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Due This Week */}
-          <div>
+          <div id="bucket-this-week" className="scroll-mt-20">
             <p className="section-header">
               <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#FF9F0A' }} />
               Due This Week ({dueThisWeek.length})

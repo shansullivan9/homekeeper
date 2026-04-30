@@ -184,7 +184,14 @@ export default function HistoryPage() {
 
   return (
     <div>
-      <PageHeader title="Task History" subtitle={`${history.length} completed tasks`} />
+      <PageHeader
+        title="Task History"
+        subtitle={
+          history.length === 0
+            ? 'Nothing logged yet'
+            : `${history.length} completed task${history.length === 1 ? '' : 's'}`
+        }
+      />
 
       <div className="px-4 pt-3 pb-2 md:max-w-md">
         <div className="relative">

@@ -218,18 +218,19 @@ export default function WelcomePage() {
   return (
     <div className="md:max-w-2xl md:mx-auto">
       <div className="px-4 py-6 md:py-10">
-        <div className="flex items-center gap-2 mb-1 text-brand-500">
-          <Sparkles size={16} />
-          <span className="text-xs font-semibold uppercase tracking-wider">
-            Welcome — Step {step} of 3
+        {/* Step pill + title — branded but not overwhelming. */}
+        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand-50 text-brand-600 mb-3">
+          <Sparkles size={14} />
+          <span className="text-micro font-semibold uppercase tracking-wider">
+            Step {step} of 3
           </span>
         </div>
-        <h1 className="text-2xl md:text-3xl font-bold text-ink-primary mb-1">
+        <h1 className="text-display md:text-mega font-bold text-ink-primary tracking-[-0.025em] mb-2">
           {step === 1 && "Let's set up your home"}
           {step === 2 && 'What does your home have?'}
           {step === 3 && 'Pick what you want to track'}
         </h1>
-        <p className="text-sm text-ink-secondary mb-6">
+        <p className="text-body text-ink-secondary mb-6 max-w-md">
           {step === 1 && "Give it a name — you can change this any time in Settings."}
           {step === 2 && "Toggling a feature on tells us which maintenance tasks to suggest."}
           {step === 3 && 'Uncheck anything you don\'t want. The rest goes straight to your dashboard.'}

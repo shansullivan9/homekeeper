@@ -91,19 +91,21 @@ export default function CalendarPage() {
             setSelectedDate(startOfMonth(next));
           }}
           aria-label="Previous month"
-          className="p-2 rounded-full text-ink-secondary active:text-brand-500 md:hover:bg-gray-100 transition-colors"
+          className="w-9 h-9 rounded-full text-ink-secondary active:text-brand-500 active:bg-gray-100 active:scale-95 md:hover:bg-gray-100 transition-all flex items-center justify-center"
         >
           <ChevronLeft size={22} />
         </button>
         <div className="flex items-center gap-2">
-          <h2 className="text-base md:text-lg font-bold">{format(currentMonth, 'MMMM yyyy')}</h2>
+          <h2 className="text-title md:text-headline font-bold tracking-[-0.01em]">
+            {format(currentMonth, 'MMMM yyyy')}
+          </h2>
           <button
             onClick={() => {
               const now = new Date();
               setCurrentMonth(now);
               setSelectedDate(now);
             }}
-            className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-brand-50 text-brand-600 border border-brand-200 active:bg-brand-100 md:hover:bg-brand-100 transition-colors"
+            className="px-3 py-1 rounded-full text-micro font-semibold bg-brand-500 text-white active:bg-brand-600 active:scale-95 md:hover:bg-brand-600 transition-all"
           >
             Today
           </button>
@@ -115,7 +117,7 @@ export default function CalendarPage() {
             setSelectedDate(startOfMonth(next));
           }}
           aria-label="Next month"
-          className="p-2 rounded-full text-ink-secondary active:text-brand-500 md:hover:bg-gray-100 transition-colors"
+          className="w-9 h-9 rounded-full text-ink-secondary active:text-brand-500 active:bg-gray-100 active:scale-95 md:hover:bg-gray-100 transition-all flex items-center justify-center"
         >
           <ChevronRight size={22} />
         </button>
@@ -143,25 +145,25 @@ export default function CalendarPage() {
             <button
               key={dateStr}
               onClick={() => setSelectedDate(day)}
-              className={`relative flex flex-col items-center justify-center py-2.5 md:py-3 rounded-xl transition-colors ${
+              className={`relative flex flex-col items-center justify-center py-2.5 md:py-3 rounded-xl transition-all active:scale-95 ${
                 isSelected
-                  ? 'bg-brand-500 text-white'
+                  ? 'bg-brand-500 text-white shadow-card'
                   : today
-                  ? 'bg-brand-50'
+                  ? 'bg-brand-50 ring-1 ring-brand-200'
                   : 'active:bg-gray-100 md:hover:bg-gray-100'
               } ${!isCurrentMonth ? 'opacity-30' : ''}`}
             >
-              <span className={`text-sm md:text-base font-medium ${isSelected ? 'text-white' : today ? 'text-brand-600 font-bold' : ''}`}>
+              <span className={`text-body font-medium tabular-nums ${isSelected ? 'text-white font-semibold' : today ? 'text-brand-600 font-bold' : ''}`}>
                 {format(day, 'd')}
               </span>
               {count > 0 && (
-                <div className="flex gap-0.5 mt-0.5">
+                <div className="flex gap-0.5 mt-1">
                   {Array.from({ length: Math.min(count, 3) }).map((_, i) => (
                     <div
                       key={i}
                       className="w-1 h-1 rounded-full"
                       style={{
-                        backgroundColor: isSelected ? 'rgba(255,255,255,0.85)' : dotColor,
+                        backgroundColor: isSelected ? 'rgba(255,255,255,0.9)' : dotColor,
                       }}
                     />
                   ))}
