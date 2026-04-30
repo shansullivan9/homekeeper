@@ -8,8 +8,8 @@ import toast from 'react-hot-toast';
 import { confirm } from '@/lib/confirm';
 import {
   Users, Plus, LogOut, Home, ChevronRight,
-  UserCircle2, Share2, RefreshCw, X, Bell,
-  LogOut as LeaveIcon,
+  UserCircle2, Mail, Share2, RefreshCw, X, Bell,
+  Building2, LogOut as LeaveIcon,
 } from 'lucide-react';
 
 // "abcdef012345" → "abcd-ef01-2345"
@@ -296,39 +296,33 @@ export default function SettingsPage() {
       <PageHeader title="Settings" />
 
       <div className="py-4 space-y-5 md:max-w-2xl">
-        {/* Profile */}
+        {/* Account — uniform row layout: [icon] [label] [value] [action]. */}
         <div className="mx-4 ios-card overflow-hidden">
-          {/* Display name row */}
-          <div className="px-4 py-3.5 flex items-center gap-3 border-b border-gray-100">
-            <div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center flex-shrink-0">
-              <UserCircle2 size={24} className="text-brand-500" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary">
-                Name
-              </p>
+          {/* Name */}
+          <div className="ios-list-item">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <UserCircle2 size={18} className="text-ink-secondary flex-shrink-0" />
+              <span className="text-[15px] font-medium flex-shrink-0">Name</span>
               {editingName ? (
-                <div className="flex items-center gap-2 mt-1">
-                  <input
-                    value={nameDraft}
-                    onChange={(e) => setNameDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') saveName();
-                      if (e.key === 'Escape') setEditingName(false);
-                    }}
-                    autoFocus
-                    maxLength={60}
-                    className="ios-input py-1.5 flex-1"
-                  />
-                </div>
+                <input
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveName();
+                    if (e.key === 'Escape') setEditingName(false);
+                  }}
+                  autoFocus
+                  maxLength={60}
+                  className="ios-input py-1 flex-1 min-w-0 ml-2"
+                />
               ) : (
-                <p className="text-[15px] font-medium truncate">
-                  {user?.display_name || 'Add your name'}
-                </p>
+                <span className="text-[14px] text-ink-tertiary truncate ml-auto">
+                  {user?.display_name || 'Not set'}
+                </span>
               )}
             </div>
             {editingName ? (
-              <>
+              <div className="flex items-center gap-3 flex-shrink-0 pl-2">
                 <button onClick={saveName} className="text-brand-500 text-sm font-semibold">
                   Save
                 </button>
@@ -338,52 +332,46 @@ export default function SettingsPage() {
                 >
                   Cancel
                 </button>
-              </>
+              </div>
             ) : (
               <button
                 onClick={() => {
                   setNameDraft(user?.display_name || '');
                   setEditingName(true);
                 }}
-                className="text-brand-500 text-sm font-medium"
+                className="text-brand-500 text-sm font-medium pl-2 flex-shrink-0"
               >
                 Edit
               </button>
             )}
           </div>
 
-          {/* Email row — no avatar; the Name row above carries it. */}
-          <div className="px-4 py-3 flex items-center gap-3 border-b border-gray-100">
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-secondary">
-                Email
-              </p>
+          {/* Email */}
+          <div className="ios-list-item">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <Mail size={18} className="text-ink-secondary flex-shrink-0" />
+              <span className="text-[15px] font-medium flex-shrink-0">Email</span>
               {editingEmail ? (
-                <div className="flex items-center gap-2 mt-1">
-                  <input
-                    type="email"
-                    value={emailDraft}
-                    onChange={(e) => setEmailDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') saveEmail();
-                      if (e.key === 'Escape') setEditingEmail(false);
-                    }}
-                    autoFocus
-                    autoComplete="email"
-                    className="ios-input py-1.5 flex-1"
-                  />
-                </div>
+                <input
+                  type="email"
+                  value={emailDraft}
+                  onChange={(e) => setEmailDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') saveEmail();
+                    if (e.key === 'Escape') setEditingEmail(false);
+                  }}
+                  autoFocus
+                  autoComplete="email"
+                  className="ios-input py-1 flex-1 min-w-0 ml-2"
+                />
               ) : (
-                <p className="text-[14px] text-ink-secondary truncate">{user?.email}</p>
-              )}
-              {editingEmail && (
-                <p className="text-[11px] text-ink-tertiary mt-1">
-                  We'll email both your old and new address to confirm.
-                </p>
+                <span className="text-[14px] text-ink-tertiary truncate ml-auto">
+                  {user?.email}
+                </span>
               )}
             </div>
             {editingEmail ? (
-              <>
+              <div className="flex items-center gap-3 flex-shrink-0 pl-2">
                 <button onClick={saveEmail} className="text-brand-500 text-sm font-semibold">
                   Save
                 </button>
@@ -393,29 +381,33 @@ export default function SettingsPage() {
                 >
                   Cancel
                 </button>
-              </>
+              </div>
             ) : (
               <button
                 onClick={() => {
                   setEmailDraft(user?.email || '');
                   setEditingEmail(true);
                 }}
-                className="text-brand-500 text-sm font-medium"
+                className="text-brand-500 text-sm font-medium pl-2 flex-shrink-0"
               >
                 Edit
               </button>
             )}
           </div>
+          {editingEmail && (
+            <p className="text-[11px] text-ink-tertiary px-4 pb-2 -mt-1">
+              We'll email both your old and new address to confirm.
+            </p>
+          )}
 
-          {/* Notifications — per-user setting, lives with the
-              account fields rather than a one-row Preferences section. */}
+          {/* Notifications */}
           <button
             onClick={() => router.push('/settings/notifications')}
             className="ios-list-item w-full"
           >
             <div className="flex items-center gap-3">
               <Bell size={18} className="text-ink-secondary" />
-              <span className="text-[15px]">Notifications</span>
+              <span className="text-[15px] font-medium">Notifications</span>
             </div>
             <ChevronRight size={16} className="text-ink-tertiary" />
           </button>
@@ -445,9 +437,9 @@ export default function SettingsPage() {
                 >
                   <div className="flex items-center gap-3">
                     <Home size={18} className="text-ink-secondary" />
-                    <span className="text-[15px]">{h.name}</span>
+                    <span className="text-[15px] font-medium">{h.name}</span>
                   </div>
-                  <span className="text-xs text-brand-500 font-medium">Switch</span>
+                  <span className="text-sm text-brand-500 font-medium">Switch</span>
                 </button>
               ))}
             </div>
@@ -458,11 +450,11 @@ export default function SettingsPage() {
         <div>
           <p className="section-header">Household</p>
           <div className="mx-4 ios-card overflow-hidden">
-            {/* Home Name — inline edit; "More details" still routes
-                 to the full home profile for property-level fields. */}
+            {/* Home Name — inline edit. */}
             <div className="ios-list-item">
               <div className="flex items-center gap-3 flex-1 min-w-0">
-                <Home size={18} className="text-brand-500 flex-shrink-0" />
+                <Home size={18} className="text-ink-secondary flex-shrink-0" />
+                <span className="text-[15px] font-medium flex-shrink-0">Home Name</span>
                 {editingHomeName ? (
                   <input
                     value={homeNameDraft}
@@ -473,14 +465,16 @@ export default function SettingsPage() {
                     }}
                     autoFocus
                     maxLength={80}
-                    className="ios-input py-1.5 flex-1"
+                    className="ios-input py-1 flex-1 min-w-0 ml-2"
                   />
                 ) : (
-                  <span className="text-[15px] truncate">{home?.name || 'My Home'}</span>
+                  <span className="text-[14px] text-ink-tertiary truncate ml-auto">
+                    {home?.name || 'My Home'}
+                  </span>
                 )}
               </div>
               {editingHomeName ? (
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-3 flex-shrink-0 pl-2">
                   <button onClick={saveHomeName} className="text-brand-500 text-sm font-semibold">Save</button>
                   <button onClick={() => setEditingHomeName(false)} className="text-ink-tertiary text-sm">Cancel</button>
                 </div>
@@ -490,30 +484,33 @@ export default function SettingsPage() {
                     setHomeNameDraft(home?.name || '');
                     setEditingHomeName(true);
                   }}
-                  className="text-brand-500 text-sm font-medium flex-shrink-0"
+                  className="text-brand-500 text-sm font-medium flex-shrink-0 pl-2"
                 >
                   Edit
                 </button>
               )}
             </div>
 
-            {/* Property details — separate, clearly labeled */}
+            {/* Property Details — distinct icon so it doesn't dupe Home Name */}
             <button
               onClick={() => router.push('/home-profile')}
               className="ios-list-item w-full"
             >
               <div className="flex items-center gap-3">
-                <Home size={18} className="text-ink-secondary" />
-                <span className="text-[15px]">Property details</span>
+                <Building2 size={18} className="text-ink-secondary" />
+                <span className="text-[15px] font-medium">Property Details</span>
               </div>
               <ChevronRight size={16} className="text-ink-tertiary" />
             </button>
 
             {/* Members */}
             <div className="px-4 py-3 border-b border-gray-100">
-              <div className="flex items-center gap-2 mb-2">
-                <Users size={16} className="text-ink-secondary" />
-                <span className="text-sm font-medium text-ink-secondary">Members</span>
+              <div className="flex items-center gap-3 mb-2">
+                <Users size={18} className="text-ink-secondary" />
+                <span className="text-[15px] font-medium">Members</span>
+                <span className="text-xs text-ink-tertiary ml-auto">
+                  {members.length} {members.length === 1 ? 'person' : 'people'}
+                </span>
               </div>
               {[...members]
                 .sort((a, b) => {
@@ -571,12 +568,12 @@ export default function SettingsPage() {
               })}
             </div>
 
-            {/* Invite Code — promoted to a full Share + copy + rotate row */}
+            {/* Invite Code — Share + copy + rotate. */}
             {home?.invite_code && (
               <div className="px-4 py-3 border-b border-gray-100">
-                <div className="flex items-center gap-2 mb-2">
-                  <Share2 size={16} className="text-ink-secondary" />
-                  <span className="text-sm font-medium text-ink-secondary">Invite Code</span>
+                <div className="flex items-center gap-3 mb-2">
+                  <Share2 size={18} className="text-ink-secondary" />
+                  <span className="text-[15px] font-medium">Invite Code</span>
                 </div>
                 <div className="flex items-center gap-2 mb-2">
                   <button
@@ -602,7 +599,7 @@ export default function SettingsPage() {
                     className="text-xs text-ink-secondary flex items-center gap-1 active:text-brand-500 md:hover:text-brand-500 transition-colors disabled:opacity-50"
                   >
                     <RefreshCw size={12} className={rotating ? 'animate-spin' : ''} />
-                    Generate new code
+                    Generate New Code
                   </button>
                 )}
               </div>
@@ -611,8 +608,8 @@ export default function SettingsPage() {
             {/* Join Another Home */}
             <button onClick={() => setShowJoin(!showJoin)} className="ios-list-item w-full">
               <div className="flex items-center gap-3">
-                <Plus size={16} className="text-ink-secondary" />
-                <span className="text-sm">Join Another Home</span>
+                <Plus size={18} className="text-ink-secondary" />
+                <span className="text-[15px] font-medium">Join Another Home</span>
               </div>
               <ChevronRight size={16} className="text-ink-tertiary" />
             </button>
@@ -635,8 +632,8 @@ export default function SettingsPage() {
             {/* Leave Household */}
             <button onClick={handleLeaveHousehold} className="ios-list-item w-full">
               <div className="flex items-center gap-3">
-                <LeaveIcon size={16} className="text-status-red" />
-                <span className="text-sm text-status-red">Leave Household</span>
+                <LeaveIcon size={18} className="text-status-red" />
+                <span className="text-[15px] font-medium text-status-red">Leave Household</span>
               </div>
             </button>
           </div>
