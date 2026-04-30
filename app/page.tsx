@@ -16,12 +16,12 @@ export default function Home() {
   }, [router]);
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-surface-secondary">
-      <div className="flex flex-col items-center gap-3">
-        <div className="w-16 h-16 rounded-2xl bg-brand-500 flex items-center justify-center">
+    <div className="flex items-center justify-center min-h-screen bg-gradient-hero-soft">
+      <div className="flex flex-col items-center gap-3 animate-scale-in">
+        <div className="w-16 h-16 rounded-ios-xl bg-gradient-hero flex items-center justify-center shadow-float">
           <span className="text-3xl">🏠</span>
         </div>
-        <p className="text-ink-secondary text-sm">Loading...</p>
+        <p className="text-ink-secondary text-caption">Loading…</p>
       </div>
     </div>
   );

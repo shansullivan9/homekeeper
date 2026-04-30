@@ -201,10 +201,10 @@ export default function DashboardPage() {
   const FilterChip = ({ value, label, count }: { value: ClaimFilter; label: string; count: number }) => (
     <button
       onClick={() => setClaimFilter(value)}
-      className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
+      className={`px-3.5 py-1.5 rounded-full text-caption font-semibold whitespace-nowrap transition-all active:scale-95 ${
         claimFilter === value
-          ? 'bg-brand-500 text-white'
-          : 'bg-gray-100 text-ink-secondary active:bg-gray-200'
+          ? 'bg-brand-500 text-white shadow-card'
+          : 'bg-white text-ink-secondary shadow-card active:bg-gray-50 md:hover:bg-gray-50'
       }`}
     >
       {label} {count > 0 && <span className="opacity-75">· {count}</span>}
