@@ -27,6 +27,7 @@ export default function AppliancesPage() {
   const searchParams = useSearchParams();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Appliance | null>(null);
+  const [sortBy, setSortBy] = useState<'name' | 'category' | 'warranty' | 'newest'>('name');
   const [editMode, setEditMode] = useState(true);
   const [manualDocId, setManualDocId] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -609,6 +610,32 @@ export default function AppliancesPage() {
         back
       />
 
+      {appliances.length > 1 && (
+        <div className="px-4 pt-2 pb-1 flex items-center gap-2 text-micro text-ink-tertiary">
+          <span className="font-semibold uppercase tracking-wider">Sort</span>
+          <div className="flex gap-1">
+            {([
+              { key: 'name', label: 'Name' },
+              { key: 'category', label: 'Category' },
+              { key: 'warranty', label: 'Warranty' },
+              { key: 'newest', label: 'Newest' },
+            ] as const).map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setSortBy(key)}
+                className={`px-2.5 py-1 rounded-full text-caption font-medium transition-colors ${
+                  sortBy === key
+                    ? 'bg-brand-50 text-brand-600'
+                    : 'text-ink-secondary md:hover:bg-gray-100 active:bg-gray-100'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="py-2">
         {appliances.length === 0 ? (
           <div className="text-center py-16 px-8">
@@ -628,9 +655,28 @@ export default function AppliancesPage() {
         ) : (
           <div className="mx-4 ios-card overflow-hidden">
             {[...appliances]
-              .sort((a, b) =>
-                (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
-              )
+              .sort((a, b) => {
+                if (sortBy === 'category') {
+                  const ca = (a.category || '~').toLowerCase();
+                  const cb = (b.category || '~').toLowerCase();
+                  if (ca !== cb) return ca.localeCompare(cb);
+                  return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+                }
+                if (sortBy === 'warranty') {
+                  // Soonest-expiring first; nulls land at the end so
+                  // appliances without warranty info don't dominate.
+                  const wa = a.warranty_expiration ? new Date(a.warranty_expiration).getTime() : Infinity;
+                  const wb = b.warranty_expiration ? new Date(b.warranty_expiration).getTime() : Infinity;
+                  if (wa !== wb) return wa - wb;
+                  return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+                }
+                if (sortBy === 'newest') {
+                  const ta = (a as any).created_at ? new Date((a as any).created_at).getTime() : 0;
+                  const tb = (b as any).created_at ? new Date((b as any).created_at).getTime() : 0;
+                  return tb - ta;
+                }
+                return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' });
+              })
               .map((a) => {
               const ws = warrantyStatus(a.warranty_expiration);
               return (
