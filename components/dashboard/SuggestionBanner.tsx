@@ -51,7 +51,9 @@ export default function SuggestionBanner() {
 
     const dismissedSet = new Set(dismissedSuggestions);
 
-    return tasks.filter((t) => {
+    // First pass: keep only suggestions that don't collide with any
+    // existing REAL task or a persistent dismissal.
+    const survivors = tasks.filter((t) => {
       if (!t.is_suggestion || t.status !== 'pending') return false;
       // Persistently dismissed → never show again, even though
       // generate_suggestions re-inserts it on every profile save.
@@ -70,6 +72,35 @@ export default function SuggestionBanner() {
       );
       return !dup;
     });
+
+    // Second pass: dedupe survivors against EACH OTHER. Without this,
+    // generate_suggestions can hand back both "Annual HVAC Service" and
+    // "Bi-Annual HVAC Service" — same category, same {"hvac"} keyword
+    // set after stop-words — and the user would see both. Prefer the
+    // longer/more specific title; break ties alphabetically.
+    const ranked = [...survivors].sort((a, b) => {
+      const lenDiff = b.title.length - a.title.length;
+      if (lenDiff !== 0) return lenDiff;
+      return a.title.localeCompare(b.title);
+    });
+    const keptIds = new Set<string>();
+    const keptKeywords: { kw: Set<string>; category: string | null }[] = [];
+    for (const s of ranked) {
+      const sKw = keywords(s.title);
+      const collides =
+        sKw.size > 0 &&
+        keptKeywords.some(
+          (k) =>
+            (!s.category_id || k.category === s.category_id) &&
+            overlaps(sKw, k.kw)
+        );
+      if (!collides) {
+        keptIds.add(s.id);
+        keptKeywords.push({ kw: sKw, category: s.category_id || null });
+      }
+    }
+    // Restore original suggestion order before returning.
+    return survivors.filter((s) => keptIds.has(s.id));
   }, [tasks, dismissedSuggestions]);
 
   if (suggestions.length === 0) return null;
