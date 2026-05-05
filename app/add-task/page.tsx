@@ -105,7 +105,7 @@ function AddTaskForm() {
   const editId = searchParams.get('edit');
   const router = useRouter();
   const supabase = createClient();
-  const { home, user, categories, tasks, appliances, documents, members, history } = useStore();
+  const { home, user, categories, tasks, appliances, documents, members, history, contractors } = useStore();
   const { loadData } = useAppInit();
 
   const [title, setTitle] = useState('');
@@ -121,6 +121,7 @@ function AddTaskForm() {
   const [estimatedCost, setEstimatedCost] = useState('');
   const [priority, setPriority] = useState<Priority>('medium');
   const [applianceId, setApplianceId] = useState('');
+  const [contractorId, setContractorId] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
   const [saving, setSaving] = useState(false);
   const [editMode, setEditMode] = useState(true);
@@ -188,13 +189,14 @@ function AddTaskForm() {
       categoryId !== '' ||
       assignedTo !== '' ||
       applianceId !== '' ||
+      contractorId !== '' ||
       dueDate !== '' ||
       completedOn !== '' ||
       isCompleted ||
       recurrence !== 'one_time' ||
       priority !== 'medium';
     setDirty(hasContent);
-  }, [title, notes, estimatedMinutes, estimatedCost, categoryId, assignedTo, applianceId, dueDate, completedOn, isCompleted, recurrence, priority, editMode, editId]);
+  }, [title, notes, estimatedMinutes, estimatedCost, categoryId, assignedTo, applianceId, contractorId, dueDate, completedOn, isCompleted, recurrence, priority, editMode, editId]);
 
   const confirmBack = async () => {
     if (!dirty) {
@@ -285,6 +287,7 @@ function AddTaskForm() {
         setEstimatedCost(task.estimated_cost?.toString() || '');
         setPriority(task.priority);
         setApplianceId(task.appliance_id || '');
+        setContractorId((task as any).contractor_id || '');
         // For completed tasks that were never claimed, default the Owner
         // display to whoever completed it so it doesn't say 'Unassigned'.
         const effectiveOwner =
@@ -384,6 +387,7 @@ function AddTaskForm() {
       estimated_cost: estimatedCost ? parseFloat(estimatedCost) : null,
       priority,
       appliance_id: applianceId || null,
+      contractor_id: contractorId || null,
       assigned_to: assignedTo || null,
       created_by: user?.id,
     };
@@ -511,6 +515,7 @@ function AddTaskForm() {
                   estimated_cost: estimatedCost ? parseFloat(estimatedCost) : null,
                   priority,
                   appliance_id: applianceId || null,
+      contractor_id: contractorId || null,
                   assigned_to: assignedTo || null,
                   created_by: user?.id,
                   status: 'pending',
@@ -529,6 +534,7 @@ function AddTaskForm() {
           setEstimatedMinutes('');
           setEstimatedCost('');
           setApplianceId('');
+          setContractorId('');
           setSourceDocumentId(null);
           setIsCompleted(false);
           setCompletedOn('');
@@ -962,6 +968,45 @@ function AddTaskForm() {
             )}
           </div>
         )}
+
+        {/* Linked Contractor */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-xs font-semibold text-ink-secondary uppercase tracking-wide">
+              Linked Contractor
+            </label>
+            <Link
+              href="/contractors?new=1"
+              className="text-xs text-brand-500 font-semibold active:text-brand-600 md:hover:underline"
+            >
+              + Add new
+            </Link>
+          </div>
+          <select
+            value={contractorId}
+            onChange={(e) => setContractorId(e.target.value)}
+            className="ios-input"
+          >
+            <option value="">None</option>
+            {[...contractors]
+              .sort((a, b) =>
+                (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
+              )
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}{c.category ? ` — ${c.category}` : ''}
+                </option>
+              ))}
+          </select>
+          {contractorId && editId && !editMode && (
+            <Link
+              href={`/contractors?edit=${contractorId}`}
+              className="inline-block text-xs text-brand-500 mt-1.5 active:text-brand-600 md:hover:underline"
+            >
+              Open contractor profile →
+            </Link>
+          )}
+        </div>
 
         {/* Notes */}
         <div>

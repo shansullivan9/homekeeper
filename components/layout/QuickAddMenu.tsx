@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
-import { ListTodo, FileText, Package, X } from 'lucide-react';
+import { ListTodo, FileText, Package, Briefcase, X } from 'lucide-react';
 
 export default function QuickAddMenu({
   open,
@@ -59,6 +59,13 @@ export default function QuickAddMenu({
       icon: Package,
       tone: 'bg-purple-50 text-purple-600',
       path: '/appliances?new=1',
+    },
+    {
+      label: 'Contractor',
+      hint: 'Save a plumber, cleaner, electrician…',
+      icon: Briefcase,
+      tone: 'bg-indigo-50 text-indigo-600',
+      path: '/contractors?new=1',
     },
   ];
 

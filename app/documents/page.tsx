@@ -19,7 +19,9 @@ import {
   File as FileIcon,
   Sparkles,
   Check,
+  Briefcase,
 } from 'lucide-react';
+import Link from 'next/link';
 import { format, parseISO, addDays, addMonths, addYears } from 'date-fns';
 import toast from 'react-hot-toast';
 import { confirm } from '@/lib/confirm';
@@ -64,6 +66,7 @@ export default function DocumentsPage() {
     user,
     appliances,
     setAppliances,
+    contractors,
     tasks,
     setTasks,
     history,
@@ -87,7 +90,7 @@ export default function DocumentsPage() {
   const [uploading, setUploading] = useState(false);
   const [analyzingId, setAnalyzingId] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
-  const [form, setForm] = useState({ title: '', category: '', notes: '', appliance_id: '' });
+  const [form, setForm] = useState({ title: '', category: '', notes: '', appliance_id: '', contractor_id: '' });
   // Bulk-upload review queue. After upload + classify, instead of
   // immediately calling each processor (which auto-creates appliances,
   // tasks, history rows, profile updates), we hand them to this modal
@@ -700,7 +703,7 @@ export default function DocumentsPage() {
   };
 
   const resetForm = () => {
-    setForm({ title: '', category: '', notes: '', appliance_id: '' });
+    setForm({ title: '', category: '', notes: '', appliance_id: '', contractor_id: '' });
     setFiles([]);
     setEditing(null);
     setShowForm(false);
@@ -714,6 +717,7 @@ export default function DocumentsPage() {
       category: d.category || '',
       notes: d.notes || '',
       appliance_id: d.appliance_id || '',
+      contractor_id: (d as any).contractor_id || '',
     });
     setFiles([]);
     setShowForm(true);
@@ -759,6 +763,7 @@ export default function DocumentsPage() {
           category: form.category || null,
           notes: form.notes || null,
           appliance_id: form.appliance_id || null,
+          contractor_id: form.contractor_id || null,
           updated_at: new Date().toISOString(),
         })
         .eq('id', editing.id)
@@ -1281,6 +1286,7 @@ export default function DocumentsPage() {
                     value={form.appliance_id}
                     onChange={(e) => u('appliance_id', e.target.value)}
                     className="ios-input mt-2"
+                    disabled={!!editing && !editMode}
                   >
                     <option value="">None</option>
                     {appliances.map((a: any) => (
@@ -1288,6 +1294,75 @@ export default function DocumentsPage() {
                         {a.name}
                       </option>
                     ))}
+                  </select>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Linked contractor — vendor associated with this document
+              (e.g. the plumber whose invoice it is). */}
+          {editing && (() => {
+            const selectedContractor = form.contractor_id
+              ? contractors.find((c: any) => c.id === form.contractor_id)
+              : null;
+            return (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-ink-secondary">Linked contractor</p>
+                  <Link
+                    href="/contractors?new=1"
+                    className="text-xs text-brand-500 font-semibold active:text-brand-600 md:hover:underline"
+                  >
+                    + Add new
+                  </Link>
+                </div>
+                <div className="ios-card overflow-hidden">
+                  {selectedContractor ? (
+                    <Link
+                      href={`/contractors?edit=${selectedContractor.id}`}
+                      className="ios-list-item w-full"
+                    >
+                      <div className="flex items-center gap-3 flex-1 min-w-0 text-left">
+                        <div className="w-9 h-9 rounded-lg bg-brand-50 text-brand-500 flex items-center justify-center flex-shrink-0">
+                          <Briefcase size={18} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[14px] font-medium truncate">
+                            {selectedContractor.name}
+                          </p>
+                          <p className="text-xs text-ink-tertiary truncate">
+                            {[selectedContractor.category, selectedContractor.company]
+                              .filter(Boolean)
+                              .join(' · ') || 'Tap to view profile'}
+                          </p>
+                        </div>
+                      </div>
+                      <ChevronRight size={16} className="text-ink-tertiary flex-shrink-0" />
+                    </Link>
+                  ) : (
+                    <div className="px-4 py-3.5 text-sm text-ink-tertiary">
+                      No contractor linked yet.
+                    </div>
+                  )}
+                </div>
+                {contractors.length > 0 && (
+                  <select
+                    value={form.contractor_id}
+                    onChange={(e) => u('contractor_id', e.target.value)}
+                    className="ios-input mt-2"
+                    disabled={!!editing && !editMode}
+                  >
+                    <option value="">None</option>
+                    {[...contractors]
+                      .sort((a: any, b: any) =>
+                        (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
+                      )
+                      .map((c: any) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}{c.category ? ` — ${c.category}` : ''}
+                        </option>
+                      ))}
                   </select>
                 )}
               </div>

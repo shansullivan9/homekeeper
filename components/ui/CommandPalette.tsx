@@ -24,6 +24,7 @@ import {
   Plus,
   Search as SearchIcon,
   CornerDownLeft,
+  Briefcase,
 } from 'lucide-react';
 
 interface CommandStore {
@@ -93,6 +94,7 @@ export default function CommandPalette() {
       { label: 'Calendar',          icon: CalendarIcon,    href: '/calendar',               group: 'Navigate', keywords: ['schedule', 'month'] },
       { label: 'Task History',      icon: Clock,           href: '/history',                group: 'Navigate', keywords: ['log', 'completed'] },
       { label: 'Appliances',        icon: Package,         href: '/appliances',             group: 'Navigate', keywords: ['systems'] },
+      { label: 'Contractors',       icon: Briefcase,       href: '/contractors',            group: 'Navigate', keywords: ['vendors', 'plumber', 'electrician', 'cleaner', 'lawn'] },
       { label: 'Documents',         icon: FileText,        href: '/documents',              group: 'Navigate', keywords: ['manuals', 'invoices', 'paperwork'] },
       { label: 'Expenses',          icon: Banknote,        href: '/expenses',               group: 'Navigate', keywords: ['cost', 'spending', 'money'] },
       { label: 'Annual Report',     icon: BarChart3,       href: '/reports',                group: 'Navigate', keywords: ['summary', 'pdf'] },
@@ -104,6 +106,7 @@ export default function CommandPalette() {
       { label: 'Add Task',          icon: Plus,            href: '/add-task',               group: 'Create',   keywords: ['new', 'todo', 'chore'] },
       { label: 'Add Document',      icon: FileText,        href: '/documents?new=1',        group: 'Create',   keywords: ['upload', 'manual', 'invoice'] },
       { label: 'Add Appliance',     icon: Package,         href: '/appliances?new=1',       group: 'Create',   keywords: ['system', 'register'] },
+      { label: 'Add Contractor',    icon: Briefcase,       href: '/contractors?new=1',      group: 'Create',   keywords: ['vendor', 'plumber', 'electrician', 'cleaner'] },
     ],
     []
   );
