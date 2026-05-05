@@ -4,8 +4,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase-browser';
 import PageHeader from '@/components/layout/PageHeader';
+import Link from 'next/link';
 import { Appliance } from '@/lib/types';
-import { Plus, X, Package, ChevronRight, FileText } from 'lucide-react';
+import { Plus, X, Package, ChevronRight, FileText, Briefcase } from 'lucide-react';
 import { format, parseISO, isPast, differenceInDays } from 'date-fns';
 import toast from 'react-hot-toast';
 import { confirm } from '@/lib/confirm';
@@ -22,7 +23,7 @@ const APPLIANCE_CATEGORIES = [
 ];
 
 export default function AppliancesPage() {
-  const { appliances, home, setAppliances, documents, tasks, history, user } = useStore();
+  const { appliances, home, setAppliances, documents, tasks, history, user, contractors } = useStore();
   const supabase = createClient();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -38,7 +39,7 @@ export default function AppliancesPage() {
   const [form, setForm] = useState({
     name: '', manufacturer: '', model_number: '', serial_number: '',
     category: '', location: '', installation_date: '', warranty_expiration: '',
-    purchase_price: '', notes: '',
+    purchase_price: '', notes: '', contractor_id: '',
   });
 
   // Existing locations across this home, used to populate the
@@ -95,7 +96,7 @@ export default function AppliancesPage() {
     setForm({
       name: '', manufacturer: '', model_number: '', serial_number: '',
       category: '', location: '', installation_date: '', warranty_expiration: '',
-      purchase_price: '', notes: '',
+      purchase_price: '', notes: '', contractor_id: '',
     });
     setManualDocId(null);
     setEditing(null);
@@ -110,6 +111,7 @@ export default function AppliancesPage() {
       serial_number: a.serial_number || '', category: a.category || '', location: a.location || '',
       installation_date: a.installation_date || '', warranty_expiration: a.warranty_expiration || '',
       purchase_price: a.purchase_price?.toString() || '', notes: a.notes || '',
+      contractor_id: (a as any).contractor_id || '',
     });
     setManualDocId(a.manual_document_id || null);
     setShowForm(true);
@@ -135,6 +137,7 @@ export default function AppliancesPage() {
       warranty_expiration: editing.warranty_expiration || '',
       purchase_price: editing.purchase_price?.toString() || '',
       notes: editing.notes || '',
+      contractor_id: (editing as any).contractor_id || '',
     });
     setManualDocId(editing.manual_document_id || null);
     setEditMode(false);
@@ -204,6 +207,7 @@ export default function AppliancesPage() {
       purchase_price: form.purchase_price ? parseFloat(form.purchase_price) : null,
       notes: form.notes || null,
       manual_document_id: manualDocId || null,
+      contractor_id: form.contractor_id || null,
     };
 
     try {
@@ -575,6 +579,63 @@ export default function AppliancesPage() {
                     </a>
                   ))}
                 </div>
+              </div>
+            );
+          })()}
+
+          {/* Linked contractor — typical use is the installer / repair
+              vendor for this unit. */}
+          {(() => {
+            const selectedContractor = form.contractor_id
+              ? contractors.find((c: any) => c.id === form.contractor_id)
+              : null;
+            return (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-ink-secondary">Linked contractor</label>
+                  <Link
+                    href="/contractors?new=1"
+                    className="text-xs text-brand-500 font-semibold active:text-brand-600 md:hover:underline"
+                  >
+                    + Add new
+                  </Link>
+                </div>
+                {selectedContractor && editing && !editMode && (
+                  <Link
+                    href={`/contractors?edit=${selectedContractor.id}`}
+                    className="ios-card flex items-center gap-3 p-3 mb-2 active:bg-gray-50"
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-brand-50 text-brand-500 flex items-center justify-center flex-shrink-0">
+                      <Briefcase size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[14px] font-medium truncate">{selectedContractor.name}</p>
+                      <p className="text-xs text-ink-tertiary truncate">
+                        {[selectedContractor.category, selectedContractor.company]
+                          .filter(Boolean)
+                          .join(' · ') || 'Tap to view profile'}
+                      </p>
+                    </div>
+                    <ChevronRight size={16} className="text-ink-tertiary" />
+                  </Link>
+                )}
+                <select
+                  value={form.contractor_id}
+                  onChange={(e) => u('contractor_id', e.target.value)}
+                  disabled={!!editing && !editMode}
+                  className="ios-input disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <option value="">None</option>
+                  {[...contractors]
+                    .sort((a: any, b: any) =>
+                      (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
+                    )
+                    .map((c: any) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}{c.category ? ` — ${c.category}` : ''}
+                      </option>
+                    ))}
+                </select>
               </div>
             );
           })()}

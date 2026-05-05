@@ -74,6 +74,7 @@ export interface Task {
   completed_at: string | null;
   completed_by: string | null;
   source_document_id: string | null;
+  contractor_id: string | null;
   created_at: string;
   updated_at: string;
   categories?: Category;
@@ -92,6 +93,7 @@ export interface TaskHistory {
   cost: number | null;
   photos: string[] | null;
   duration_minutes: number | null;
+  contractor_id: string | null;
 }
 
 export interface Appliance {
@@ -109,6 +111,7 @@ export interface Appliance {
   notes: string | null;
   photo_url: string | null;
   manual_document_id: string | null;
+  contractor_id: string | null;
   created_at: string;
 }
 
@@ -139,8 +142,27 @@ export interface Document {
   notes: string | null;
   searchable_text: string | null;
   appliance_id: string | null;
+  contractor_id: string | null;
   uploaded_by: string | null;
   uploaded_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Contractor {
+  id: string;
+  home_id: string;
+  name: string;
+  company: string | null;
+  // Free-text — "Plumber", "Cleaner", "Lawn", etc. Not constrained
+  // to home categories so users can name their trades however they
+  // want ("Sonia's Cleaning Crew" rather than just "Cleaner").
+  category: string | null;
+  phone: string | null;
+  email: string | null;
+  website: string | null;
+  address: string | null;
+  notes: string | null;
   created_at: string;
   updated_at: string;
 }

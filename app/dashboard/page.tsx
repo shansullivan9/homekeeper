@@ -7,7 +7,7 @@ import SuggestionBanner from '@/components/dashboard/SuggestionBanner';
 import PageHeader from '@/components/layout/PageHeader';
 import { useRouter } from 'next/navigation';
 import { useAppInit } from '@/hooks/useAppInit';
-import { Home as HomeIcon, Users, ChevronRight, ChevronUp, ChevronDown, Package, Clock3, Banknote, FileText, BarChart3 } from 'lucide-react';
+import { Home as HomeIcon, Users, ChevronRight, ChevronUp, ChevronDown, Package, Clock3, Banknote, FileText, BarChart3, Briefcase } from 'lucide-react';
 
 type ClaimFilter = 'all' | 'unclaimed' | 'mine' | 'theirs';
 
@@ -16,6 +16,7 @@ type ClaimFilter = 'all' | 'unclaimed' | 'mine' | 'theirs';
 // chosen order persists in localStorage scoped to the signed-in user.
 const QUICK_LINKS = [
   { label: 'Appliances & Systems', icon: Package, href: '/appliances', color: 'text-purple-500' },
+  { label: 'Contractors', icon: Briefcase, href: '/contractors', color: 'text-indigo-500' },
   { label: 'Documents', icon: FileText, href: '/documents', color: 'text-sky-500' },
   { label: 'Expenses', icon: Banknote, href: '/expenses', color: 'text-emerald-500' },
   { label: 'Home Profile', icon: HomeIcon, href: '/home-profile', color: 'text-brand-500' },
@@ -27,7 +28,7 @@ const linkOrderKey = (uid: string | null | undefined) =>
   `hk:dashboard-quick-links-order:${uid || 'anon'}`;
 
 export default function DashboardPage() {
-  const { tasks, home, user, members, history, appliances, documents } = useStore();
+  const { tasks, home, user, members, history, appliances, documents, contractors } = useStore();
   const { loadData } = useAppInit();
   const router = useRouter();
   const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
@@ -428,6 +429,8 @@ export default function DashboardPage() {
                     ? appliances.length
                     : link.href === '/documents'
                     ? documents.length
+                    : link.href === '/contractors'
+                    ? contractors.length
                     : null;
                 const isFirst = idx === 0;
                 const isLast = idx === orderedLinks.length - 1;

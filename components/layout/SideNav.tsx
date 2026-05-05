@@ -13,6 +13,7 @@ import {
   FileText,
   Banknote,
   Clock3,
+  Briefcase,
   Search as SearchIcon,
 } from 'lucide-react';
 import QuickAddMenu from '@/components/layout/QuickAddMenu';
@@ -25,8 +26,9 @@ const primaryTabs = [
 ];
 
 const secondaryTabs = [
-  { href: '/documents', label: 'Documents', icon: FileText },
   { href: '/appliances', label: 'Appliances', icon: Package },
+  { href: '/contractors', label: 'Contractors', icon: Briefcase },
+  { href: '/documents', label: 'Documents', icon: FileText },
   { href: '/expenses', label: 'Expenses', icon: Banknote },
   { href: '/timeline', label: 'Home Timeline', icon: Clock3 },
   { href: '/home-profile', label: 'Home Profile', icon: HomeIcon },

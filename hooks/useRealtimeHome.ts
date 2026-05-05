@@ -2,7 +2,7 @@
 import { useEffect } from 'react';
 import { createClient } from '@/lib/supabase-browser';
 import { useStore } from '@/lib/store';
-import { Task, TaskHistory, Appliance, Document } from '@/lib/types';
+import { Task, TaskHistory, Appliance, Document, Contractor } from '@/lib/types';
 
 /**
  * Subscribes the Zustand store to Supabase Realtime for the active
@@ -170,6 +170,47 @@ export function useRealtimeHome() {
         )
         .subscribe();
       channels.push(appsChannel);
+
+      // Contractors directory — keep the picker dropdowns / contractor
+      // list page in sync when a partner adds or edits an entry.
+      const contractorsChannel = supabase
+        .channel(`hk-contractors-${homeId}-${unique}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'contractors',
+            filter: `home_id=eq.${homeId}`,
+          },
+          (payload: any) => {
+            const store = useStore.getState();
+            try {
+              if (payload.eventType === 'INSERT') {
+                const c = payload.new as Contractor;
+                if (store.contractors.some((existing) => existing.id === c.id)) return;
+                store.setContractors(
+                  [c, ...store.contractors].sort((a, b) =>
+                    (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
+                  )
+                );
+              } else if (payload.eventType === 'UPDATE') {
+                const c = payload.new as Contractor;
+                store.setContractors(
+                  store.contractors.map((existing) => (existing.id === c.id ? c : existing))
+                );
+              } else if (payload.eventType === 'DELETE') {
+                const id = (payload.old as Contractor)?.id;
+                if (!id) return;
+                store.setContractors(store.contractors.filter((c) => c.id !== id));
+              }
+            } catch (err) {
+              console.warn('realtime contractors handler error:', err);
+            }
+          }
+        )
+        .subscribe();
+      channels.push(contractorsChannel);
     } catch (err) {
       console.warn('realtime subscribe failed (non-fatal):', err);
     }
