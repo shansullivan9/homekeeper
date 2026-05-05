@@ -9,11 +9,15 @@ import PageHeader from '@/components/layout/PageHeader';
 import { confirm } from '@/lib/confirm';
 import { useStoredState } from '@/lib/useStoredState';
 import { formatCurrency } from '@/lib/constants';
+import {
+  detectContractorsFromNotes,
+  type ContractorDetection,
+} from '@/lib/contractor-detect';
 import { format, parseISO } from 'date-fns';
 import toast from 'react-hot-toast';
 import {
   Plus, X, Search, ChevronRight, Phone, Mail, Globe, MapPin, StickyNote,
-  Hammer, FileText, Package, Clock, Briefcase,
+  Hammer, FileText, Package, Clock, Briefcase, Sparkles, Check,
 } from 'lucide-react';
 
 // US-style phone formatter — accepts the most common digit groupings
@@ -280,6 +284,153 @@ function ContractorsPageInner() {
     () => linkedHistory.reduce((sum, h) => sum + (h.cost || 0), 0),
     [linkedHistory]
   );
+
+  // ============================================================
+  // Detect-from-notes importer state
+  // ============================================================
+  const [detectOpen, setDetectOpen] = useState(false);
+  const [detections, setDetections] = useState<ContractorDetection[]>([]);
+  // The user can edit each name and tick / un-tick it before import.
+  const [detectChoices, setDetectChoices] = useState<
+    Record<string, { include: boolean; name: string }>
+  >({});
+  const [importing, setImporting] = useState(false);
+
+  // Recompute the candidate detection list whenever the source data
+  // changes, so opening the sheet always reflects the latest notes.
+  const allDetections = useMemo(
+    () =>
+      detectContractorsFromNotes({
+        history,
+        tasks,
+        appliances,
+        documents,
+        existingContractors: contractors,
+      }),
+    [history, tasks, appliances, documents, contractors]
+  );
+
+  const openDetect = () => {
+    setDetections(allDetections);
+    const initial: Record<string, { include: boolean; name: string }> = {};
+    for (const d of allDetections) {
+      // Use the lowercase name as the stable key — the detector
+      // dedupes on it too.
+      initial[d.name.toLowerCase()] = { include: true, name: d.name };
+    }
+    setDetectChoices(initial);
+    setDetectOpen(true);
+  };
+
+  const importDetected = async () => {
+    if (!home) return;
+    const picked = detections.filter(
+      (d) => detectChoices[d.name.toLowerCase()]?.include
+    );
+    if (picked.length === 0) {
+      setDetectOpen(false);
+      return;
+    }
+    setImporting(true);
+    try {
+      // Create contractors first.
+      const insertRows = picked.map((d) => ({
+        home_id: home.id,
+        name: detectChoices[d.name.toLowerCase()]?.name?.trim() || d.name,
+        phone: d.phone,
+        updated_at: new Date().toISOString(),
+      }));
+      const { data: inserted, error: insertErr } = await supabase
+        .from('contractors')
+        .insert(insertRows as any)
+        .select();
+      if (insertErr) throw insertErr;
+      const newRows = (inserted || []) as Contractor[];
+
+      // Map detection → newly-created contractor, by index (insert order
+      // matches input order in Postgres). Builders are PostgrestFilter-
+      // Builder; they're thenable at runtime so Promise.allSettled just
+      // works — we sidestep TS's stricter Promise<T>[] typing.
+      const updates: any[] = [];
+      const taskUpdates: Task[] = [...tasks];
+      const historyUpdates: TaskHistory[] = [...history];
+      const docUpdates: Document[] = [...documents];
+      const applianceUpdates: Appliance[] = [...appliances];
+
+      picked.forEach((d, i) => {
+        const created = newRows[i];
+        if (!created) return;
+        for (const src of d.sources) {
+          if (src.kind === 'history') {
+            updates.push(
+              supabase
+                .from('task_history')
+                .update({ contractor_id: created.id } as any)
+                .eq('id', src.id)
+            );
+            const idx = historyUpdates.findIndex((h) => h.id === src.id);
+            if (idx >= 0)
+              historyUpdates[idx] = { ...historyUpdates[idx], contractor_id: created.id } as any;
+          } else if (src.kind === 'task') {
+            updates.push(
+              supabase
+                .from('tasks')
+                .update({ contractor_id: created.id, updated_at: new Date().toISOString() } as any)
+                .eq('id', src.id)
+            );
+            const idx = taskUpdates.findIndex((t) => t.id === src.id);
+            if (idx >= 0)
+              taskUpdates[idx] = { ...taskUpdates[idx], contractor_id: created.id } as any;
+          } else if (src.kind === 'document') {
+            updates.push(
+              supabase
+                .from('documents')
+                .update({ contractor_id: created.id, updated_at: new Date().toISOString() } as any)
+                .eq('id', src.id)
+            );
+            const idx = docUpdates.findIndex((dd) => dd.id === src.id);
+            if (idx >= 0)
+              docUpdates[idx] = { ...docUpdates[idx], contractor_id: created.id } as any;
+          } else if (src.kind === 'appliance') {
+            updates.push(
+              supabase
+                .from('appliances')
+                .update({ contractor_id: created.id } as any)
+                .eq('id', src.id)
+            );
+            const idx = applianceUpdates.findIndex((a) => a.id === src.id);
+            if (idx >= 0)
+              applianceUpdates[idx] = { ...applianceUpdates[idx], contractor_id: created.id } as any;
+          }
+        }
+      });
+
+      await Promise.allSettled(updates);
+
+      // Local store updates so the UI reflects the new links right
+      // away (realtime will eventually catch up but this avoids the
+      // post-import lag).
+      setContractors(
+        [...contractors, ...newRows].sort((a, b) =>
+          (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
+        )
+      );
+      setTasks(taskUpdates);
+      setHistory(historyUpdates);
+      setDocuments(docUpdates);
+      setAppliances(applianceUpdates);
+
+      const linkCount = picked.reduce((sum, d) => sum + d.sources.length, 0);
+      toast.success(
+        `Imported ${picked.length} contractor${picked.length === 1 ? '' : 's'} · linked ${linkCount} ${linkCount === 1 ? 'row' : 'rows'}`
+      );
+      setDetectOpen(false);
+    } catch (err: any) {
+      toast.error(err.message || 'Import failed');
+    } finally {
+      setImporting(false);
+    }
+  };
 
   // ============================================================
   // Form (create / edit / view) — shown when ?new=1 or ?edit=id
@@ -632,6 +783,30 @@ function ContractorsPageInner() {
         }
       />
       <div className="px-4 py-4 space-y-3 md:max-w-2xl md:mx-auto">
+        {/* "Found in past notes" banner — surfaces when the heuristic
+            spots possible contractors in notes the user already wrote
+            (e.g. "Mario Tolentino (919) 390-4202" on a history entry)
+            and they haven't imported them yet. */}
+        {contractors.length > 0 && allDetections.length > 0 && (
+          <button
+            onClick={openDetect}
+            className="w-full rounded-ios bg-gradient-warm p-3 flex items-center gap-3 text-left active:scale-[0.99] md:hover:shadow-card-hover transition-all"
+          >
+            <div className="w-9 h-9 rounded-ios bg-white/70 flex items-center justify-center text-amber-600 flex-shrink-0">
+              <Sparkles size={18} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-body font-semibold text-ink-primary">
+                Found {allDetections.length} possible{' '}
+                {allDetections.length === 1 ? 'contractor' : 'contractors'} in your past notes
+              </p>
+              <p className="text-caption text-ink-secondary">
+                Tap to review and import
+              </p>
+            </div>
+            <ChevronRight size={16} className="text-ink-tertiary" />
+          </button>
+        )}
         {contractors.length > 0 && (
           <>
             <div className="relative">
@@ -681,12 +856,23 @@ function ContractorsPageInner() {
               Plumbers, cleaners, electricians, lawn services. Link them to
               tasks and appliances so you always know who you've used.
             </p>
-            <button
-              onClick={startNew}
-              className="px-5 py-2.5 rounded-ios bg-brand-500 text-white text-body font-semibold active:bg-brand-600 active:scale-[0.98] md:hover:bg-brand-600 transition-all shadow-card"
-            >
-              Add your first contractor
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2 justify-center">
+              <button
+                onClick={startNew}
+                className="px-5 py-2.5 rounded-ios bg-brand-500 text-white text-body font-semibold active:bg-brand-600 active:scale-[0.98] md:hover:bg-brand-600 transition-all shadow-card"
+              >
+                Add your first contractor
+              </button>
+              {allDetections.length > 0 && (
+                <button
+                  onClick={openDetect}
+                  className="px-5 py-2.5 rounded-ios bg-white/70 backdrop-blur-sm text-brand-600 text-body font-semibold active:bg-white active:scale-[0.98] md:hover:bg-white transition-all inline-flex items-center justify-center gap-2"
+                >
+                  <Sparkles size={16} />
+                  Find {allDetections.length} from past notes
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="ios-card overflow-hidden">
@@ -721,6 +907,141 @@ function ContractorsPageInner() {
           </div>
         )}
       </div>
+
+      {/* Detect-from-notes modal. Lists every detected name with the
+          source row count + an editable name field + an include
+          checkbox. Importing creates contractors and back-fills
+          contractor_id on every linked source row. */}
+      {detectOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+          onClick={() => !importing && setDetectOpen(false)}
+        >
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 animate-fade-in"
+            style={{
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              WebkitBackdropFilter: 'blur(20px)',
+              backdropFilter: 'blur(20px)',
+            }}
+          />
+          <div
+            className="relative bg-white rounded-ios-xl w-full max-w-md shadow-elevated overflow-hidden animate-slide-up flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxHeight: 'calc(100vh - 4rem)' }}
+          >
+            <div className="flex justify-center pt-2.5 sm:hidden">
+              <div className="w-9 h-1 rounded-full bg-gray-300" />
+            </div>
+            <div className="px-5 pt-3 pb-2 flex items-center justify-between">
+              <div>
+                <p className="text-title font-semibold flex items-center gap-1.5">
+                  <Sparkles size={16} className="text-amber-500" />
+                  Found in past notes
+                </p>
+                <p className="text-caption text-ink-tertiary">
+                  Pulled from your task, history, document, and appliance notes
+                </p>
+              </div>
+              <button
+                onClick={() => !importing && setDetectOpen(false)}
+                aria-label="Close"
+                className="p-1 -mr-1 text-ink-tertiary tap-shrink"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            {detections.length === 0 ? (
+              <div className="px-5 py-10 text-center text-caption text-ink-tertiary">
+                Nothing detected — your existing contractors might already
+                cover everything.
+              </div>
+            ) : (
+              <div className="px-2 pb-2 overflow-y-auto flex-1">
+                {detections.map((d) => {
+                  const key = d.name.toLowerCase();
+                  const choice = detectChoices[key] || { include: true, name: d.name };
+                  return (
+                    <label
+                      key={key}
+                      className={`flex items-start gap-3 px-3 py-3 rounded-ios cursor-pointer transition-colors ${
+                        choice.include
+                          ? 'bg-brand-50/50'
+                          : 'active:bg-gray-50 md:hover:bg-gray-50'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={choice.include}
+                        onChange={(e) =>
+                          setDetectChoices((c) => ({
+                            ...c,
+                            [key]: { ...choice, include: e.target.checked },
+                          }))
+                        }
+                        className="mt-1.5 w-4 h-4 accent-brand-500 flex-shrink-0"
+                      />
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <input
+                          type="text"
+                          value={choice.name}
+                          onChange={(e) =>
+                            setDetectChoices((c) => ({
+                              ...c,
+                              [key]: { ...choice, name: e.target.value },
+                            }))
+                          }
+                          className="w-full text-body font-semibold bg-transparent outline-none border-b border-transparent focus:border-brand-300"
+                          placeholder="Contractor name"
+                        />
+                        {d.phone && (
+                          <p className="text-caption text-ink-secondary flex items-center gap-1">
+                            <Phone size={11} className="text-ink-tertiary" />
+                            {d.phone}
+                          </p>
+                        )}
+                        <p className="text-micro text-ink-tertiary">
+                          From {d.sources.length}{' '}
+                          {d.sources.length === 1 ? 'entry' : 'entries'}
+                          {' · '}
+                          {d.sources.slice(0, 2).map((s) => s.title).join(', ')}
+                          {d.sources.length > 2 ? ` +${d.sources.length - 2}` : ''}
+                        </p>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+            <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex gap-2">
+              <button
+                onClick={() => !importing && setDetectOpen(false)}
+                disabled={importing}
+                className="flex-1 py-2.5 rounded-ios bg-white border border-gray-200 text-sm font-semibold text-ink-secondary active:bg-gray-50 md:hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={importDetected}
+                disabled={
+                  importing ||
+                  detections.length === 0 ||
+                  !Object.values(detectChoices).some((c) => c.include)
+                }
+                className="flex-1 py-2.5 rounded-ios bg-brand-500 text-white text-sm font-semibold active:bg-brand-600 active:scale-[0.98] transition-all disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+              >
+                <Check size={14} strokeWidth={2.5} />
+                {importing
+                  ? 'Importing…'
+                  : `Import ${
+                      Object.values(detectChoices).filter((c) => c.include).length
+                    }`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
