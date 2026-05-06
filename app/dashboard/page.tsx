@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { format, isBefore, startOfDay, endOfDay, addDays, endOfMonth, subDays } from 'date-fns';
 import TaskCard from '@/components/tasks/TaskCard';
@@ -108,6 +108,48 @@ export default function DashboardPage() {
   // updated live so the list reflows under the finger.
   const linksListRef = useRef<HTMLDivElement | null>(null);
   const [draggingHref, setDraggingHref] = useState<string | null>(null);
+
+  // FLIP animation: capture each row's position before the next
+  // render, then translate it back and animate to zero so reorders
+  // slide instead of jumping. Skip the dragged row — it's already
+  // where the finger put it.
+  const prevRectsRef = useRef<Map<string, DOMRect>>(new Map());
+  useLayoutEffect(() => {
+    const list = linksListRef.current;
+    if (!list) return;
+    const rows = Array.from(
+      list.querySelectorAll<HTMLElement>('[data-link-href]')
+    );
+    if (rows.length === 0) {
+      prevRectsRef.current.clear();
+      return;
+    }
+    const newRects = new Map<string, DOMRect>();
+    for (const row of rows) {
+      newRects.set(row.dataset.linkHref!, row.getBoundingClientRect());
+    }
+    const prev = prevRectsRef.current;
+    for (const row of rows) {
+      const href = row.dataset.linkHref!;
+      if (href === draggingHref) continue;
+      const before = prev.get(href);
+      const after = newRects.get(href)!;
+      if (!before) continue;
+      const dy = before.top - after.top;
+      if (Math.abs(dy) < 1) continue;
+      row.style.transition = 'none';
+      row.style.transform = `translateY(${dy}px)`;
+    }
+    void list.offsetHeight;
+    for (const row of rows) {
+      const href = row.dataset.linkHref!;
+      if (href === draggingHref) continue;
+      if (!prev.has(href)) continue;
+      row.style.transition = 'transform 200ms cubic-bezier(0.2, 0, 0, 1)';
+      row.style.transform = '';
+    }
+    prevRectsRef.current = newRects;
+  });
 
   const handleDragMove = (e: React.PointerEvent) => {
     if (!draggingHref || !linksListRef.current) return;
