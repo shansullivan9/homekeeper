@@ -64,15 +64,23 @@ export default function DashboardPage() {
     const byHref = new Map<string, (typeof QUICK_LINKS)[number]>(
       QUICK_LINKS.map((l) => [l.href as string, l])
     );
-    const seen = new Set<string>();
-    const result: typeof alpha = [];
-    for (const href of linkOrder) {
-      const found = byHref.get(href);
-      if (found && !seen.has(href)) {
-        result.push(found);
-        seen.add(href);
-      }
-    }
+    const saved = linkOrder
+      .map((href) => byHref.get(href))
+      .filter((l): l is (typeof QUICK_LINKS)[number] => !!l);
+
+    // If the saved order is already alphabetical for the links it
+    // covers, the user never actually customized — fall back to the
+    // fresh alphabetical default so new features slot in by name.
+    const savedAlpha = [...saved].sort((a, b) =>
+      a.label.localeCompare(b.label)
+    );
+    const savedIsAlphabetical = saved.every(
+      (l, i) => l.href === savedAlpha[i]?.href
+    );
+    if (savedIsAlphabetical) return alpha;
+
+    const seen = new Set<string>(saved.map((l) => l.href));
+    const result: typeof alpha = [...saved];
     // Append any links not in the saved order, alphabetically.
     for (const link of alpha) {
       if (!seen.has(link.href)) result.push(link);

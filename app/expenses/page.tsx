@@ -273,7 +273,7 @@ export default function ExpensesPage() {
       </div>
 
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" onClick={() => !saving && setEditing(null)}>
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4" onClick={() => !saving && setEditing(null)}>
           <div
             aria-hidden="true"
             className="absolute inset-0 animate-fade-in"
@@ -284,7 +284,7 @@ export default function ExpensesPage() {
             }}
           />
           <div
-            className="relative bg-white rounded-ios-lg w-full max-w-md p-4 shadow-xl space-y-4"
+            className="relative bg-white rounded-ios-lg w-full max-w-md p-4 shadow-xl space-y-4 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between">
