@@ -8,7 +8,7 @@ import { useAppInit } from '@/hooks/useAppInit';
 import PageHeader from '@/components/layout/PageHeader';
 import { RECURRENCE_LABELS, CATEGORY_ICONS, categoryFromTitle, recurrenceFromTitle } from '@/lib/constants';
 import { Recurrence, Priority, Task } from '@/lib/types';
-import { Trash2, FileText, ChevronRight, Calendar as CalendarIcon, ChevronLeft } from 'lucide-react';
+import { Trash2, FileText, ChevronRight, Calendar as CalendarIcon, ChevronLeft, Pencil, Lock } from 'lucide-react';
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday,
@@ -597,20 +597,22 @@ function AddTaskForm() {
         onBack={confirmBack}
         rightAction={
           editId ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <button
                 onClick={async () => {
                   if (editMode) await handleSave();
                   else setEditMode(true);
                 }}
                 disabled={saving}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors disabled:opacity-50 ${
+                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-ios text-sm font-semibold shadow-sm transition-colors disabled:opacity-50 ${
                   editMode
-                    ? 'bg-brand-500 text-white active:bg-brand-600'
-                    : 'bg-brand-50 text-brand-600 active:bg-brand-100 border border-brand-200'
+                    ? 'bg-status-green text-white active:bg-emerald-600 md:hover:bg-emerald-600'
+                    : 'bg-brand-500 text-white active:bg-brand-600 md:hover:bg-brand-600'
                 }`}
+                title={editMode ? 'Save changes' : 'Edit task'}
               >
-                {editMode ? (saving ? 'Saving…' : 'Save') : '✏️ Edit'}
+                <Pencil size={14} strokeWidth={2.5} />
+                {editMode ? (saving ? 'Saving…' : 'Save') : 'Edit'}
               </button>
               <button onClick={handleDelete} className="text-status-red p-1" title="Delete task">
                 <Trash2 size={20} />
@@ -637,9 +639,20 @@ function AddTaskForm() {
           </button>
         )}
 
+        {editId && !editMode && (
+          <button
+            type="button"
+            onClick={() => setEditMode(true)}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-ios bg-brand-50 border border-brand-200 text-brand-600 text-sm font-medium active:bg-brand-100 md:hover:bg-brand-100 transition-colors"
+          >
+            <Lock size={14} strokeWidth={2.5} />
+            <span className="flex-1 text-left">Read-only — tap Edit to make changes</span>
+          </button>
+        )}
+
         <fieldset
           disabled={!!editId && !editMode}
-          className="m-0 p-0 border-0 min-w-0 space-y-4 disabled:opacity-100"
+          className="m-0 p-0 border-0 min-w-0 space-y-4 disabled:opacity-60"
         >
 
         {/* Title — the form's hero input. Promoted with larger
