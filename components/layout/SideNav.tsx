@@ -25,13 +25,15 @@ const primaryTabs = [
   { href: '/history', label: 'Task History', icon: Clock },
 ];
 
+// Alphabetical by label so new features slot in by name, not append
+// to the bottom. Settings stays last as a meta utility.
 const secondaryTabs = [
   { href: '/appliances', label: 'Appliances', icon: Package },
   { href: '/contractors', label: 'Contractors', icon: Briefcase },
   { href: '/documents', label: 'Documents', icon: FileText },
   { href: '/expenses', label: 'Expenses', icon: Banknote },
-  { href: '/timeline', label: 'Home Timeline', icon: Clock3 },
   { href: '/home-profile', label: 'Home Profile', icon: HomeIcon },
+  { href: '/timeline', label: 'Home Timeline', icon: Clock3 },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

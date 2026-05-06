@@ -1528,7 +1528,7 @@ export default function DocumentsPage() {
       {/* Bulk upload review */}
       {reviewBuckets && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4"
           onClick={() => !uploading && setReviewBuckets(null)}
         >
           <div
@@ -1541,10 +1541,10 @@ export default function DocumentsPage() {
             }}
           />
           <div
-            className="relative bg-white rounded-ios-lg w-full max-w-md shadow-xl overflow-hidden"
+            className="relative bg-white rounded-ios-lg w-full max-w-md shadow-xl overflow-hidden flex flex-col max-h-[90vh]"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
               <p className="text-[15px] font-semibold">Review uploads</p>
               <button
                 onClick={() => setReviewBuckets(null)}
@@ -1554,7 +1554,7 @@ export default function DocumentsPage() {
                 <X size={20} />
               </button>
             </div>
-            <div className="px-4 py-3">
+            <div className="px-4 py-3 overflow-y-auto">
               <p className="text-xs text-ink-secondary mb-3">
                 AI detected actionable documents. Pick which to process now —
                 anything you skip stays as a plain document.
@@ -1605,7 +1605,7 @@ export default function DocumentsPage() {
                 })}
               </div>
             </div>
-            <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex gap-2">
+            <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex gap-2 flex-shrink-0">
               <button
                 onClick={() => setReviewBuckets(null)}
                 disabled={uploading}

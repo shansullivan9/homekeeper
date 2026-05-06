@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { format, isBefore, startOfDay, endOfDay, addDays, endOfMonth, subDays } from 'date-fns';
 import TaskCard from '@/components/tasks/TaskCard';
@@ -7,7 +7,7 @@ import SuggestionBanner from '@/components/dashboard/SuggestionBanner';
 import PageHeader from '@/components/layout/PageHeader';
 import { useRouter } from 'next/navigation';
 import { useAppInit } from '@/hooks/useAppInit';
-import { Home as HomeIcon, Users, ChevronRight, ChevronUp, ChevronDown, Package, Clock3, Banknote, FileText, BarChart3, Briefcase } from 'lucide-react';
+import { Home as HomeIcon, Users, ChevronRight, GripVertical, Package, Clock3, Banknote, FileText, BarChart3, Briefcase } from 'lucide-react';
 
 type ClaimFilter = 'all' | 'unclaimed' | 'mine' | 'theirs';
 
@@ -64,15 +64,23 @@ export default function DashboardPage() {
     const byHref = new Map<string, (typeof QUICK_LINKS)[number]>(
       QUICK_LINKS.map((l) => [l.href as string, l])
     );
-    const seen = new Set<string>();
-    const result: typeof alpha = [];
-    for (const href of linkOrder) {
-      const found = byHref.get(href);
-      if (found && !seen.has(href)) {
-        result.push(found);
-        seen.add(href);
-      }
-    }
+    const saved = linkOrder
+      .map((href) => byHref.get(href))
+      .filter((l): l is (typeof QUICK_LINKS)[number] => !!l);
+
+    // If the saved order is already alphabetical for the links it
+    // covers, the user never actually customized — fall back to the
+    // fresh alphabetical default so new features slot in by name.
+    const savedAlpha = [...saved].sort((a, b) =>
+      a.label.localeCompare(b.label)
+    );
+    const savedIsAlphabetical = saved.every(
+      (l, i) => l.href === savedAlpha[i]?.href
+    );
+    if (savedIsAlphabetical) return alpha;
+
+    const seen = new Set<string>(saved.map((l) => l.href));
+    const result: typeof alpha = [...saved];
     // Append any links not in the saved order, alphabetically.
     for (const link of alpha) {
       if (!seen.has(link.href)) result.push(link);
@@ -92,15 +100,47 @@ export default function DashboardPage() {
     }
   };
 
-  const moveLink = (idx: number, dir: -1 | 1) => {
-    const target = idx + dir;
-    if (target < 0 || target >= orderedLinks.length) return;
-    const hrefs = orderedLinks.map((l) => l.href);
-    [hrefs[idx], hrefs[target]] = [hrefs[target], hrefs[idx]];
-    persistOrder(hrefs);
+  const resetLinkOrder = () => persistOrder(null);
+
+  // Drag-to-reorder. We use pointer events so the same code path
+  // handles mouse + touch. While dragging, finger position is matched
+  // to row bounding rects (midpoint test) and the saved order is
+  // updated live so the list reflows under the finger.
+  const linksListRef = useRef<HTMLDivElement | null>(null);
+  const [draggingHref, setDraggingHref] = useState<string | null>(null);
+
+  const handleDragMove = (e: React.PointerEvent) => {
+    if (!draggingHref || !linksListRef.current) return;
+    e.preventDefault();
+    const rows = Array.from(
+      linksListRef.current.querySelectorAll<HTMLElement>('[data-link-href]')
+    );
+    const from = orderedLinks.findIndex((l) => l.href === draggingHref);
+    if (from < 0) return;
+
+    let target = from;
+    for (let i = 0; i < rows.length; i++) {
+      if (i === from) continue;
+      const rect = rows[i].getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
+      if (i < from && e.clientY < mid) {
+        target = i;
+        break;
+      }
+      if (i > from && e.clientY > mid) {
+        target = i;
+      }
+    }
+
+    if (target !== from) {
+      const hrefs = orderedLinks.map((l) => l.href);
+      const [moved] = hrefs.splice(from, 1);
+      hrefs.splice(target, 0, moved);
+      persistOrder(hrefs);
+    }
   };
 
-  const resetLinkOrder = () => persistOrder(null);
+  const endDrag = () => setDraggingHref(null);
 
   const activeTasks = useMemo(() => {
     return tasks.filter((t) => t.status !== 'completed' && t.status !== 'skipped' && !t.is_suggestion);
@@ -402,7 +442,7 @@ export default function DashboardPage() {
         )}
 
         {/* Quick Links — only on the unfiltered view. Alphabetical
-            by default; long-tap or hit Edit to reorder. */}
+            by default; hit Edit then drag the handle to reorder. */}
         {claimFilter === 'all' && (
           <div className="mx-4 mb-4">
             <div className="flex items-center justify-end gap-3 mb-1.5 px-1">
@@ -421,8 +461,8 @@ export default function DashboardPage() {
                 {editingLinks ? 'Done' : 'Edit'}
               </button>
             </div>
-            <div className="ios-card overflow-hidden">
-              {orderedLinks.map((link, idx) => {
+            <div ref={linksListRef} className="ios-card overflow-hidden">
+              {orderedLinks.map((link) => {
                 const Icon = link.icon;
                 const count =
                   link.href === '/appliances'
@@ -432,35 +472,39 @@ export default function DashboardPage() {
                     : link.href === '/contractors'
                     ? contractors.length
                     : null;
-                const isFirst = idx === 0;
-                const isLast = idx === orderedLinks.length - 1;
                 if (editingLinks) {
+                  const isDragging = draggingHref === link.href;
                   return (
-                    <div key={link.href} className="ios-list-item w-full">
+                    <div
+                      key={link.href}
+                      data-link-href={link.href}
+                      className={`ios-list-item w-full transition-shadow ${
+                        isDragging
+                          ? 'bg-brand-50/60 shadow-md scale-[1.01] relative z-10'
+                          : ''
+                      }`}
+                    >
                       <div className="flex items-center gap-3">
                         <div className={`w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center ${link.color}`}>
                           <Icon size={18} />
                         </div>
                         <span className="text-[15px] font-medium">{link.label}</span>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => moveLink(idx, -1)}
-                          disabled={isFirst}
-                          aria-label={`Move ${link.label} up`}
-                          className="w-8 h-8 rounded-md flex items-center justify-center text-ink-secondary disabled:opacity-30 active:bg-surface-tertiary"
-                        >
-                          <ChevronUp size={18} />
-                        </button>
-                        <button
-                          onClick={() => moveLink(idx, 1)}
-                          disabled={isLast}
-                          aria-label={`Move ${link.label} down`}
-                          className="w-8 h-8 rounded-md flex items-center justify-center text-ink-secondary disabled:opacity-30 active:bg-surface-tertiary"
-                        >
-                          <ChevronDown size={18} />
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onPointerDown={(e) => {
+                          e.preventDefault();
+                          (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+                          setDraggingHref(link.href);
+                        }}
+                        onPointerMove={handleDragMove}
+                        onPointerUp={endDrag}
+                        onPointerCancel={endDrag}
+                        aria-label={`Drag to reorder ${link.label}`}
+                        className="w-10 h-10 -mr-2 rounded-md flex items-center justify-center text-ink-tertiary active:text-ink-secondary touch-none cursor-grab active:cursor-grabbing select-none"
+                      >
+                        <GripVertical size={18} />
+                      </button>
                     </div>
                   );
                 }
