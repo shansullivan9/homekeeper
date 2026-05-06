@@ -425,7 +425,7 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
         single tap of "Complete" still works for the common case. */}
     {showCompleteSheet && (
       <div
-        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4"
+        className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4"
         onClick={() => !completing && setShowCompleteSheet(false)}
       >
         <div
@@ -438,10 +438,10 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
           }}
         />
         <div
-          className="relative bg-white rounded-ios-lg w-full max-w-md shadow-xl animate-slide-up"
+          className="relative bg-white rounded-ios-lg w-full max-w-md shadow-xl animate-slide-up flex flex-col max-h-[90vh]"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
             <p className="text-[15px] font-semibold truncate">Log: {task.title}</p>
             <button
               onClick={() => setShowCompleteSheet(false)}
@@ -451,7 +451,7 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
               <X size={20} />
             </button>
           </div>
-          <div className="px-4 py-3 space-y-3">
+          <div className="px-4 py-3 space-y-3 overflow-y-auto">
             <p className="text-[12px] text-ink-secondary">
               Override the cost or time if it differs from the estimate. Leave
               blank to skip.
@@ -531,7 +531,7 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
               </label>
             </div>
           </div>
-          <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex gap-2">
+          <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex gap-2 flex-shrink-0">
             <button
               onClick={() => setShowCompleteSheet(false)}
               disabled={completing}
