@@ -278,17 +278,13 @@ export default function DashboardPage() {
         return true;
       })
       .sort((a, b) => {
-        // Sort by the more recent of completed_at vs created_at so
-        // just-logged historical bills land at the top of the list.
-        const aKey = Math.max(
-          new Date(a.completed_at || 0).getTime(),
-          new Date((a as any).created_at || 0).getTime()
-        );
-        const bKey = Math.max(
-          new Date(b.completed_at || 0).getTime(),
-          new Date((b as any).created_at || 0).getTime()
-        );
-        return bKey - aKey;
+        // Sort strictly by service date (completed_at), most recent
+        // first — that's how a completion log reads. created_at is
+        // only consulted in the FILTER above so just-logged old
+        // bills make it through the visibility window.
+        const aT = a.completed_at ? new Date(a.completed_at).getTime() : 0;
+        const bT = b.completed_at ? new Date(b.completed_at).getTime() : 0;
+        return bT - aT;
       }),
     [tasks, recentlyCompletedCutoff, claimFilter, user]
   );

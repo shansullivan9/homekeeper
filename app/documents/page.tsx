@@ -561,9 +561,18 @@ export default function DocumentsPage() {
         .map((t) => (t as any).source_document_id as string)
     );
     const linkedTargets = documents.filter((d) => linkedDocIds.has(d.id));
-    const unlinkedInvoices = documents.filter(
-      (d) => !linkedDocIds.has(d.id) && (d.category === 'Invoice')
-    );
+    // Any doc that isn't already linked AND isn't owned by a different
+    // pipeline (Manual → appliances; Builder Doc → home profile) is a
+    // candidate. Includes "Other" and unclassified so a misclassified
+    // Spectrum bill still gets processed. The extract route returns
+    // is_invoice=false for non-invoices, which we treat as a benign
+    // skip — no task is created.
+    const unlinkedInvoices = documents.filter((d) => {
+      if (linkedDocIds.has(d.id)) return false;
+      const cat = (d.category || '').trim();
+      if (cat === 'Manual' || cat === 'Builder Doc') return false;
+      return true;
+    });
     const total = linkedTargets.length + unlinkedInvoices.length;
     if (total === 0) {
       toast('No invoice documents to clean up.');
@@ -1618,12 +1627,16 @@ export default function DocumentsPage() {
         subtitle={`${documents.length} stored`}
         back
         rightAction={
-          // Surface the cleanup action when there's at least one
-          // invoice-linked doc to retitle OR an Invoice-classified
-          // doc that never generated a task (silent extraction
-          // failure on first upload — re-process now).
+          // Surface the cleanup action whenever there's at least one
+          // doc that hasn't been turned into a task yet (any non-
+          // Manual / non-Builder-Doc doc) OR an existing invoice-
+          // linked doc that could be retitled.
           (tasks.some((t) => t.status === 'completed' && (t as any).source_document_id) ||
-            documents.some((d) => d.category === 'Invoice' && !tasks.some((t) => (t as any).source_document_id === d.id))) ? (
+            documents.some((d) => {
+              const cat = (d.category || '').trim();
+              if (cat === 'Manual' || cat === 'Builder Doc') return false;
+              return !tasks.some((t) => (t as any).source_document_id === d.id);
+            })) ? (
             <button
               onClick={retitleInvoices}
               disabled={retitling}
