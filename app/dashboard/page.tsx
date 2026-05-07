@@ -252,12 +252,22 @@ export default function DashboardPage() {
   const upcoming = buckets.upcoming;
   const later = buckets.later;
 
+  // "Recently Completed" surfaces both work that was completed
+  // recently AND historical completions that the user just logged
+  // (e.g. uploading 4 months of past bills). We OR the completed_at
+  // window with a created_at window so freshly-inserted rows show up
+  // even when their service date is months in the past.
   const recentlyCompletedCutoff = useMemo(() => subDays(now, 30), [now]);
   const recentlyCompleted = useMemo(() =>
     tasks
       .filter((t) => {
         if (t.status !== 'completed' || !t.completed_at) return false;
-        if (new Date(t.completed_at) < recentlyCompletedCutoff) return false;
+        const completedRecently =
+          new Date(t.completed_at) >= recentlyCompletedCutoff;
+        const loggedRecently =
+          (t as any).created_at &&
+          new Date((t as any).created_at) >= recentlyCompletedCutoff;
+        if (!completedRecently && !loggedRecently) return false;
         // Match the claim filter so "Yours" shows only tasks you
         // completed, "Theirs" shows partner-completed, etc.
         if (claimFilter === 'mine')
@@ -267,7 +277,19 @@ export default function DashboardPage() {
         if (claimFilter === 'unclaimed') return !(t as any).completed_by;
         return true;
       })
-      .sort((a, b) => new Date(b.completed_at || 0).getTime() - new Date(a.completed_at || 0).getTime())
+      .sort((a, b) => {
+        // Sort by the more recent of completed_at vs created_at so
+        // just-logged historical bills land at the top of the list.
+        const aKey = Math.max(
+          new Date(a.completed_at || 0).getTime(),
+          new Date((a as any).created_at || 0).getTime()
+        );
+        const bKey = Math.max(
+          new Date(b.completed_at || 0).getTime(),
+          new Date((b as any).created_at || 0).getTime()
+        );
+        return bKey - aKey;
+      })
       .slice(0, 5),
     [tasks, recentlyCompletedCutoff, claimFilter, user]
   );
