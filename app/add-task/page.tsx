@@ -7,7 +7,7 @@ import { useStore } from '@/lib/store';
 import { useAppInit } from '@/hooks/useAppInit';
 import PageHeader from '@/components/layout/PageHeader';
 import { RECURRENCE_LABELS, CATEGORY_ICONS, categoryFromTitle, recurrenceFromTitle } from '@/lib/constants';
-import { Recurrence, Priority, Task } from '@/lib/types';
+import { Recurrence, Priority, Task, Document } from '@/lib/types';
 import { Trash2, FileText, ChevronRight, Calendar as CalendarIcon, ChevronLeft, Pencil, Lock } from 'lucide-react';
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
@@ -307,14 +307,41 @@ function AddTaskForm() {
     ? documents.find((d) => d.id === sourceDocumentId) || null
     : null;
 
-  const openSource = async () => {
-    if (!linkedSource) return;
+  // Past statements / receipts for THIS recurring task. We match
+  // sibling completed tasks by title (case-insensitive trim) that
+  // have a source_document_id pointing at an invoice. Lets the user
+  // jump straight from a pending "Spectrum — Internet Bill" to all
+  // of last year's PDFs without leaving the task screen.
+  const pastStatements = useMemo(() => {
+    if (!title.trim()) return [];
+    const norm = title.trim().toLowerCase();
+    const docById = new Map(documents.map((d) => [d.id, d]));
+    return tasks
+      .filter((t) => {
+        if (t.status !== 'completed') return false;
+        if (t.id === editId) return false;
+        const sid = (t as any).source_document_id as string | null;
+        if (!sid || !docById.has(sid)) return false;
+        return (t.title || '').trim().toLowerCase() === norm;
+      })
+      .map((t) => ({
+        task: t,
+        doc: docById.get((t as any).source_document_id)!,
+      }))
+      .sort((a, b) => {
+        const at = a.task.completed_at ? new Date(a.task.completed_at).getTime() : 0;
+        const bt = b.task.completed_at ? new Date(b.task.completed_at).getTime() : 0;
+        return bt - at;
+      });
+  }, [title, tasks, documents, editId]);
+
+  const openDocument = async (doc: Document) => {
     const popup = typeof window !== 'undefined' ? window.open('', '_blank') : null;
     try {
       const { data, error } = await supabase.storage
         .from('documents')
-        .createSignedUrl(linkedSource.file_path, 60 * 5);
-      if (error || !data) throw new Error('Could not open source document');
+        .createSignedUrl(doc.file_path, 60 * 5);
+      if (error || !data) throw new Error('Could not open document');
       if (popup && !popup.closed) {
         popup.location.href = data.signedUrl;
       } else {
@@ -322,8 +349,13 @@ function AddTaskForm() {
       }
     } catch (err: any) {
       if (popup && !popup.closed) popup.close();
-      toast.error(err?.message || 'Could not open source document');
+      toast.error(err?.message || 'Could not open document');
     }
+  };
+
+  const openSource = async () => {
+    if (!linkedSource) return;
+    await openDocument(linkedSource);
   };
 
   const nextDueFromCompleted = (completedDate: string, rec: Recurrence): string | null => {
@@ -653,6 +685,42 @@ function AddTaskForm() {
             </div>
             <ChevronRight size={16} className="text-ink-tertiary" />
           </button>
+        )}
+
+        {pastStatements.length > 0 && (
+          <div>
+            <p className="text-micro font-semibold text-ink-secondary uppercase tracking-wider mb-2">
+              Past statements ({pastStatements.length})
+            </p>
+            <div className="ios-card overflow-hidden">
+              {pastStatements.map(({ task: pt, doc: pd }, idx) => (
+                <button
+                  key={pt.id}
+                  type="button"
+                  onClick={() => openDocument(pd)}
+                  className={`ios-list-item w-full text-left active:bg-gray-50 md:hover:bg-gray-50 transition-colors ${
+                    idx > 0 ? 'border-t border-gray-100' : ''
+                  }`}
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="w-9 h-9 rounded-lg bg-sky-50 text-sky-500 flex items-center justify-center flex-shrink-0">
+                      <FileText size={16} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[14px] font-medium truncate">{pd.title}</p>
+                      <p className="text-caption text-ink-tertiary truncate">
+                        {pt.completed_at
+                          ? format(parseISO(pt.completed_at), 'MMM d, yyyy')
+                          : 'Logged'}
+                        {pt.estimated_cost ? ` · $${pt.estimated_cost.toLocaleString(undefined, { maximumFractionDigits: 2 })}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight size={16} className="text-ink-tertiary flex-shrink-0" />
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
         {editId && !editMode && (

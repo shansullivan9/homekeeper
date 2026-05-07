@@ -604,6 +604,47 @@ export default function DocumentsPage() {
       }
     }
 
+    // Apply title patches to the local store BEFORE deduping so the
+    // dedupe step sees the new titles.
+    let nextTasks = tasks.map((t) =>
+      taskPatch[t.id] ? ({ ...t, title: taskPatch[t.id] } as any) : t
+    ) as Task[];
+
+    // Dedupe pending recurring tasks that now share a title (e.g.
+    // four "Spectrum — Internet Bill" pendings that were previously
+    // disambiguated by the AI's varying phrasing). Keep the row with
+    // the latest due_date and delete the rest. Only collapses when 2+
+    // share a title to keep the action conservative.
+    const pendingByTitle = new Map<string, Task[]>();
+    for (const t of nextTasks) {
+      if (t.status !== 'pending' || !t.recurrence || t.recurrence === 'one_time') continue;
+      const key = (t.title || '').trim().toLowerCase();
+      if (!key) continue;
+      const list = pendingByTitle.get(key) || [];
+      list.push(t);
+      pendingByTitle.set(key, list);
+    }
+    const toDelete: string[] = [];
+    let deduped = 0;
+    for (const list of pendingByTitle.values()) {
+      if (list.length < 2) continue;
+      list.sort((a, b) => {
+        const aD = a.due_date || '';
+        const bD = b.due_date || '';
+        if (aD !== bD) return bD.localeCompare(aD);
+        return new Date((b as any).updated_at || 0).getTime() -
+               new Date((a as any).updated_at || 0).getTime();
+      });
+      // Keep list[0]; delete the rest.
+      for (let i = 1; i < list.length; i++) toDelete.push(list[i].id);
+      deduped += list.length - 1;
+    }
+    if (toDelete.length > 0) {
+      await supabase.from('tasks').delete().in('id', toDelete);
+      const dropped = new Set(toDelete);
+      nextTasks = nextTasks.filter((t) => !dropped.has(t.id));
+    }
+
     // Reflect changes in the local store without a full reload.
     if (Object.keys(docPatch).length) {
       setDocuments(
@@ -612,12 +653,10 @@ export default function DocumentsPage() {
         )
       );
     }
+    if (Object.keys(taskPatch).length || toDelete.length > 0) {
+      setTasks(nextTasks);
+    }
     if (Object.keys(taskPatch).length) {
-      setTasks(
-        tasks.map((t) =>
-          taskPatch[t.id] ? ({ ...t, title: taskPatch[t.id] } as any) : t
-        )
-      );
       setHistory(
         history.map((h) =>
           h.task_id && taskPatch[h.task_id]
@@ -628,7 +667,9 @@ export default function DocumentsPage() {
     }
 
     toast.dismiss(tId);
-    toast.success(`Cleaned ${updated} title${updated === 1 ? '' : 's'}`);
+    const parts = [`Cleaned ${updated} title${updated === 1 ? '' : 's'}`];
+    if (deduped > 0) parts.push(`merged ${deduped} duplicate${deduped === 1 ? '' : 's'}`);
+    toast.success(parts.join(' · '));
     setRetitling(false);
   };
 
