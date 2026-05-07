@@ -376,7 +376,17 @@ export default function DocumentsPage() {
         }
 
         const inv = json.invoice || {};
-        const title = inv.task_title || inv.vendor || 'Service';
+        // Recurring task title needs to be STABLE across invoices from
+        // the same vendor — otherwise four months of Spectrum bills
+        // create four separate "next pending" tasks instead of one. We
+        // anchor on vendor where possible: "Spectrum — Internet Bill",
+        // "Modern Mechanical — HVAC Tune-up", etc. Falls back to one or
+        // the other when only one is present.
+        const vendor: string = (inv.vendor || '').trim();
+        const taskHint: string = (inv.task_title || '').trim();
+        const title = vendor && taskHint
+          ? `${vendor} — ${taskHint}`
+          : (taskHint || vendor || 'Service');
         const completedDate = inv.completed_date || null;
         const completedAt = completedDate ? `${completedDate}T12:00:00Z` : new Date().toISOString();
         const recurrence = inv.recurrence || 'one_time';

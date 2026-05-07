@@ -23,11 +23,11 @@ const SCHEMA = {
     },
     document_title: {
       type: SchemaType.STRING,
-      description: 'A clean, human-readable title for this document, e.g. "Modern Mechanical — Termite Inspection (Apr 2026)". Empty string if unsure.',
+      description: 'Leave empty — the server formats the document title deterministically from vendor + completed_date.',
     },
     task_title: {
       type: SchemaType.STRING,
-      description: 'A short title describing the work done, e.g. "Termite Inspection", "HVAC Tune-up", "Gutter Cleaning". Empty string if unclear.',
+      description: 'A SHORT, GENERIC service descriptor in 1-3 words. Use the SAME phrasing for repeat services from the same vendor so a monthly cable bill always reads "Internet Bill", a quarterly pest visit always reads "Pest Treatment", etc. Examples: "Internet Bill", "Electric Bill", "Water Bill", "Gas Bill", "HVAC Tune-up", "Termite Inspection", "Pest Treatment", "Gutter Cleaning", "Lawn Service". Do NOT include the month, year, vendor name, or invoice number. Empty string if unclear.',
     },
     vendor: {
       type: SchemaType.STRING,
@@ -146,7 +146,11 @@ export async function POST(req: NextRequest) {
     generationConfig: {
       responseMimeType: 'application/json',
       responseSchema: SCHEMA as any,
-      temperature: 0.1,
+      // Zero temperature so two runs over the same PDF return the
+      // same JSON. Critical when the user uploads e.g. 4 months of
+      // the same vendor's bills and expects identical task_title /
+      // recurrence / category across them.
+      temperature: 0,
     },
   });
 
@@ -154,7 +158,13 @@ export async function POST(req: NextRequest) {
 Return strict JSON matching the schema. Use empty strings for unknown text fields and 0 for unknown amounts.
 Set is_invoice=false if the document is not an invoice or receipt for home work.
 The completed_date must be YYYY-MM-DD; if only a month/year is shown, use the 1st of that month.
-Never invent vendors or amounts.`;
+Never invent vendors or amounts.
+
+Determinism rules — follow EXACTLY:
+- task_title is a generic 1-3 word service descriptor (e.g. "Internet Bill", "Electric Bill", "Pest Treatment", "HVAC Tune-up"). It must NOT include the month, year, vendor name, or any invoice-specific detail. Reuse the same phrasing for repeat services so multiple invoices from the same vendor share one task.
+- For utility statements (internet/cable, electric, gas, water, sewer, trash) recurrence is "monthly".
+- For pest/termite quarterly plans recurrence is "quarterly"; for "every 6 months" plans it is "bi_annual".
+- Leave document_title as an empty string — the server fills it from vendor + completed_date.`;
 
   let result;
   try {
@@ -218,13 +228,41 @@ Never invent vendors or amounts.`;
   const rawRec = cleanStr(parsed.recurrence).toLowerCase();
   const recurrence = allowedRecurrence.has(rawRec) ? rawRec : 'one_time';
 
+  const vendor = cleanStr(parsed.vendor);
+  const taskTitle = cleanStr(parsed.task_title);
+  const completedDate = cleanDate(parsed.completed_date);
+
+  // Server-formatted document title — deterministic, vendor-anchored,
+  // human-readable. Four monthly Spectrum bills will read "Spectrum —
+  // Jan 2026", "Spectrum — Feb 2026", … instead of whatever phrasing
+  // the model chose on each run.
+  const MONTHS = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  const formatDocTitle = (): string => {
+    const dateLabel = (() => {
+      if (!completedDate) return '';
+      const [y, m] = completedDate.split('-');
+      const idx = parseInt(m, 10) - 1;
+      if (idx < 0 || idx > 11) return '';
+      return `${MONTHS[idx]} ${y}`;
+    })();
+    if (vendor && dateLabel) return `${vendor} — ${dateLabel}`;
+    if (vendor && taskTitle) return `${vendor} — ${taskTitle}`;
+    if (vendor) return vendor;
+    if (taskTitle && dateLabel) return `${taskTitle} — ${dateLabel}`;
+    if (taskTitle) return taskTitle;
+    return '';
+  };
+
   return NextResponse.json({
     ok: true,
-    document_title: cleanStr(parsed.document_title),
+    document_title: formatDocTitle(),
     invoice: {
-      task_title: cleanStr(parsed.task_title),
-      vendor: cleanStr(parsed.vendor),
-      completed_date: cleanDate(parsed.completed_date),
+      task_title: taskTitle,
+      vendor,
+      completed_date: completedDate,
       cost: cleanNum(parsed.cost),
       category_hint: cleanStr(parsed.category_hint),
       recurrence,
