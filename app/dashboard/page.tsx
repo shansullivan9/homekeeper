@@ -289,9 +289,14 @@ export default function DashboardPage() {
           new Date((b as any).created_at || 0).getTime()
         );
         return bKey - aKey;
-      })
-      .slice(0, 5),
+      }),
     [tasks, recentlyCompletedCutoff, claimFilter, user]
+  );
+  const RECENTLY_COMPLETED_LIMIT = 25;
+  const recentlyCompletedVisible = recentlyCompleted.slice(0, RECENTLY_COMPLETED_LIMIT);
+  const recentlyCompletedHidden = Math.max(
+    0,
+    recentlyCompleted.length - RECENTLY_COMPLETED_LIMIT
   );
 
   const currentYear = now.getFullYear();
@@ -705,9 +710,17 @@ export default function DashboardPage() {
               </button>
             </div>
             <div className="mx-4 ios-card overflow-hidden">
-              {recentlyCompleted.map((t) => (
+              {recentlyCompletedVisible.map((t) => (
                 <TaskCard key={t.id} task={t} compact sectionColor="#8E8E93" />
               ))}
+              {recentlyCompletedHidden > 0 && (
+                <button
+                  onClick={() => router.push('/history')}
+                  className="ios-list-item w-full text-brand-500 text-caption font-semibold active:bg-gray-50 md:hover:bg-gray-50"
+                >
+                  +{recentlyCompletedHidden} more in Task History →
+                </button>
+              )}
             </div>
           </div>
         )}
