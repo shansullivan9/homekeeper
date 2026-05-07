@@ -450,16 +450,42 @@ export default function HistoryPage() {
                         );
                       })()}
                     </div>
-                    {h.notes && (
-                      <div className="mt-1.5 flex items-start gap-1.5 text-xs text-ink-secondary">
-                        <StickyNote
-                          size={11}
-                          className="mt-0.5 text-ink-tertiary flex-shrink-0"
-                          aria-hidden="true"
-                        />
-                        <p className="italic line-clamp-2 leading-snug">{h.notes}</p>
-                      </div>
-                    )}
+                    {(() => {
+                      // Hide the notes line when it's just the
+                      // contractor's name — that's already covered by
+                      // the contractor chip above and showing it twice
+                      // looks like a bug. Also hides notes that the
+                      // detector left as exactly "Vendor (phone)".
+                      if (!h.notes) return null;
+                      const cid =
+                        (h as any).contractor_id ||
+                        (h.task_id
+                          ? (tasks.find((t) => t.id === h.task_id) as any)?.contractor_id
+                          : null);
+                      const c = cid ? contractors.find((x) => x.id === cid) : null;
+                      const trimmed = h.notes.trim();
+                      const stripped = trimmed
+                        .replace(/\s*\(?[\d\s().-]{7,}\)?\s*$/, '')
+                        .trim()
+                        .toLowerCase();
+                      if (
+                        c &&
+                        (stripped === c.name.trim().toLowerCase() ||
+                          trimmed.toLowerCase() === c.name.trim().toLowerCase())
+                      ) {
+                        return null;
+                      }
+                      return (
+                        <div className="mt-1.5 flex items-start gap-1.5 text-xs text-ink-secondary">
+                          <StickyNote
+                            size={11}
+                            className="mt-0.5 text-ink-tertiary flex-shrink-0"
+                            aria-hidden="true"
+                          />
+                          <p className="italic line-clamp-2 leading-snug">{h.notes}</p>
+                        </div>
+                      );
+                    })()}
                     {h.photos && h.photos.length > 0 && (
                       <div className="flex gap-1.5 mt-2">
                         {h.photos.slice(0, 4).map((url, i) => (
