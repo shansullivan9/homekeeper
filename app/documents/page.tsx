@@ -328,24 +328,32 @@ export default function DocumentsPage() {
     const newTasks: any[] = [];
     const newHistoryRows: any[] = [];
 
-    const nextDueDate = (completed: string, recurrence: string): string | null => {
-      const d = parseISO(completed);
+    const advanceOnce = (fromIso: string, recurrence: string): string | null => {
+      const d = parseISO(fromIso);
       switch (recurrence) {
-        case 'weekly':
-          return format(addDays(d, 7), 'yyyy-MM-dd');
-        case 'bi_monthly':
-          return format(addMonths(d, 2), 'yyyy-MM-dd');
-        case 'monthly':
-          return format(addMonths(d, 1), 'yyyy-MM-dd');
-        case 'quarterly':
-          return format(addMonths(d, 3), 'yyyy-MM-dd');
-        case 'bi_annual':
-          return format(addMonths(d, 6), 'yyyy-MM-dd');
-        case 'yearly':
-          return format(addYears(d, 1), 'yyyy-MM-dd');
-        default:
-          return null;
+        case 'weekly':     return format(addDays(d, 7), 'yyyy-MM-dd');
+        case 'bi_monthly': return format(addMonths(d, 2), 'yyyy-MM-dd');
+        case 'monthly':    return format(addMonths(d, 1), 'yyyy-MM-dd');
+        case 'quarterly':  return format(addMonths(d, 3), 'yyyy-MM-dd');
+        case 'bi_annual':  return format(addMonths(d, 6), 'yyyy-MM-dd');
+        case 'yearly':     return format(addYears(d, 1), 'yyyy-MM-dd');
+        default:           return null;
       }
+    };
+    const nextDueDate = (completed: string, recurrence: string): string | null => {
+      // Advance one cycle at a time until we reach a date >= today,
+      // so an invoice dated months in the past lands the next task on
+      // an UPCOMING due date instead of an already-overdue one. Capped
+      // at 240 iterations to guard against bad recurrence inputs.
+      const todayIso = format(new Date(), 'yyyy-MM-dd');
+      let cursor = completed;
+      for (let i = 0; i < 240; i++) {
+        const next = advanceOnce(cursor, recurrence);
+        if (!next) return null;
+        if (next >= todayIso) return next;
+        cursor = next;
+      }
+      return cursor;
     };
 
     for (const doc of docs) {
