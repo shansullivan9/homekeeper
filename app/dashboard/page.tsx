@@ -7,7 +7,8 @@ import SuggestionBanner from '@/components/dashboard/SuggestionBanner';
 import PageHeader from '@/components/layout/PageHeader';
 import { useRouter } from 'next/navigation';
 import { useAppInit } from '@/hooks/useAppInit';
-import { Home as HomeIcon, Users, ChevronRight, GripVertical, Package, Clock3, Banknote, FileText, BarChart3, Briefcase } from 'lucide-react';
+import { Home as HomeIcon, Users, ChevronRight, ChevronDown, GripVertical, Package, Clock3, Banknote, FileText, BarChart3, Briefcase } from 'lucide-react';
+import { useStoredState } from '@/lib/useStoredState';
 
 type ClaimFilter = 'all' | 'unclaimed' | 'mine' | 'theirs';
 
@@ -183,6 +184,23 @@ export default function DashboardPage() {
   };
 
   const endDrag = () => setDraggingHref(null);
+
+  // Per-bucket collapse state. Stored as an array (JSON-friendly) and
+  // converted to a Set for O(1) membership checks. Each section
+  // header is tap-to-toggle so the user can hide overwhelming
+  // buckets (e.g. 11 mortgage bills under "Due This Month") without
+  // scrolling past them every time.
+  const [collapsedBuckets, setCollapsedBuckets] = useStoredState<string[]>(
+    'dashboard:collapsed-buckets',
+    [],
+    user?.id
+  );
+  const collapsed = useMemo(() => new Set(collapsedBuckets), [collapsedBuckets]);
+  const toggleBucket = (key: string) => {
+    setCollapsedBuckets((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+  };
 
   const activeTasks = useMemo(() => {
     return tasks.filter((t) => t.status !== 'completed' && t.status !== 'skipped' && !t.is_suggestion);
@@ -605,87 +623,117 @@ export default function DashboardPage() {
         <div className={`md:grid md:grid-cols-2 md:gap-x-4 md:px-0 ${everythingEmpty ? 'hidden' : ''}`}>
           {/* Overdue */}
           <div id="bucket-overdue" className="scroll-mt-20">
-            <p className="section-header">
-              <span className="inline-block w-2 h-2 rounded-full bg-status-red mr-1.5" />
-              Overdue ({overdue.length})
-            </p>
-            <div className="mx-4 ios-card overflow-hidden">
-              {overdue.length > 0 ? (
-                overdue.map((t) => (
-                  <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#FF3B30" />
-                ))
-              ) : (
-                <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
-              )}
-            </div>
+            <BucketHeader
+              bucketKey="overdue"
+              label="Overdue"
+              count={overdue.length}
+              dotColor="#FF3B30"
+              collapsed={collapsed.has('overdue')}
+              onToggle={() => toggleBucket('overdue')}
+            />
+            {!collapsed.has('overdue') && (
+              <div className="mx-4 ios-card overflow-hidden">
+                {overdue.length > 0 ? (
+                  overdue.map((t) => (
+                    <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#FF3B30" />
+                  ))
+                ) : (
+                  <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Due This Week */}
           <div id="bucket-this-week" className="scroll-mt-20">
-            <p className="section-header">
-              <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#FF9F0A' }} />
-              Due This Week ({dueThisWeek.length})
-            </p>
-            <div className="mx-4 ios-card overflow-hidden">
-              {dueThisWeek.length > 0 ? (
-                dueThisWeek.map((t) => (
-                  <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#FF9F0A" />
-                ))
-              ) : (
-                <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
-              )}
-            </div>
+            <BucketHeader
+              bucketKey="this-week"
+              label="Due This Week"
+              count={dueThisWeek.length}
+              dotColor="#FF9F0A"
+              collapsed={collapsed.has('this-week')}
+              onToggle={() => toggleBucket('this-week')}
+            />
+            {!collapsed.has('this-week') && (
+              <div className="mx-4 ios-card overflow-hidden">
+                {dueThisWeek.length > 0 ? (
+                  dueThisWeek.map((t) => (
+                    <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#FF9F0A" />
+                  ))
+                ) : (
+                  <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Due This Month */}
           <div>
-            <p className="section-header">
-              <span className="inline-block w-2 h-2 rounded-full bg-status-green mr-1.5" />
-              Due This Month ({dueThisMonth.length})
-            </p>
-            <div className="mx-4 ios-card overflow-hidden">
-              {dueThisMonth.length > 0 ? (
-                dueThisMonth.map((t) => (
-                  <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#34C759" />
-                ))
-              ) : (
-                <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
-              )}
-            </div>
+            <BucketHeader
+              bucketKey="this-month"
+              label="Due This Month"
+              count={dueThisMonth.length}
+              dotColor="#34C759"
+              collapsed={collapsed.has('this-month')}
+              onToggle={() => toggleBucket('this-month')}
+            />
+            {!collapsed.has('this-month') && (
+              <div className="mx-4 ios-card overflow-hidden">
+                {dueThisMonth.length > 0 ? (
+                  dueThisMonth.map((t) => (
+                    <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#34C759" />
+                  ))
+                ) : (
+                  <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Upcoming */}
           <div>
-            <p className="section-header">
-              <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#4B9CD3' }} />
-              Upcoming ({upcoming.length})
-            </p>
-            <div className="mx-4 ios-card overflow-hidden">
-              {upcoming.length > 0 ? (
-                upcoming.map((t) => (
-                  <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#4B9CD3" />
-                ))
-              ) : (
-                <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
-              )}
-            </div>
+            <BucketHeader
+              bucketKey="upcoming"
+              label="Upcoming"
+              count={upcoming.length}
+              dotColor="#4B9CD3"
+              collapsed={collapsed.has('upcoming')}
+              onToggle={() => toggleBucket('upcoming')}
+            />
+            {!collapsed.has('upcoming') && (
+              <div className="mx-4 ios-card overflow-hidden">
+                {upcoming.length > 0 ? (
+                  upcoming.map((t) => (
+                    <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#4B9CD3" />
+                  ))
+                ) : (
+                  <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Later */}
           <div>
-            <p className="section-header">
-              <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#592A8A' }} />
-              Later ({later.length})
-            </p>
-            <div className="mx-4 ios-card overflow-hidden">
-              {later.length > 0 ? (
-                later.map((t) => (
-                  <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#592A8A" />
-                ))
-              ) : (
-                <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
-              )}
-            </div>
+            <BucketHeader
+              bucketKey="later"
+              label="Later"
+              count={later.length}
+              dotColor="#592A8A"
+              collapsed={collapsed.has('later')}
+              onToggle={() => toggleBucket('later')}
+            />
+            {!collapsed.has('later') && (
+              <div className="mx-4 ios-card overflow-hidden">
+                {later.length > 0 ? (
+                  later.map((t) => (
+                    <TaskCard key={t.id} task={t} onComplete={loadData} sectionColor="#592A8A" />
+                  ))
+                ) : (
+                  <div className="px-4 py-3.5 text-sm text-ink-tertiary">None</div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -693,34 +741,89 @@ export default function DashboardPage() {
             it stays visible even when active buckets are empty. */}
         {recentlyCompleted.length > 0 && (
           <div>
-            <div className="section-header flex items-center justify-between !pr-2">
-              <span className="flex items-center">
-                <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: '#8E8E93' }} />
-                Recently Completed ({recentlyCompleted.length})
-              </span>
-              <button
-                onClick={() => router.push('/history')}
-                className="text-brand-500 text-caption font-semibold normal-case tracking-normal active:text-brand-600 md:hover:text-brand-600"
-              >
-                View all
-              </button>
-            </div>
-            <div className="mx-4 ios-card overflow-hidden">
-              {recentlyCompletedVisible.map((t) => (
-                <TaskCard key={t.id} task={t} compact sectionColor="#8E8E93" />
-              ))}
-              {recentlyCompletedHidden > 0 && (
+            <BucketHeader
+              bucketKey="recently-completed"
+              label="Recently Completed"
+              count={recentlyCompleted.length}
+              dotColor="#8E8E93"
+              collapsed={collapsed.has('recently-completed')}
+              onToggle={() => toggleBucket('recently-completed')}
+              rightSlot={
                 <button
-                  onClick={() => router.push('/history')}
-                  className="ios-list-item w-full text-brand-500 text-caption font-semibold active:bg-gray-50 md:hover:bg-gray-50"
+                  onClick={(e) => { e.stopPropagation(); router.push('/history'); }}
+                  className="text-brand-500 text-caption font-semibold normal-case tracking-normal active:text-brand-600 md:hover:text-brand-600"
                 >
-                  +{recentlyCompletedHidden} more in Task History →
+                  View all
                 </button>
-              )}
-            </div>
+              }
+            />
+            {!collapsed.has('recently-completed') && (
+              <div className="mx-4 ios-card overflow-hidden">
+                {recentlyCompletedVisible.map((t) => (
+                  <TaskCard key={t.id} task={t} compact sectionColor="#8E8E93" />
+                ))}
+                {recentlyCompletedHidden > 0 && (
+                  <button
+                    onClick={() => router.push('/history')}
+                    className="ios-list-item w-full text-brand-500 text-caption font-semibold active:bg-gray-50 md:hover:bg-gray-50"
+                  >
+                    +{recentlyCompletedHidden} more in Task History →
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// Tap-to-collapse section header used by every dashboard bucket.
+// Renders the colored dot + label + count, a chevron that flips
+// when collapsed, and an optional rightSlot for actions like
+// "View all" that should sit in the same row.
+function BucketHeader({
+  bucketKey,
+  label,
+  count,
+  dotColor,
+  collapsed,
+  onToggle,
+  rightSlot,
+}: {
+  bucketKey: string;
+  label: string;
+  count: number;
+  dotColor: string;
+  collapsed: boolean;
+  onToggle: () => void;
+  rightSlot?: React.ReactNode;
+}) {
+  return (
+    <div className="section-header flex items-center justify-between !pr-2">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={!collapsed}
+        aria-controls={`bucket-body-${bucketKey}`}
+        className="flex items-center gap-1.5 flex-1 text-left active:opacity-70"
+      >
+        <span
+          className="inline-block w-2 h-2 rounded-full"
+          style={{ backgroundColor: dotColor }}
+        />
+        <span>
+          {label} ({count})
+        </span>
+        <ChevronDown
+          size={14}
+          className={`text-ink-tertiary transition-transform ${
+            collapsed ? '-rotate-90' : ''
+          }`}
+        />
+      </button>
+      {rightSlot}
     </div>
   );
 }
