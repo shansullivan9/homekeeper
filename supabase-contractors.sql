@@ -22,6 +22,22 @@ CREATE TABLE IF NOT EXISTS public.contractors (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Patch any pre-existing contractors table from an earlier version of
+-- this migration. CREATE TABLE IF NOT EXISTS above does NOT add
+-- missing columns when the table already exists, so we follow up with
+-- explicit ADD COLUMN IF NOT EXISTS for every optional field.
+ALTER TABLE public.contractors ADD COLUMN IF NOT EXISTS company  TEXT;
+ALTER TABLE public.contractors ADD COLUMN IF NOT EXISTS category TEXT;
+ALTER TABLE public.contractors ADD COLUMN IF NOT EXISTS phone    TEXT;
+ALTER TABLE public.contractors ADD COLUMN IF NOT EXISTS email    TEXT;
+ALTER TABLE public.contractors ADD COLUMN IF NOT EXISTS website  TEXT;
+ALTER TABLE public.contractors ADD COLUMN IF NOT EXISTS address  TEXT;
+ALTER TABLE public.contractors ADD COLUMN IF NOT EXISTS notes    TEXT;
+ALTER TABLE public.contractors
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE public.contractors
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
 CREATE INDEX IF NOT EXISTS idx_contractors_home_id ON public.contractors(home_id);
 
 ALTER TABLE public.contractors ENABLE ROW LEVEL SECURITY;

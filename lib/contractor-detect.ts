@@ -31,6 +31,10 @@ export interface ContractorDetection {
   // Best-guess name. Editable in the importer UI before saving.
   name: string;
   phone: string | null;
+  // Best-guess trade inferred from the source row's title (e.g. a
+  // "Lawn Mowing" task points at Landscaping). null when nothing
+  // matches; user can edit before import.
+  category: string | null;
   // Every row that surfaced this name. Used both to show the user
   // "this would link X past jobs" and to actually patch contractor_id
   // on those rows after import.
@@ -38,6 +42,41 @@ export interface ContractorDetection {
 }
 
 const PHONE_RE = /\b\(?(\d{3})\)?[-.\s]?(\d{3})[-.\s]?(\d{4})\b/;
+
+// Title/notes keyword → contractor trade. Distinct from the task
+// CATEGORY_KEYWORDS map because trades read differently than chore
+// categories (a contractor is "Landscaping", not "Yard"). First match
+// wins; longest/most specific phrases are listed first.
+const TRADE_KEYWORDS: { keywords: string[]; trade: string }[] = [
+  { keywords: ['hvac', 'furnace', 'air condition', 'thermostat', 'duct', 'heat pump', 'a/c '], trade: 'HVAC' },
+  { keywords: ['plumb', 'water heater', 'water softener', 'pipe', 'leak', 'drain', 'faucet', 'sewer', 'sump', 'toilet'], trade: 'Plumbing' },
+  { keywords: ['electric', 'wiring', 'breaker', 'gfci', 'outlet', 'panel', 'ceiling fan', 'light bulb'], trade: 'Electrical' },
+  { keywords: ['landscap', 'lawn', 'mow', 'garden', 'mulch', 'sprinkler', 'irrigation', 'shrub', 'hedge', 'tree trim', 'leaf'], trade: 'Landscaping' },
+  { keywords: ['pool', 'spa', 'hot tub'], trade: 'Pool' },
+  { keywords: ['pest', 'termite', 'roach', 'rodent', 'mosquito', 'extermin', 'rat', 'spider'], trade: 'Pest Control' },
+  { keywords: ['roof', 'gutter'], trade: 'Roofing' },
+  { keywords: ['chimney'], trade: 'Chimney' },
+  { keywords: ['paint'], trade: 'Painting' },
+  { keywords: ['pressure wash', 'power wash', 'window clean'], trade: 'Exterior Cleaning' },
+  { keywords: ['carpet clean', 'house clean', 'maid', 'housekeep', 'cleaner'], trade: 'Cleaning' },
+  { keywords: ['washer', 'dryer', 'dishwasher', 'refrigerator', 'fridge', 'oven', 'microwave', 'stove', 'appliance repair'], trade: 'Appliance Repair' },
+  { keywords: ['handyman', 'general contract'], trade: 'Handyman' },
+  { keywords: ['septic'], trade: 'Septic' },
+  { keywords: ['fence', 'deck', 'patio', 'driveway', 'siding'], trade: 'Exterior' },
+  { keywords: ['remodel', 'renovat', 'install'], trade: 'Projects' },
+];
+
+function inferTrade(...sources: (string | null | undefined)[]): string | null {
+  const hay = sources
+    .filter((s): s is string => !!s && !!s.trim())
+    .join(' ')
+    .toLowerCase();
+  if (!hay) return null;
+  for (const rule of TRADE_KEYWORDS) {
+    if (rule.keywords.some((kw) => hay.includes(kw))) return rule.trade;
+  }
+  return null;
+}
 
 function isPlausibleName(raw: string): boolean {
   const s = raw.trim();
@@ -100,6 +139,10 @@ export function detectContractorsFromNotes(input: {
     if (!hit) return;
     const key = hit.name.toLowerCase();
     if (known.has(key)) return;
+    // Trade is inferred from the source row's title plus its notes —
+    // a "Lawn Mowing" task surfaces "Mario" → Landscaping even when
+    // the notes themselves are just "Mario (919) 390-4202".
+    const trade = inferTrade(source.title, text);
     const existing = map.get(key);
     const fullSource: DetectionSource = { ...source, raw: text };
     if (existing) {
@@ -107,9 +150,15 @@ export function detectContractorsFromNotes(input: {
       // Tolentino" beats "mario tolentino").
       if (hit.name.length > existing.name.length) existing.name = hit.name;
       if (!existing.phone && hit.phone) existing.phone = hit.phone;
+      if (!existing.category && trade) existing.category = trade;
       existing.sources.push(fullSource);
     } else {
-      map.set(key, { name: hit.name, phone: hit.phone, sources: [fullSource] });
+      map.set(key, {
+        name: hit.name,
+        phone: hit.phone,
+        category: trade,
+        sources: [fullSource],
+      });
     }
   };
 

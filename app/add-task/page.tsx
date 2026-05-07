@@ -328,30 +328,46 @@ function AddTaskForm() {
 
   const nextDueFromCompleted = (completedDate: string, rec: Recurrence): string | null => {
     if (rec === 'one_time' || !completedDate) return null;
-    const base = new Date(completedDate + 'T00:00:00');
     const addMonths = (d: Date, m: number) => {
       const out = new Date(d);
       out.setMonth(out.getMonth() + m);
       return out;
     };
-    let next: Date;
-    switch (rec) {
-      case 'weekly': next = new Date(base.getTime() + 7 * 86400000); break;
-      case 'monthly': next = addMonths(base, 1); break;
-      case 'bi_monthly': next = addMonths(base, 2); break;
-      case 'quarterly': next = addMonths(base, 3); break;
-      case 'bi_annual': next = addMonths(base, 6); break;
-      case 'yearly': next = addMonths(base, 12); break;
-      case 'bi_yearly': next = addMonths(base, 24); break;
-      case 'custom': {
-        const days = recurrenceDays ? parseInt(recurrenceDays) : 0;
-        if (!days) return null;
-        next = new Date(base.getTime() + days * 86400000);
-        break;
+    const advanceOnce = (fromIso: string): string | null => {
+      const base = new Date(fromIso + 'T00:00:00');
+      let next: Date;
+      switch (rec) {
+        case 'weekly': next = new Date(base.getTime() + 7 * 86400000); break;
+        case 'monthly': next = addMonths(base, 1); break;
+        case 'bi_monthly': next = addMonths(base, 2); break;
+        case 'quarterly': next = addMonths(base, 3); break;
+        case 'bi_annual': next = addMonths(base, 6); break;
+        case 'yearly': next = addMonths(base, 12); break;
+        case 'bi_yearly': next = addMonths(base, 24); break;
+        case 'custom': {
+          const days = recurrenceDays ? parseInt(recurrenceDays) : 0;
+          if (!days) return null;
+          next = new Date(base.getTime() + days * 86400000);
+          break;
+        }
+        default: return null;
       }
-      default: return null;
+      return next.toISOString().slice(0, 10);
+    };
+    // Advance one cycle at a time until the next date is today or
+    // later. Logging an old bill (e.g. completed Jan 10, today is May)
+    // should land the user's next pending task on an UPCOMING date,
+    // not an already-overdue one. Capped at 240 iterations so a
+    // misconfigured weekly task can't spin forever.
+    const todayIso = new Date().toISOString().slice(0, 10);
+    let cursor = completedDate;
+    for (let i = 0; i < 240; i++) {
+      const next = advanceOnce(cursor);
+      if (!next) return null;
+      if (next >= todayIso) return next;
+      cursor = next;
     }
-    return next.toISOString().slice(0, 10);
+    return cursor;
   };
 
   const handleSave = async (opts: { addAnother?: boolean } = {}) => {

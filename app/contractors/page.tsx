@@ -285,6 +285,25 @@ function ContractorsPageInner() {
     [linkedHistory]
   );
 
+  // Per-contractor spend roll-up for the list view. One pass over
+  // history so the list-view subtitle can show "$X · N jobs · last
+  // service" without each row recomputing.
+  const spendByContractor = useMemo(() => {
+    const map = new Map<string, { total: number; jobs: number; lastDate: string | null }>();
+    for (const h of history) {
+      const cid = (h as any).contractor_id as string | null | undefined;
+      if (!cid) continue;
+      const entry = map.get(cid) || { total: 0, jobs: 0, lastDate: null };
+      entry.total += h.cost || 0;
+      entry.jobs += 1;
+      if (h.completed_at && (!entry.lastDate || h.completed_at > entry.lastDate)) {
+        entry.lastDate = h.completed_at;
+      }
+      map.set(cid, entry);
+    }
+    return map;
+  }, [history]);
+
   // ============================================================
   // Detect-from-notes importer state
   // ============================================================
@@ -292,7 +311,7 @@ function ContractorsPageInner() {
   const [detections, setDetections] = useState<ContractorDetection[]>([]);
   // The user can edit each name and tick / un-tick it before import.
   const [detectChoices, setDetectChoices] = useState<
-    Record<string, { include: boolean; name: string }>
+    Record<string, { include: boolean; name: string; category: string }>
   >({});
   const [importing, setImporting] = useState(false);
 
@@ -312,11 +331,15 @@ function ContractorsPageInner() {
 
   const openDetect = () => {
     setDetections(allDetections);
-    const initial: Record<string, { include: boolean; name: string }> = {};
+    const initial: Record<string, { include: boolean; name: string; category: string }> = {};
     for (const d of allDetections) {
       // Use the lowercase name as the stable key — the detector
       // dedupes on it too.
-      initial[d.name.toLowerCase()] = { include: true, name: d.name };
+      initial[d.name.toLowerCase()] = {
+        include: true,
+        name: d.name,
+        category: d.category || '',
+      };
     }
     setDetectChoices(initial);
     setDetectOpen(true);
@@ -334,12 +357,17 @@ function ContractorsPageInner() {
     setImporting(true);
     try {
       // Create contractors first.
-      const insertRows = picked.map((d) => ({
-        home_id: home.id,
-        name: detectChoices[d.name.toLowerCase()]?.name?.trim() || d.name,
-        phone: d.phone,
-        updated_at: new Date().toISOString(),
-      }));
+      const insertRows = picked.map((d) => {
+        const choice = detectChoices[d.name.toLowerCase()];
+        const category = (choice?.category ?? d.category ?? '').trim();
+        return {
+          home_id: home.id,
+          name: choice?.name?.trim() || d.name,
+          phone: d.phone,
+          category: category || null,
+          updated_at: new Date().toISOString(),
+        };
+      });
       const { data: inserted, error: insertErr } = await supabase
         .from('contractors')
         .insert(insertRows as any)
@@ -876,29 +904,39 @@ function ContractorsPageInner() {
           </div>
         ) : (
           <div className="ios-card overflow-hidden">
-            {visible.map((c) => (
-              <Link
-                key={c.id}
-                href={`/contractors?edit=${c.id}`}
-                className="ios-list-item w-full"
-              >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <div className="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center text-brand-500 flex-shrink-0">
-                    <Briefcase size={18} />
+            {visible.map((c) => {
+              const spend = spendByContractor.get(c.id);
+              return (
+                <Link
+                  key={c.id}
+                  href={`/contractors?edit=${c.id}`}
+                  className="ios-list-item w-full"
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="w-10 h-10 rounded-full bg-brand-50 flex items-center justify-center text-brand-500 flex-shrink-0">
+                      <Briefcase size={18} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-body font-semibold truncate">{c.name}</p>
+                      <p className="text-caption text-ink-tertiary truncate">
+                        {[c.category, c.company].filter(Boolean).join(' · ') ||
+                          fmtPhone(c.phone) ||
+                          c.email ||
+                          'Tap to add details'}
+                      </p>
+                      {spend && spend.jobs > 0 && (
+                        <p className="text-micro text-ink-tertiary truncate">
+                          {spend.total > 0 && `$${spend.total.toLocaleString(undefined, { maximumFractionDigits: 0 })} · `}
+                          {spend.jobs} {spend.jobs === 1 ? 'job' : 'jobs'}
+                          {spend.lastDate && ` · last ${format(parseISO(spend.lastDate), 'MMM d, yyyy')}`}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-body font-semibold truncate">{c.name}</p>
-                    <p className="text-caption text-ink-tertiary truncate">
-                      {[c.category, c.company].filter(Boolean).join(' · ') ||
-                        fmtPhone(c.phone) ||
-                        c.email ||
-                        'Tap to add details'}
-                    </p>
-                  </div>
-                </div>
-                <ChevronRight size={16} className="text-ink-tertiary" />
-              </Link>
-            ))}
+                  <ChevronRight size={16} className="text-ink-tertiary" />
+                </Link>
+              );
+            })}
             {visible.length === 0 && search.trim() && (
               <div className="px-4 py-6 text-caption text-ink-tertiary text-center">
                 No matches for &ldquo;{search}&rdquo;
@@ -994,6 +1032,18 @@ function ContractorsPageInner() {
                           }
                           className="w-full text-body font-semibold bg-transparent outline-none border-b border-transparent focus:border-brand-300"
                           placeholder="Contractor name"
+                        />
+                        <input
+                          type="text"
+                          value={choice.category}
+                          onChange={(e) =>
+                            setDetectChoices((c) => ({
+                              ...c,
+                              [key]: { ...choice, category: e.target.value },
+                            }))
+                          }
+                          className="w-full text-caption text-ink-secondary bg-transparent outline-none border-b border-transparent focus:border-brand-300"
+                          placeholder="Trade (e.g. HVAC, Plumbing)"
                         />
                         {d.phone && (
                           <p className="text-caption text-ink-secondary flex items-center gap-1">
