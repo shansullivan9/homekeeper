@@ -517,6 +517,121 @@ export default function DocumentsPage() {
     }
   };
 
+  // Re-runs invoice extraction over every already-uploaded invoice
+  // doc in this home and rewrites doc.title + linked tasks.title +
+  // task_history.title to the new deterministic format. Idempotent
+  // so the user can tap it whenever titles drift.
+  const [retitling, setRetitling] = useState(false);
+  const retitleInvoices = async () => {
+    if (!home || retitling) return;
+    // "Invoice docs" = any doc that has at least one completed task
+    // pointing at it via source_document_id. Tasks already loaded.
+    const linkedTaskIds = tasks.filter(
+      (t) => t.status === 'completed' && (t as any).source_document_id
+    );
+    const docIds = new Set<string>(
+      linkedTaskIds.map((t) => (t as any).source_document_id as string)
+    );
+    const targets = documents.filter((d) => docIds.has(d.id));
+    if (targets.length === 0) {
+      toast('No invoice documents to clean up.');
+      return;
+    }
+    setRetitling(true);
+    const tId = toast.loading(`Re-formatting ${targets.length} title${targets.length === 1 ? '' : 's'}…`);
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess.session?.access_token;
+    if (!token) {
+      toast.dismiss(tId);
+      toast.error('Not signed in');
+      setRetitling(false);
+      return;
+    }
+
+    let updated = 0;
+    const docPatch: Record<string, string> = {};
+    const taskPatch: Record<string, string> = {};
+    for (const doc of targets) {
+      try {
+        const res = await fetch('/api/invoices/extract', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ documentId: doc.id }),
+        });
+        const json = await res.json();
+        if (!res.ok || !json.ok) continue;
+
+        const newDocTitle: string = (json.document_title || '').trim();
+        const inv = json.invoice || {};
+        const vendor: string = (inv.vendor || '').trim();
+        const taskHint: string = (inv.task_title || '').trim();
+        const newTaskTitle = vendor && taskHint
+          ? `${vendor} — ${taskHint}`
+          : (taskHint || vendor || 'Service');
+
+        if (newDocTitle && newDocTitle !== doc.title) {
+          await supabase
+            .from('documents')
+            .update({ title: newDocTitle, updated_at: new Date().toISOString() })
+            .eq('id', doc.id);
+          docPatch[doc.id] = newDocTitle;
+        }
+
+        // Update every completed task linked to this doc + the
+        // matching task_history row(s).
+        const linked = tasks.filter(
+          (t) => (t as any).source_document_id === doc.id
+        );
+        for (const t of linked) {
+          if (t.title !== newTaskTitle) {
+            await supabase
+              .from('tasks')
+              .update({ title: newTaskTitle, updated_at: new Date().toISOString() })
+              .eq('id', t.id);
+            taskPatch[t.id] = newTaskTitle;
+            await supabase
+              .from('task_history')
+              .update({ title: newTaskTitle })
+              .eq('task_id', t.id);
+          }
+        }
+        updated++;
+      } catch {
+        // Skip and continue — one bad doc shouldn't stop the rest.
+      }
+    }
+
+    // Reflect changes in the local store without a full reload.
+    if (Object.keys(docPatch).length) {
+      setDocuments(
+        documents.map((d) =>
+          docPatch[d.id] ? ({ ...d, title: docPatch[d.id] } as Document) : d
+        )
+      );
+    }
+    if (Object.keys(taskPatch).length) {
+      setTasks(
+        tasks.map((t) =>
+          taskPatch[t.id] ? ({ ...t, title: taskPatch[t.id] } as any) : t
+        )
+      );
+      setHistory(
+        history.map((h) =>
+          h.task_id && taskPatch[h.task_id]
+            ? ({ ...h, title: taskPatch[h.task_id] } as any)
+            : h
+        )
+      );
+    }
+
+    toast.dismiss(tId);
+    toast.success(`Cleaned ${updated} title${updated === 1 ? '' : 's'}`);
+    setRetitling(false);
+  };
+
   const processBuilderDocs = async (docs: Document[]) => {
     if (!home || docs.length === 0) return;
     const t = toast.loading(
@@ -1414,6 +1529,21 @@ export default function DocumentsPage() {
         title="Documents"
         subtitle={`${documents.length} stored`}
         back
+        rightAction={
+          // Only surface the cleanup action when there's at least
+          // one invoice-linked doc to clean up.
+          tasks.some((t) => t.status === 'completed' && (t as any).source_document_id) ? (
+            <button
+              onClick={retitleInvoices}
+              disabled={retitling}
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-brand-50 text-brand-600 text-xs font-semibold border border-brand-200 active:bg-brand-100 md:hover:bg-brand-100 disabled:opacity-50"
+              title="Re-format invoice document titles using the latest deterministic template"
+            >
+              <Sparkles size={12} className={retitling ? 'animate-pulse' : ''} />
+              {retitling ? 'Cleaning…' : 'Clean titles'}
+            </button>
+          ) : null
+        }
       />
 
       {documents.length > 0 && (
