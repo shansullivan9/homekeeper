@@ -13,7 +13,7 @@ import { confirm } from '@/lib/confirm';
 import { useStoredState } from '@/lib/useStoredState';
 
 export default function HistoryPage() {
-  const { history, tasks, categories, setHistory, setTasks, user } = useStore();
+  const { history, tasks, categories, contractors, setHistory, setTasks, user } = useStore();
   const supabase = createClient();
   const router = useRouter();
   const [search, setSearch] = useState('');
@@ -428,6 +428,27 @@ export default function HistoryPage() {
                           {categoryFor(h)}
                         </span>
                       )}
+                      {(() => {
+                        // Contractor chip — prefer the history row's
+                        // own contractor_id (set by complete_task RPC
+                        // and the "already done" save path), but fall
+                        // back to the source task so older history
+                        // rows that predate task_history.contractor_id
+                        // still show the vendor.
+                        const cid =
+                          (h as any).contractor_id ||
+                          (h.task_id
+                            ? (tasks.find((t) => t.id === h.task_id) as any)?.contractor_id
+                            : null);
+                        if (!cid) return null;
+                        const c = contractors.find((x) => x.id === cid);
+                        if (!c) return null;
+                        return (
+                          <span className="text-[10px] text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                            {c.name}
+                          </span>
+                        );
+                      })()}
                     </div>
                     {h.notes && (
                       <div className="mt-1.5 flex items-start gap-1.5 text-xs text-ink-secondary">

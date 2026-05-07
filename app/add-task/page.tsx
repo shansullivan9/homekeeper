@@ -482,6 +482,7 @@ function AddTaskForm() {
               completed_by_name: user?.display_name || null,
               completed_at: completedAtIso,
               cost: estimatedCost ? parseFloat(estimatedCost) : null,
+              contractor_id: contractorId || null,
             });
           }
         } else if (!isCompleted) {
@@ -518,6 +519,7 @@ function AddTaskForm() {
             completed_by_name: user?.display_name || null,
             completed_at: completedAtIso || new Date().toISOString(),
             cost: estimatedCost ? parseFloat(estimatedCost) : null,
+            contractor_id: contractorId || null,
           });
 
           // Recurring task logged as already-done: create the next
