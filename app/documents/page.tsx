@@ -356,6 +356,7 @@ export default function DocumentsPage() {
       return cursor;
     };
 
+    const failures: { name: string; reason: string }[] = [];
     for (const doc of docs) {
       try {
         const res = await fetch('/api/invoices/extract', {
@@ -364,7 +365,18 @@ export default function DocumentsPage() {
           body: JSON.stringify({ documentId: doc.id }),
         });
         const json = await res.json();
-        if (!res.ok || !json.ok) continue;
+        if (!res.ok || !json.ok) {
+          // Surface the reason instead of silently dropping the doc —
+          // otherwise a failed extraction looks like a successful
+          // upload that "didn't show up anywhere."
+          const label = doc.title || doc.file_name || 'document';
+          const reason =
+            json?.message ||
+            json?.error ||
+            (res.status === 415 ? 'Unsupported file type' : `HTTP ${res.status}`);
+          failures.push({ name: label, reason });
+          continue;
+        }
 
         const newTitle: string = (json.document_title || '').trim();
         if (newTitle && newTitle !== doc.title) {
@@ -515,6 +527,19 @@ export default function DocumentsPage() {
     } else {
       toast('No invoice details could be extracted.');
     }
+    if (failures.length > 0) {
+      // Long-lived error toast so the user can read which doc(s)
+      // didn't make it through the AI pipeline.
+      const summary =
+        failures.length <= 3
+          ? failures.map((f) => `${f.name}: ${f.reason}`).join('\n')
+          : `${failures.length} documents could not be read by the AI. First few: ` +
+            failures.slice(0, 3).map((f) => f.name).join(', ');
+      toast.error(summary, { duration: 8000 });
+      // Also log the full list to the console for diagnosis.
+      // eslint-disable-next-line no-console
+      console.warn('[invoice-extract] failures', failures);
+    }
   };
 
   // Re-runs invoice extraction over every already-uploaded invoice
@@ -524,21 +549,43 @@ export default function DocumentsPage() {
   const [retitling, setRetitling] = useState(false);
   const retitleInvoices = async () => {
     if (!home || retitling) return;
-    // "Invoice docs" = any doc that has at least one completed task
-    // pointing at it via source_document_id. Tasks already loaded.
-    const linkedTaskIds = tasks.filter(
-      (t) => t.status === 'completed' && (t as any).source_document_id
+    // We act on two groups of documents:
+    //   (a) docs already linked to a completed task → retitle so the
+    //       new deterministic format applies.
+    //   (b) docs classified as "Invoice" that DON'T yet have a linked
+    //       task → run extraction now to create the missing task +
+    //       history row. Catches uploads that silently failed before.
+    const linkedDocIds = new Set<string>(
+      tasks
+        .filter((t) => t.status === 'completed' && (t as any).source_document_id)
+        .map((t) => (t as any).source_document_id as string)
     );
-    const docIds = new Set<string>(
-      linkedTaskIds.map((t) => (t as any).source_document_id as string)
+    const linkedTargets = documents.filter((d) => linkedDocIds.has(d.id));
+    const unlinkedInvoices = documents.filter(
+      (d) => !linkedDocIds.has(d.id) && (d.category === 'Invoice')
     );
-    const targets = documents.filter((d) => docIds.has(d.id));
-    if (targets.length === 0) {
+    const total = linkedTargets.length + unlinkedInvoices.length;
+    if (total === 0) {
       toast('No invoice documents to clean up.');
       return;
     }
     setRetitling(true);
-    const tId = toast.loading(`Re-formatting ${targets.length} title${targets.length === 1 ? '' : 's'}…`);
+    const tId = toast.loading(
+      `Processing ${total} invoice${total === 1 ? '' : 's'}…`
+    );
+    // Queue the unlinked ones through the existing processInvoices
+    // pipeline first so their tasks/history exist before we try to
+    // retitle. Only kicked off when there are unlinked docs to avoid
+    // the "No invoice details could be extracted." toast firing.
+    if (unlinkedInvoices.length > 0) {
+      try {
+        await processInvoices(unlinkedInvoices);
+      } catch (err) {
+        // eslint-disable-next-line no-console
+        console.warn('[clean-titles] processInvoices failed', err);
+      }
+    }
+    const targets = linkedTargets.length > 0 ? linkedTargets : [];
     const { data: sess } = await supabase.auth.getSession();
     const token = sess.session?.access_token;
     if (!token) {
@@ -1571,17 +1618,20 @@ export default function DocumentsPage() {
         subtitle={`${documents.length} stored`}
         back
         rightAction={
-          // Only surface the cleanup action when there's at least
-          // one invoice-linked doc to clean up.
-          tasks.some((t) => t.status === 'completed' && (t as any).source_document_id) ? (
+          // Surface the cleanup action when there's at least one
+          // invoice-linked doc to retitle OR an Invoice-classified
+          // doc that never generated a task (silent extraction
+          // failure on first upload — re-process now).
+          (tasks.some((t) => t.status === 'completed' && (t as any).source_document_id) ||
+            documents.some((d) => d.category === 'Invoice' && !tasks.some((t) => (t as any).source_document_id === d.id))) ? (
             <button
               onClick={retitleInvoices}
               disabled={retitling}
               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-brand-50 text-brand-600 text-xs font-semibold border border-brand-200 active:bg-brand-100 md:hover:bg-brand-100 disabled:opacity-50"
-              title="Re-format invoice document titles using the latest deterministic template"
+              title="Re-process invoice PDFs and re-format their titles"
             >
               <Sparkles size={12} className={retitling ? 'animate-pulse' : ''} />
-              {retitling ? 'Cleaning…' : 'Clean titles'}
+              {retitling ? 'Processing…' : 'Process invoices'}
             </button>
           ) : null
         }
