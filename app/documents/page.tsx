@@ -357,14 +357,41 @@ export default function DocumentsPage() {
     };
 
     const failures: { name: string; reason: string }[] = [];
-    for (const doc of docs) {
-      try {
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    // Gemini free tier caps generateContent at ~15 RPM. Space the
+    // requests so a batch of 8+ uploads doesn't blow the budget on
+    // the very first try, and retry the ones that still 429 after
+    // honoring the server-supplied retryAfterMs hint.
+    const THROTTLE_MS = 1500;
+    const MAX_RETRIES = 3;
+    const callExtract = async (documentId: string): Promise<{
+      res: Response;
+      json: any;
+    }> => {
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         const res = await fetch('/api/invoices/extract', {
           method: 'POST',
           headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` },
-          body: JSON.stringify({ documentId: doc.id }),
+          body: JSON.stringify({ documentId }),
         });
         const json = await res.json();
+        if (res.status !== 429 || attempt === MAX_RETRIES) return { res, json };
+        const wait = Math.max(2000, Number(json?.retryAfterMs) || 20000);
+        toast.dismiss(t);
+        const tWait = toast.loading(
+          `Gemini rate limit — retrying in ${Math.ceil(wait / 1000)}s…`
+        );
+        await sleep(wait);
+        toast.dismiss(tWait);
+      }
+      // Unreachable, but TypeScript doesn't know that.
+      throw new Error('exhausted retries');
+    };
+    for (let i = 0; i < docs.length; i++) {
+      const doc = docs[i];
+      try {
+        if (i > 0) await sleep(THROTTLE_MS);
+        const { res, json } = await callExtract(doc.id);
         if (!res.ok || !json.ok) {
           // Surface the reason instead of silently dropping the doc —
           // otherwise a failed extraction looks like a successful
@@ -399,7 +426,8 @@ export default function DocumentsPage() {
         const title = vendor && taskHint
           ? `${vendor} — ${taskHint}`
           : (taskHint || vendor || 'Service');
-        const completedDate = inv.completed_date || null;
+        const completedDate: string | null = inv.completed_date || null;
+        const billDueDate: string | null = inv.due_date || null;
         const completedAt = completedDate ? `${completedDate}T12:00:00Z` : new Date().toISOString();
         const recurrence = inv.recurrence || 'one_time';
         const matchedCategory =
@@ -417,7 +445,11 @@ export default function DocumentsPage() {
             category_id: matchedCategory?.id || null,
             title,
             description: description || null,
-            due_date: completedDate || null,
+            // The historical row's due_date carries the bill's "Due
+            // by" date when present, so the user can see "this bill
+            // was due Jan 10" on the completed entry. Falls back to
+            // the service date when the AI couldn't read a due date.
+            due_date: billDueDate || completedDate || null,
             recurrence,
             priority: 'medium',
             status: 'completed',
@@ -449,16 +481,34 @@ export default function DocumentsPage() {
           .single();
         if (hist) newHistoryRows.push(hist);
 
-        if (recurrence !== 'one_time' && completedDate) {
-          const next = nextDueDate(completedDate, recurrence);
+        // Anchor the next bill's due date on the BILL'S OWN due_date
+        // when the model surfaced it (the "Due by Jan 10" field on
+        // statements). Falls back to the service period start when
+        // a due date wasn't printed, so receipts for past work still
+        // schedule the next visit.
+        const recurrenceAnchor = billDueDate || completedDate;
+        if (recurrence !== 'one_time' && recurrenceAnchor) {
+          const next = nextDueDate(recurrenceAnchor, recurrence);
           if (next) {
             const normalized = title.trim().toLowerCase();
-            const existing = tasks.find(
-              (t) =>
+            // Look in BOTH the stale store snapshot AND the pending
+            // rows we've created earlier in this same loop. Without
+            // the second check, four bills processed back-to-back
+            // each create their own pending sibling because the
+            // store hasn't been refreshed yet.
+            const inFlight = newTasks.find(
+              (t: any) =>
                 t.status === 'pending' &&
-                !t.is_suggestion &&
-                t.title.trim().toLowerCase() === normalized
+                (t.title || '').trim().toLowerCase() === normalized
             );
+            const existing =
+              inFlight ||
+              tasks.find(
+                (t) =>
+                  t.status === 'pending' &&
+                  !t.is_suggestion &&
+                  t.title.trim().toLowerCase() === normalized
+              );
             if (existing) {
               if (!existing.due_date || existing.due_date < next) {
                 const { data: updated } = await supabase
@@ -471,7 +521,13 @@ export default function DocumentsPage() {
                   .eq('id', existing.id)
                   .select()
                   .single();
-                if (updated) newTasks.push(updated);
+                if (updated) {
+                  // Replace the stale entry in newTasks so subsequent
+                  // iterations see the fresh due_date.
+                  const idx = newTasks.findIndex((t: any) => t.id === existing.id);
+                  if (idx >= 0) newTasks[idx] = updated;
+                  else newTasks.push(updated);
+                }
               }
             } else {
               const { data: nextTask } = await supabase

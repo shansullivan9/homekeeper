@@ -35,7 +35,11 @@ const SCHEMA = {
     },
     completed_date: {
       type: SchemaType.STRING,
-      description: 'Date the work was completed in YYYY-MM-DD format. Use the service date if listed, otherwise the invoice/issue date. Empty string if no date is present.',
+      description: 'Date the work was performed / paid in YYYY-MM-DD format. For a service receipt use the service date. For a recurring utility / mortgage / subscription bill, use the SERVICE PERIOD date (e.g. for a Spectrum statement covering "Dec 24 — Jan 23" use 2025-12-24). Empty string if no date is present.',
+    },
+    due_date: {
+      type: SchemaType.STRING,
+      description: 'Date payment is due, YYYY-MM-DD. For a bill this is the "Due by" / "Pay by" date printed on the statement. For a paid receipt with no future due date, leave empty.',
     },
     cost: {
       type: SchemaType.NUMBER,
@@ -60,6 +64,7 @@ const SCHEMA = {
     'task_title',
     'vendor',
     'completed_date',
+    'due_date',
     'cost',
     'category_hint',
     'recurrence',
@@ -180,10 +185,29 @@ Determinism rules — follow EXACTLY:
       ],
     });
   } catch (err: any) {
-    return NextResponse.json(
-      { error: err?.message || 'Model call failed' },
-      { status: 502 }
-    );
+    // Surface Gemini rate limits with a structured response so the
+    // client can back off and retry instead of treating it as a
+    // permanent extraction failure. The SDK throws the full error
+    // message including a "retryDelay" hint we can parse.
+    const msg: string = err?.message || 'Model call failed';
+    const is429 =
+      msg.includes('429') ||
+      /Too Many Requests/i.test(msg) ||
+      /quota/i.test(msg);
+    if (is429) {
+      const m = msg.match(/retry[^"]*"(\d+(?:\.\d+)?)s/i) ||
+                msg.match(/in (\d+(?:\.\d+)?)s/i);
+      const retryAfterMs = m ? Math.ceil(parseFloat(m[1]) * 1000) : 20000;
+      return NextResponse.json(
+        {
+          error: 'Gemini rate limit hit — please retry shortly.',
+          rateLimited: true,
+          retryAfterMs,
+        },
+        { status: 429 }
+      );
+    }
+    return NextResponse.json({ error: msg }, { status: 502 });
   }
 
   let parsed: any;
@@ -231,6 +255,7 @@ Determinism rules — follow EXACTLY:
   const vendor = cleanStr(parsed.vendor);
   const taskTitle = cleanStr(parsed.task_title);
   const completedDate = cleanDate(parsed.completed_date);
+  const dueDate = cleanDate(parsed.due_date);
 
   // Server-formatted document title — deterministic, vendor-anchored,
   // human-readable. Four monthly Spectrum bills will read "Spectrum —
@@ -263,6 +288,7 @@ Determinism rules — follow EXACTLY:
       task_title: taskTitle,
       vendor,
       completed_date: completedDate,
+      due_date: dueDate,
       cost: cleanNum(parsed.cost),
       category_hint: cleanStr(parsed.category_hint),
       recurrence,
