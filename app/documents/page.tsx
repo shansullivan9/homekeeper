@@ -507,11 +507,27 @@ export default function DocumentsPage() {
             const existing =
               inFlight || findExistingPendingMatch(liveTasks, title, recurrence);
             if (existing) {
-              if (!existing.due_date || existing.due_date < next) {
+              // Preserve the user's day-of-month. If existing.due_date
+              // is already in the future, leave it alone — the user may
+              // have manually corrected it (e.g. AI mis-read the
+              // statement and they bumped it to the actual 10th). Only
+              // touch it when it's missing or stale.
+              const todayIso = format(new Date(), 'yyyy-MM-dd');
+              const existingDue = existing.due_date || '';
+              let updateTo: string | null = null;
+              if (!existingDue) {
+                updateTo = next;
+              } else if (existingDue < todayIso) {
+                // Stale — advance from the existing day pattern, not
+                // from the new bill's anchor, so a manual correction
+                // sticks across future uploads.
+                updateTo = nextDueDate(existingDue, recurrence) || next;
+              }
+              if (updateTo && (!existingDue || existingDue < updateTo)) {
                 const { data: updated } = await supabase
                   .from('tasks')
                   .update({
-                    due_date: next,
+                    due_date: updateTo,
                     recurrence,
                     updated_at: new Date().toISOString(),
                   })
@@ -525,6 +541,11 @@ export default function DocumentsPage() {
                   if (idx >= 0) newTasks[idx] = updated;
                   else newTasks.push(updated);
                 }
+              } else if (newTasks.findIndex((t: any) => t.id === existing.id) < 0) {
+                // Make sure the existing pending row is in the in-flight
+                // list so a sibling bill in the same upload batch
+                // matches against it.
+                newTasks.push(existing as any);
               }
             } else {
               const { data: nextTask } = await supabase

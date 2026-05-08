@@ -2,7 +2,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase-browser';
-import { pickPendingDuplicatesToDelete } from '@/lib/task-dedup';
+import {
+  pickPendingDuplicatesToDelete,
+  pickRecurringTasksToRespawn,
+} from '@/lib/task-dedup';
 import { format, isBefore, startOfDay, endOfDay, addDays, endOfMonth, subDays } from 'date-fns';
 import TaskCard from '@/components/tasks/TaskCard';
 import SuggestionBanner from '@/components/dashboard/SuggestionBanner';
@@ -59,39 +62,76 @@ export default function DashboardPage() {
     }
   }, [user?.id]);
 
-  // Self-healing cleanup for duplicate "next pending" recurring tasks
-  // created by older versions of the invoice upload pipeline (when AI
-  // phrasing drift across uploads of the same vendor produced multiple
-  // pending siblings). Runs at most once per dashboard mount, after
-  // tasks have loaded, and is a no-op when there are no duplicates.
+  // Self-healing for the recurring-bill pipeline. Two operations, both
+  // idempotent and gated to run at most once per dashboard mount:
+  //   1. Collapse duplicate pending recurring tasks created by older
+  //      uploads where AI phrasing drift fooled dedup.
+  //   2. Respawn a pending task for any (vendor, recurrence) group that
+  //      has completed history but no live pending — covers the case
+  //      where the user trash-canned a recurring pending and the chain
+  //      silently stopped firing.
   const cleanedUpRef = useRef(false);
   useEffect(() => {
     if (cleanedUpRef.current) return;
     if (!home?.id || tasks.length === 0) return;
-    const toDelete = pickPendingDuplicatesToDelete(tasks);
-    if (toDelete.length === 0) {
-      cleanedUpRef.current = true;
-      return;
-    }
     cleanedUpRef.current = true;
-    const dropped = new Set(toDelete);
+
+    const toDelete = pickPendingDuplicatesToDelete(tasks);
+    const seeds = pickRecurringTasksToRespawn(tasks);
+    if (toDelete.length === 0 && seeds.length === 0) return;
+
     const supabase = createClient();
-    supabase
-      .from('tasks')
-      .delete()
-      .in('id', toDelete)
-      .then(({ error }) => {
+    (async () => {
+      const dropped = new Set<string>();
+      if (toDelete.length > 0) {
+        const { error } = await supabase
+          .from('tasks')
+          .delete()
+          .in('id', toDelete);
         if (error) {
-          // Surface in console but don't block the dashboard render.
           // eslint-disable-next-line no-console
           console.warn('[dedupe-pending] delete failed', error);
           cleanedUpRef.current = false;
-          return;
+        } else {
+          for (const id of toDelete) dropped.add(id);
         }
-        useStore
-          .getState()
-          .setTasks(useStore.getState().tasks.filter((t) => !dropped.has(t.id)));
-      });
+      }
+
+      const respawned: any[] = [];
+      for (const seed of seeds) {
+        const { data, error } = await supabase
+          .from('tasks')
+          .insert({
+            home_id: seed.home_id,
+            category_id: seed.category_id,
+            title: seed.title,
+            description: seed.description,
+            due_date: seed.due_date,
+            recurrence: seed.recurrence,
+            priority: 'medium',
+            status: 'pending',
+            estimated_cost: seed.estimated_cost,
+            created_by: seed.created_by,
+          })
+          .select()
+          .single();
+        if (error) {
+          // eslint-disable-next-line no-console
+          console.warn('[respawn-recurring] insert failed', error);
+          continue;
+        }
+        if (data) respawned.push(data);
+      }
+
+      if (dropped.size > 0 || respawned.length > 0) {
+        const current = useStore.getState().tasks;
+        const next = [
+          ...respawned,
+          ...current.filter((t) => !dropped.has(t.id)),
+        ];
+        useStore.getState().setTasks(next);
+      }
+    })();
   }, [home?.id, tasks]);
 
   const orderedLinks = useMemo(() => {
