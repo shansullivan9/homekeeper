@@ -114,6 +114,7 @@ export interface RespawnSeed {
   due_date: string;
   estimated_cost: number | null;
   created_by: string | null;
+  assigned_to: string | null;
   source_completed_id: string;
 }
 
@@ -182,6 +183,11 @@ export function pickRecurringTasksToRespawn(
       due_date: next,
       estimated_cost: latest.estimated_cost,
       created_by: latest.created_by,
+      // Carry the most recent claimer forward so a chore that's
+      // historically been "Shan's" stays Shan's after the chain
+      // self-heals. Mirrors what complete_task does on the
+      // green-check path.
+      assigned_to: (latest as any).assigned_to ?? null,
       source_completed_id: latest.id,
     });
   }
