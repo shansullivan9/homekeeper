@@ -1,3 +1,4 @@
+import { addDays, addMonths, addYears, format, parseISO } from 'date-fns';
 import type { Task } from './types';
 
 /**
@@ -77,4 +78,112 @@ export function pickPendingDuplicatesToDelete(tasks: Task[]): string[] {
     for (let i = 1; i < list.length; i++) toDelete.push(list[i].id);
   }
   return toDelete;
+}
+
+function advanceOnce(fromIso: string, recurrence: string): string | null {
+  const d = parseISO(fromIso);
+  switch (recurrence) {
+    case 'weekly':     return format(addDays(d, 7), 'yyyy-MM-dd');
+    case 'bi_monthly': return format(addMonths(d, 2), 'yyyy-MM-dd');
+    case 'monthly':    return format(addMonths(d, 1), 'yyyy-MM-dd');
+    case 'quarterly':  return format(addMonths(d, 3), 'yyyy-MM-dd');
+    case 'bi_annual':  return format(addMonths(d, 6), 'yyyy-MM-dd');
+    case 'yearly':     return format(addYears(d, 1), 'yyyy-MM-dd');
+    default:           return null;
+  }
+}
+
+function nextDueAfterToday(anchorIso: string, recurrence: string): string | null {
+  const todayIso = format(new Date(), 'yyyy-MM-dd');
+  let cursor = anchorIso;
+  for (let i = 0; i < 240; i++) {
+    const next = advanceOnce(cursor, recurrence);
+    if (!next) return null;
+    if (next >= todayIso) return next;
+    cursor = next;
+  }
+  return cursor;
+}
+
+export interface RespawnSeed {
+  home_id: string;
+  category_id: string | null;
+  title: string;
+  description: string | null;
+  recurrence: string;
+  due_date: string;
+  estimated_cost: number | null;
+  created_by: string | null;
+  source_completed_id: string;
+}
+
+/**
+ * For every (vendor, recurrence) group that has at least one COMPLETED
+ * recurring task but NO pending task, derive what the next pending task
+ * should look like from the most recent completion. Used to self-heal
+ * when the user accidentally trash-can'd a recurring pending and the
+ * series stopped firing.
+ *
+ * Only considers completions within the last `windowDays` so a
+ * forgotten one-off-then-cancelled bill from years ago doesn't suddenly
+ * resurrect itself.
+ */
+export function pickRecurringTasksToRespawn(
+  tasks: Task[],
+  windowDays = 400,
+): RespawnSeed[] {
+  const todayIso = format(new Date(), 'yyyy-MM-dd');
+  const cutoff = format(
+    new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000),
+    'yyyy-MM-dd',
+  );
+
+  // Collect by dedup key.
+  const completedByKey = new Map<string, Task[]>();
+  const hasPendingKey = new Set<string>();
+  for (const t of tasks) {
+    if (!t.recurrence || t.recurrence === 'one_time') continue;
+    const key = pendingDedupKey(t.title, t.recurrence);
+    if (!key.split('|')[0]) continue;
+    if (t.status === 'pending' && !t.is_suggestion) {
+      hasPendingKey.add(key);
+    } else if (t.status === 'completed') {
+      const list = completedByKey.get(key) || [];
+      list.push(t);
+      completedByKey.set(key, list);
+    }
+  }
+
+  const seeds: RespawnSeed[] = [];
+  for (const [key, list] of completedByKey.entries()) {
+    if (hasPendingKey.has(key)) continue;
+    // Pick the most recent completion as the source of truth for the
+    // schedule: that's the bill the user most recently "saw".
+    list.sort((a, b) => {
+      const aT = a.completed_at || a.due_date || '';
+      const bT = b.completed_at || b.due_date || '';
+      return bT.localeCompare(aT);
+    });
+    const latest = list[0];
+    const completedIso = (latest.completed_at || '').slice(0, 10);
+    if (!completedIso || completedIso < cutoff) continue;
+    // Use the last-known due_date as the day-of-month anchor when
+    // possible (e.g. the bill was due on the 10th); fall back to
+    // completion date.
+    const anchor = latest.due_date || completedIso;
+    const next = nextDueAfterToday(anchor, latest.recurrence);
+    if (!next || next < todayIso) continue;
+    seeds.push({
+      home_id: latest.home_id,
+      category_id: latest.category_id,
+      title: latest.title,
+      description: latest.description,
+      recurrence: latest.recurrence,
+      due_date: next,
+      estimated_cost: latest.estimated_cost,
+      created_by: latest.created_by,
+      source_completed_id: latest.id,
+    });
+  }
+  return seeds;
 }

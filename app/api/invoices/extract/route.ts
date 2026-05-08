@@ -39,7 +39,7 @@ const SCHEMA = {
     },
     due_date: {
       type: SchemaType.STRING,
-      description: 'Date payment is due, YYYY-MM-DD. For a bill this is the "Due by" / "Pay by" date printed on the statement. For a paid receipt with no future due date, leave empty.',
+      description: 'Date payment is due, YYYY-MM-DD. For a bill this is the explicit due date printed on the statement, labeled as one of: "Due by", "Pay by", "Payment due", "Payment due by", "Auto Pay scheduled for", "AutoPay date", "Due date". This is NEVER the same as the statement date, billing period start/end, or service period dates. For a paid receipt with no future due date, leave empty.',
     },
     cost: {
       type: SchemaType.NUMBER,
@@ -169,7 +169,14 @@ Determinism rules — follow EXACTLY:
 - task_title is a generic 1-3 word service descriptor (e.g. "Internet Bill", "Electric Bill", "Pest Treatment", "HVAC Tune-up"). It must NOT include the month, year, vendor name, or any invoice-specific detail. Reuse the same phrasing for repeat services so multiple invoices from the same vendor share one task.
 - For utility statements (internet/cable, electric, gas, water, sewer, trash) recurrence is "monthly".
 - For pest/termite quarterly plans recurrence is "quarterly"; for "every 6 months" plans it is "bi_annual".
-- Leave document_title as an empty string — the server fills it from vendor + completed_date.`;
+- Leave document_title as an empty string — the server fills it from vendor + completed_date.
+
+due_date extraction — read carefully:
+- Find the EXPLICIT payment due date on the statement. Common labels: "Due by", "Pay by", "Payment due", "Payment due by", "Auto Pay scheduled for", "AutoPay date", "Due date".
+- The due date is NEVER the statement date, billing date, billing period start, billing period end, or service period dates ("Service from … to …", "For service Dec 24 — Jan 23"). Do not confuse them.
+- Spectrum statements: the due date appears near the top right or just under the amount, formatted like "Due Jan 10" or "Auto Pay scheduled for Jan 10".
+- Mortgage statements (Rocket, Chase, etc.): the due date is labeled "Payment Due Date" and is typically the 1st of the month — distinct from the "Statement Date".
+- If no explicit due-date label is present anywhere on the document, leave due_date as an empty string. Do NOT guess.`;
 
   let result;
   try {
