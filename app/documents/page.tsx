@@ -3,6 +3,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase-browser';
+import {
+  pendingDedupKey,
+  findExistingPendingMatch,
+} from '@/lib/task-dedup';
 import PageHeader from '@/components/layout/PageHeader';
 import { Document } from '@/lib/types';
 import {
@@ -490,25 +494,18 @@ export default function DocumentsPage() {
         if (recurrence !== 'one_time' && recurrenceAnchor) {
           const next = nextDueDate(recurrenceAnchor, recurrence);
           if (next) {
-            const normalized = title.trim().toLowerCase();
-            // Look in BOTH the stale store snapshot AND the pending
-            // rows we've created earlier in this same loop. Without
-            // the second check, four bills processed back-to-back
-            // each create their own pending sibling because the
-            // store hasn't been refreshed yet.
-            const inFlight = newTasks.find(
-              (t: any) =>
-                t.status === 'pending' &&
-                (t.title || '').trim().toLowerCase() === normalized
+            // Dedup anchors on (vendor, recurrence) — see
+            // lib/task-dedup.ts. Reads the LIVE store so consecutive
+            // single-file uploads see each other's freshly created
+            // pending tasks instead of a stale React-closure snapshot.
+            const liveTasks = useStore.getState().tasks;
+            const inFlight = findExistingPendingMatch(
+              newTasks as any,
+              title,
+              recurrence
             );
             const existing =
-              inFlight ||
-              tasks.find(
-                (t) =>
-                  t.status === 'pending' &&
-                  !t.is_suggestion &&
-                  t.title.trim().toLowerCase() === normalized
-              );
+              inFlight || findExistingPendingMatch(liveTasks, title, recurrence);
             if (existing) {
               if (!existing.due_date || existing.due_date < next) {
                 const { data: updated } = await supabase
@@ -722,23 +719,24 @@ export default function DocumentsPage() {
       taskPatch[t.id] ? ({ ...t, title: taskPatch[t.id] } as any) : t
     ) as Task[];
 
-    // Dedupe pending recurring tasks that now share a title (e.g.
-    // four "Spectrum — Internet Bill" pendings that were previously
-    // disambiguated by the AI's varying phrasing). Keep the row with
-    // the latest due_date and delete the rest. Only collapses when 2+
-    // share a title to keep the action conservative.
-    const pendingByTitle = new Map<string, Task[]>();
+    // Dedupe pending recurring tasks that share a vendor + recurrence
+    // (e.g. four "Spectrum — Internet Bill" pendings disambiguated only
+    // by AI phrasing drift like "Rocket" vs "ROCKET" or "Mortgage
+    // Statement" vs "Mortgage Payment"). Keeps the row with the latest
+    // due_date and deletes the rest. See lib/task-dedup.ts.
+    const pendingByKey = new Map<string, Task[]>();
     for (const t of nextTasks) {
       if (t.status !== 'pending' || !t.recurrence || t.recurrence === 'one_time') continue;
-      const key = (t.title || '').trim().toLowerCase();
-      if (!key) continue;
-      const list = pendingByTitle.get(key) || [];
+      if (t.is_suggestion) continue;
+      const key = pendingDedupKey(t.title, t.recurrence);
+      if (!key.split('|')[0]) continue;
+      const list = pendingByKey.get(key) || [];
       list.push(t);
-      pendingByTitle.set(key, list);
+      pendingByKey.set(key, list);
     }
     const toDelete: string[] = [];
     let deduped = 0;
-    for (const list of pendingByTitle.values()) {
+    for (const list of pendingByKey.values()) {
       if (list.length < 2) continue;
       list.sort((a, b) => {
         const aD = a.due_date || '';
