@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '@/lib/store';
+import { createClient } from '@/lib/supabase-browser';
+import { pickPendingDuplicatesToDelete } from '@/lib/task-dedup';
 import { format, isBefore, startOfDay, endOfDay, addDays, endOfMonth, subDays } from 'date-fns';
 import TaskCard from '@/components/tasks/TaskCard';
 import SuggestionBanner from '@/components/dashboard/SuggestionBanner';
@@ -56,6 +58,41 @@ export default function DashboardPage() {
       setLinkOrder(null);
     }
   }, [user?.id]);
+
+  // Self-healing cleanup for duplicate "next pending" recurring tasks
+  // created by older versions of the invoice upload pipeline (when AI
+  // phrasing drift across uploads of the same vendor produced multiple
+  // pending siblings). Runs at most once per dashboard mount, after
+  // tasks have loaded, and is a no-op when there are no duplicates.
+  const cleanedUpRef = useRef(false);
+  useEffect(() => {
+    if (cleanedUpRef.current) return;
+    if (!home?.id || tasks.length === 0) return;
+    const toDelete = pickPendingDuplicatesToDelete(tasks);
+    if (toDelete.length === 0) {
+      cleanedUpRef.current = true;
+      return;
+    }
+    cleanedUpRef.current = true;
+    const dropped = new Set(toDelete);
+    const supabase = createClient();
+    supabase
+      .from('tasks')
+      .delete()
+      .in('id', toDelete)
+      .then(({ error }) => {
+        if (error) {
+          // Surface in console but don't block the dashboard render.
+          // eslint-disable-next-line no-console
+          console.warn('[dedupe-pending] delete failed', error);
+          cleanedUpRef.current = false;
+          return;
+        }
+        useStore
+          .getState()
+          .setTasks(useStore.getState().tasks.filter((t) => !dropped.has(t.id)));
+      });
+  }, [home?.id, tasks]);
 
   const orderedLinks = useMemo(() => {
     const alpha = [...QUICK_LINKS].sort((a, b) =>
