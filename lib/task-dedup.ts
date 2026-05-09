@@ -93,16 +93,32 @@ function advanceOnce(fromIso: string, recurrence: string): string | null {
   }
 }
 
-function nextDueAfterToday(anchorIso: string, recurrence: string): string | null {
+/**
+ * Walk forward from anchor by `recurrence` increments, returning every
+ * cycle date up to and including the first one >= today. Used to backfill
+ * pending rows for cycles that came and went while the chain was broken
+ * (e.g. user trash-canned the April Spectrum pending → April never got
+ * logged → respawn should produce both an Apr-cycle and a May-cycle row,
+ * not just jump to May).
+ */
+function generateCycleDates(anchorIso: string, recurrence: string): string[] {
   const todayIso = format(new Date(), 'yyyy-MM-dd');
+  const out: string[] = [];
   let cursor = anchorIso;
-  for (let i = 0; i < 240; i++) {
+  for (let i = 0; i < 24; i++) {
     const next = advanceOnce(cursor, recurrence);
-    if (!next) return null;
-    if (next >= todayIso) return next;
+    if (!next) break;
+    out.push(next);
     cursor = next;
+    if (next >= todayIso) break;
   }
-  return cursor;
+  return out;
+}
+
+function daysApart(a: string, b: string): number {
+  const aMs = parseISO(a).getTime();
+  const bMs = parseISO(b).getTime();
+  return Math.abs((aMs - bMs) / 86400000);
 }
 
 export interface RespawnSeed {
@@ -133,7 +149,6 @@ export function pickRecurringTasksToRespawn(
   tasks: Task[],
   windowDays = 400,
 ): RespawnSeed[] {
-  const todayIso = format(new Date(), 'yyyy-MM-dd');
   const cutoff = format(
     new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000),
     'yyyy-MM-dd',
@@ -172,24 +187,49 @@ export function pickRecurringTasksToRespawn(
     // possible (e.g. the bill was due on the 10th); fall back to
     // completion date.
     const anchor = latest.due_date || completedIso;
-    const next = nextDueAfterToday(anchor, latest.recurrence);
-    if (!next || next < todayIso) continue;
-    seeds.push({
-      home_id: latest.home_id,
-      category_id: latest.category_id,
-      title: latest.title,
-      description: latest.description,
-      recurrence: latest.recurrence,
-      due_date: next,
-      estimated_cost: latest.estimated_cost,
-      created_by: latest.created_by,
-      // Carry the most recent claimer forward so a chore that's
-      // historically been "Shan's" stays Shan's after the chain
-      // self-heals. Mirrors what complete_task does on the
-      // green-check path.
-      assigned_to: (latest as any).assigned_to ?? null,
-      source_completed_id: latest.id,
-    });
+    const cycleDates = generateCycleDates(anchor, latest.recurrence);
+    if (cycleDates.length === 0) continue;
+    // Existing completions covered by their due_date (or completed_at)
+    // — used to skip cycles that already have a logged completion so we
+    // don't double-count a cycle the user already paid via upload.
+    const completedAnchors = list
+      .map((t) => (t.due_date || (t.completed_at || '').slice(0, 10)))
+      .filter(Boolean) as string[];
+    const halfWindow = halfCycleDays(latest.recurrence);
+    for (const cycleDate of cycleDates) {
+      const alreadyLogged = completedAnchors.some(
+        (d) => daysApart(d, cycleDate) <= halfWindow,
+      );
+      if (alreadyLogged) continue;
+      seeds.push({
+        home_id: latest.home_id,
+        category_id: latest.category_id,
+        title: latest.title,
+        description: latest.description,
+        recurrence: latest.recurrence,
+        due_date: cycleDate,
+        estimated_cost: latest.estimated_cost,
+        created_by: latest.created_by,
+        // Carry the most recent claimer forward so a chore that's
+        // historically been "Shan's" stays Shan's after the chain
+        // self-heals. Mirrors what complete_task does on the
+        // green-check path.
+        assigned_to: (latest as any).assigned_to ?? null,
+        source_completed_id: latest.id,
+      });
+    }
   }
   return seeds;
+}
+
+function halfCycleDays(recurrence: string): number {
+  switch (recurrence) {
+    case 'weekly':     return 3;
+    case 'bi_monthly': return 28;
+    case 'monthly':    return 14;
+    case 'quarterly':  return 40;
+    case 'bi_annual':  return 80;
+    case 'yearly':     return 150;
+    default:           return 14;
+  }
 }

@@ -7,6 +7,12 @@ import {
   pendingDedupKey,
   findExistingPendingMatch,
 } from '@/lib/task-dedup';
+import {
+  findDocumentDuplicateClusters,
+  findCompletedTaskDuplicateClusters,
+  type DocumentCluster,
+  type CompletedTaskCluster,
+} from '@/lib/document-dedup';
 import PageHeader from '@/components/layout/PageHeader';
 import { Document } from '@/lib/types';
 import {
@@ -109,6 +115,58 @@ export default function DocumentsPage() {
     Invoice: boolean;
     'Builder Doc': boolean;
   }>({ Manual: true, Invoice: true, 'Builder Doc': true });
+
+  // Surfaced when ≥1 cluster of likely-duplicate documents OR completed
+  // recurring tasks is detected. The user opens the modal, picks which
+  // ones to delete; the action is destructive so each delete asks for
+  // confirmation before firing.
+  const [showDuplicates, setShowDuplicates] = useState(false);
+  const docClusters = useMemo<DocumentCluster[]>(
+    () => findDocumentDuplicateClusters(documents),
+    [documents]
+  );
+  const taskClusters = useMemo<CompletedTaskCluster[]>(
+    () => findCompletedTaskDuplicateClusters(tasks as any),
+    [tasks]
+  );
+  const totalDuplicateGroups = docClusters.length + taskClusters.length;
+
+  // Delete a document AND any tasks/history rows linked to it. Used by
+  // the duplicate-review modal so a single tap removes the duplicate
+  // bill end-to-end (no orphaned task showing in history).
+  const deleteDocumentAndLinkedTasks = async (doc: Document) => {
+    const linkedTasks = tasks.filter(
+      (t) => (t as any).source_document_id === doc.id
+    );
+    const linkedTaskIds = linkedTasks.map((t) => t.id);
+    if (linkedTaskIds.length > 0) {
+      // task_history references task_id — clear those first to avoid
+      // FK errors if the column is set to RESTRICT rather than CASCADE.
+      await supabase
+        .from('task_history')
+        .delete()
+        .in('task_id', linkedTaskIds);
+      await supabase.from('tasks').delete().in('id', linkedTaskIds);
+    }
+    await supabase.from('documents').delete().eq('id', doc.id);
+    if (doc.file_path) {
+      await supabase.storage.from('documents').remove([doc.file_path]);
+    }
+    const linkedSet = new Set(linkedTaskIds);
+    setDocuments(documents.filter((d) => d.id !== doc.id));
+    setTasks(tasks.filter((t) => !linkedSet.has(t.id)));
+    setHistory(history.filter((h) => !linkedSet.has((h as any).task_id || '')));
+  };
+
+  // Delete a single completed task + its history row. Used for the
+  // completed-task duplicate cluster (e.g. two "Spectrum — Internet
+  // Bill" history entries for the same month from a duplicate upload).
+  const deleteCompletedTask = async (task: any) => {
+    await supabase.from('task_history').delete().eq('task_id', task.id);
+    await supabase.from('tasks').delete().eq('id', task.id);
+    setTasks(tasks.filter((t) => t.id !== task.id));
+    setHistory(history.filter((h) => (h as any).task_id !== task.id));
+  };
 
   // Run classify on each uploaded document. If the user didn't pick a
   // category in the form, use the classifier's pick. Always store the
@@ -1725,6 +1783,27 @@ export default function DocumentsPage() {
         }
       />
 
+      {totalDuplicateGroups > 0 && (
+        <div className="px-4 pt-3">
+          <button
+            type="button"
+            onClick={() => setShowDuplicates(true)}
+            className="w-full flex items-center justify-between gap-3 p-3 rounded-ios border border-amber-200 bg-amber-50 text-amber-900 active:bg-amber-100 md:hover:bg-amber-100 transition-colors"
+          >
+            <div className="flex-1 min-w-0 text-left">
+              <p className="text-[13px] font-semibold">
+                {totalDuplicateGroups} possible duplicate{totalDuplicateGroups === 1 ? '' : ' group'}
+                {totalDuplicateGroups === 1 ? '' : 's'} found
+              </p>
+              <p className="text-[11px] text-amber-800/80 mt-0.5 truncate">
+                Tap to review and delete
+              </p>
+            </div>
+            <ChevronRight size={16} className="text-amber-700 flex-shrink-0" />
+          </button>
+        </div>
+      )}
+
       {documents.length > 0 && (
         <div className="px-4 pt-3 pb-2">
           <div className="relative">
@@ -1976,6 +2055,188 @@ export default function DocumentsPage() {
                 className="flex-1 py-2.5 rounded-ios bg-brand-500 text-white text-sm font-semibold active:bg-brand-600 md:hover:bg-brand-600 transition-colors disabled:opacity-50"
               >
                 {uploading ? 'Processing…' : 'Process selected'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDuplicates && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4"
+          onClick={() => setShowDuplicates(false)}
+        >
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 animate-fade-in"
+            style={{
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              WebkitBackdropFilter: 'blur(20px)',
+              backdropFilter: 'blur(20px)',
+            }}
+          />
+          <div
+            className="relative bg-white rounded-ios-lg w-full max-w-md shadow-xl overflow-hidden flex flex-col max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+              <p className="text-[15px] font-semibold">Review duplicates</p>
+              <button
+                onClick={() => setShowDuplicates(false)}
+                className="p-1 text-ink-tertiary"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="px-4 py-3 overflow-y-auto">
+              <p className="text-xs text-ink-secondary mb-3">
+                These look like duplicates. Tap delete on the ones you don't
+                want to keep — anything you delete also clears its task and
+                history entry.
+              </p>
+
+              {docClusters.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary mb-2">
+                    Documents
+                  </p>
+                  <div className="space-y-3">
+                    {docClusters.map((cluster) => (
+                      <div
+                        key={`doc-${cluster.key}`}
+                        className="rounded-ios border border-gray-200 overflow-hidden"
+                      >
+                        <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
+                          <p className="text-[13px] font-semibold truncate">
+                            {cluster.vendorLabel || 'Unknown vendor'} —{' '}
+                            {cluster.periodLabel || '—'}
+                          </p>
+                          <p className="text-[11px] text-ink-tertiary mt-0.5">
+                            {cluster.docs.length} matching documents
+                          </p>
+                        </div>
+                        <div className="divide-y divide-gray-100">
+                          {cluster.docs.map((d) => (
+                            <div
+                              key={d.id}
+                              className="px-3 py-2 flex items-center gap-2"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[13px] truncate">{d.title || d.file_name}</p>
+                                <p className="text-[11px] text-ink-tertiary">
+                                  {formatBytes(d.file_size)} ·{' '}
+                                  {new Date(d.uploaded_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const ok = await confirm({
+                                    title: 'Delete this document?',
+                                    message:
+                                      'Removes the file, its task, and the history entry.',
+                                    confirmLabel: 'Delete',
+                                    destructive: true,
+                                  });
+                                  if (!ok) return;
+                                  try {
+                                    await deleteDocumentAndLinkedTasks(d);
+                                    toast.success('Deleted');
+                                  } catch (err: any) {
+                                    toast.error(err?.message || 'Delete failed');
+                                  }
+                                }}
+                                className="px-3 py-1.5 rounded-full text-[12px] font-semibold text-red-600 border border-red-200 bg-white active:bg-red-50 md:hover:bg-red-50"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {taskClusters.length > 0 && (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-tertiary mb-2">
+                    Completed tasks
+                  </p>
+                  <div className="space-y-3">
+                    {taskClusters.map((cluster) => (
+                      <div
+                        key={`task-${cluster.key}`}
+                        className="rounded-ios border border-gray-200 overflow-hidden"
+                      >
+                        <div className="px-3 py-2 bg-gray-50 border-b border-gray-200">
+                          <p className="text-[13px] font-semibold truncate">
+                            {cluster.label}
+                          </p>
+                          <p className="text-[11px] text-ink-tertiary mt-0.5">
+                            {cluster.tasks.length} entries in the same month
+                          </p>
+                        </div>
+                        <div className="divide-y divide-gray-100">
+                          {cluster.tasks.map((t: any) => (
+                            <div
+                              key={t.id}
+                              className="px-3 py-2 flex items-center gap-2"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[13px] truncate">
+                                  {t.due_date || (t.completed_at || '').slice(0, 10) || '—'}
+                                  {t.estimated_cost != null && (
+                                    <span className="text-ink-tertiary ml-2">
+                                      ${Number(t.estimated_cost).toFixed(2)}
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="text-[11px] text-ink-tertiary">
+                                  Completed{' '}
+                                  {t.completed_at
+                                    ? new Date(t.completed_at).toLocaleDateString()
+                                    : '—'}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const ok = await confirm({
+                                    title: 'Delete this completed entry?',
+                                    message:
+                                      'Removes the task and its history row. The source document stays.',
+                                    confirmLabel: 'Delete',
+                                    destructive: true,
+                                  });
+                                  if (!ok) return;
+                                  try {
+                                    await deleteCompletedTask(t);
+                                    toast.success('Deleted');
+                                  } catch (err: any) {
+                                    toast.error(err?.message || 'Delete failed');
+                                  }
+                                }}
+                                className="px-3 py-1.5 rounded-full text-[12px] font-semibold text-red-600 border border-red-200 bg-white active:bg-red-50 md:hover:bg-red-50"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex-shrink-0">
+              <button
+                onClick={() => setShowDuplicates(false)}
+                className="w-full py-2.5 rounded-ios bg-white border border-gray-200 text-sm font-semibold text-ink-secondary md:hover:bg-gray-50 active:bg-gray-50"
+              >
+                Done
               </button>
             </div>
           </div>
