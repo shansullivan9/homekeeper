@@ -34,7 +34,7 @@ const linkOrderKey = (uid: string | null | undefined) =>
   `hk:dashboard-quick-links-order:${uid || 'anon'}`;
 
 export default function DashboardPage() {
-  const { tasks, home, user, members, history, appliances, documents, contractors } = useStore();
+  const { tasks, home, user, members, history, appliances, documents, contractors, categories } = useStore();
   const { loadData } = useAppInit();
   const router = useRouter();
   const [claimFilter, setClaimFilter] = useState<ClaimFilter>('all');
@@ -61,6 +61,52 @@ export default function DashboardPage() {
       setLinkOrder(null);
     }
   }, [user?.id]);
+
+  // One-shot auto-migration: re-point any task that's still attached
+  // to the legacy "Yard" category at "Exterior". Runs once per dashboard
+  // mount and is a no-op when nothing matches. RLS lets the user update
+  // their own household's tasks; the now-orphan default Yard category
+  // row is hidden from pickers separately so the user never sees it.
+  const yardMigratedRef = useRef(false);
+  useEffect(() => {
+    if (yardMigratedRef.current) return;
+    if (!home?.id || categories.length === 0 || tasks.length === 0) return;
+    const yardCat = categories.find(
+      (c: any) => (c.name || '').trim().toLowerCase() === 'yard'
+    );
+    const exteriorCat = categories.find(
+      (c: any) => (c.name || '').trim().toLowerCase() === 'exterior'
+    );
+    if (!yardCat || !exteriorCat) {
+      yardMigratedRef.current = true;
+      return;
+    }
+    const yardTasks = tasks.filter((t) => t.category_id === yardCat.id);
+    if (yardTasks.length === 0) {
+      yardMigratedRef.current = true;
+      return;
+    }
+    yardMigratedRef.current = true;
+    const supabase = createClient();
+    supabase
+      .from('tasks')
+      .update({ category_id: exteriorCat.id, updated_at: new Date().toISOString() })
+      .in('id', yardTasks.map((t) => t.id))
+      .then(({ error }) => {
+        if (error) {
+          // eslint-disable-next-line no-console
+          console.warn('[migrate-yard] update failed', error);
+          yardMigratedRef.current = false;
+          return;
+        }
+        const yardSet = new Set(yardTasks.map((t) => t.id));
+        useStore.getState().setTasks(
+          useStore.getState().tasks.map((t) =>
+            yardSet.has(t.id) ? ({ ...t, category_id: exteriorCat.id } as any) : t
+          )
+        );
+      });
+  }, [home?.id, categories, tasks]);
 
   // Self-healing for the recurring-bill pipeline. Two operations, both
   // idempotent and gated to run at most once per dashboard mount:

@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase-browser';
 import { useStore } from '@/lib/store';
 import { useAppInit } from '@/hooks/useAppInit';
 import PageHeader from '@/components/layout/PageHeader';
-import { RECURRENCE_LABELS, categoryEmoji, categoryFromTitle, recurrenceFromTitle } from '@/lib/constants';
+import { RECURRENCE_LABELS, categoryEmoji, categoryFromTitle, recurrenceFromTitle, isVisibleCategory } from '@/lib/constants';
 import { Recurrence, Priority, Task, Document } from '@/lib/types';
 import { Trash2, FileText, ChevronRight, Calendar as CalendarIcon, ChevronLeft, Pencil, Lock } from 'lucide-react';
 import {
@@ -637,7 +637,9 @@ function AddTaskForm() {
     }
   };
 
-  const activeCategories = categories.filter((c) => c.is_default || c.home_id === home?.id);
+  const activeCategories = categories.filter(
+    (c) => (c.is_default || c.home_id === home?.id) && isVisibleCategory(c)
+  );
 
   return (
     <div>

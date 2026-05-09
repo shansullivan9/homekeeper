@@ -67,6 +67,31 @@ export function categoryEmoji(cat: { name?: string | null; icon?: string | null 
   return '📌';
 }
 
+/**
+ * Display-side legacy category names → current names. Some history
+ * rows still carry "Yard" as category_name and we can't UPDATE
+ * task_history via RLS — normalize at read time so chips, badges, and
+ * filters all show the right (post-merge) name.
+ */
+export const LEGACY_CATEGORY_NAMES: Record<string, string> = {
+  Yard: 'Exterior',
+};
+
+export function normalizeCategoryName(name: string | null | undefined): string | null {
+  if (!name) return null;
+  return LEGACY_CATEGORY_NAMES[name] || name;
+}
+
+/**
+ * Filter for category lists (pickers, chips, etc.) — hides categories
+ * that have been retired so they never show up to the user even if a
+ * zombie row is still present in the DB.
+ */
+export function isVisibleCategory(cat: { name?: string | null }): boolean {
+  if (!cat.name) return true;
+  return !(cat.name in LEGACY_CATEGORY_NAMES);
+}
+
 // Title-keyword → emoji map. We try these in order, longest/most-specific
 // first, so "pressure wash" beats "wash", "co detector" beats "detector",
 // and obvious nouns ("chimney", "gutter", "termite") get their own picture.
