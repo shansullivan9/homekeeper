@@ -248,7 +248,10 @@ export default function HistoryPage() {
     const counts = new Map<string, number>();
     let uncategorized = 0;
     for (const h of history) {
-      const name = h.category_name?.trim();
+      // Use the same fallback as the badge — otherwise a row with a
+      // null category_name but a linked task category renders "Interior"
+      // yet still counts as Uncategorized.
+      const name = categoryFor(h)?.trim();
       if (!name) {
         uncategorized += 1;
         continue;
@@ -262,7 +265,7 @@ export default function HistoryPage() {
       arr.push({ key: '__uncategorized__', label: 'Uncategorized', count: uncategorized });
     }
     return arr;
-  }, [history]);
+  }, [history, tasks, categories]);
 
   const filtered = useMemo(() => {
     const base = !search.trim()
@@ -271,7 +274,7 @@ export default function HistoryPage() {
           const q = search.toLowerCase();
           return (
             h.title.toLowerCase().includes(q) ||
-            h.category_name?.toLowerCase().includes(q) ||
+            categoryFor(h)?.toLowerCase().includes(q) ||
             h.completed_by_name?.toLowerCase().includes(q) ||
             h.notes?.toLowerCase().includes(q)
           );
@@ -281,10 +284,10 @@ export default function HistoryPage() {
       categoryFilter === 'all'
         ? base
         : categoryFilter === '__uncategorized__'
-        ? base.filter((h) => !h.category_name?.trim())
+        ? base.filter((h) => !categoryFor(h)?.trim())
         : base.filter(
             (h) =>
-              (h.category_name || '').trim().toLowerCase() ===
+              (categoryFor(h) || '').trim().toLowerCase() ===
               categoryFilter.toLowerCase()
           );
     // Apply the selected sort. Fall through to "recent" for unknown
@@ -303,7 +306,7 @@ export default function HistoryPage() {
       );
     }
     return sorted;
-  }, [history, search, sortBy, categoryFilter]);
+  }, [history, search, sortBy, categoryFilter, tasks, categories]);
 
   // Month grouping only makes sense for the chronological sorts.
   const grouped = useMemo(() => {
