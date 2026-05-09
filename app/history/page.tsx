@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase-browser';
 import { TaskHistory } from '@/lib/types';
+import { normalizeCategoryName } from '@/lib/constants';
 import PageHeader from '@/components/layout/PageHeader';
 import { format, parseISO } from 'date-fns';
 import { CheckCircle2, Search, RotateCcw, RotateCw, Trash2, StickyNote } from 'lucide-react';
@@ -33,12 +34,19 @@ export default function HistoryPage() {
 
   // Some history rows were written before category_name was being saved
   // properly, so fall back to the linked task's category if available.
+  // Also normalizes legacy names (e.g. "Yard" → "Exterior") so old
+  // history rows we can't UPDATE via RLS still display the current
+  // category in chips and badges.
   const categoryFor = (h: TaskHistory): string | null => {
-    if (h.category_name) return h.category_name;
-    if (!h.task_id) return null;
-    const linkedTask = tasks.find((t) => t.id === h.task_id);
-    if (!linkedTask?.category_id) return null;
-    return categories.find((c) => c.id === linkedTask.category_id)?.name || null;
+    const raw = h.category_name
+      ? h.category_name
+      : (() => {
+          if (!h.task_id) return null;
+          const linkedTask = tasks.find((t) => t.id === h.task_id);
+          if (!linkedTask?.category_id) return null;
+          return categories.find((c) => c.id === linkedTask.category_id)?.name || null;
+        })();
+    return normalizeCategoryName(raw);
   };
 
   const handleUndo = async (h: TaskHistory) => {
