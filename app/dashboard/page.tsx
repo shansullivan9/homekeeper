@@ -112,6 +112,7 @@ export default function DashboardPage() {
             status: 'pending',
             estimated_cost: seed.estimated_cost,
             created_by: seed.created_by,
+            assigned_to: seed.assigned_to,
           })
           .select()
           .single();
