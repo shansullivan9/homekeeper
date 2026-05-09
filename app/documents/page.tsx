@@ -168,6 +168,74 @@ export default function DocumentsPage() {
     setHistory(history.filter((h) => (h as any).task_id !== task.id));
   };
 
+  // "Wipe everything matching this search" — used to start fresh when
+  // bad uploads have polluted documents + tasks for a specific vendor.
+  // Cascades through documents → linked tasks → history rows AND
+  // catches orphan tasks/history whose title matches the query but
+  // whose source doc was already removed.
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const bulkDeleteMatching = async () => {
+    const q = search.trim().toLowerCase();
+    if (!q) return;
+    const matchingDocs = visible;
+    const matchingTaskIds = new Set<string>();
+    for (const t of tasks) {
+      const haystack = `${t.title || ''} ${t.description || ''}`.toLowerCase();
+      if (haystack.includes(q)) matchingTaskIds.add(t.id);
+    }
+    for (const d of matchingDocs) {
+      // Anything linked to a matching doc is already covered.
+      for (const t of tasks) {
+        if ((t as any).source_document_id === d.id) matchingTaskIds.add(t.id);
+      }
+    }
+    const docCount = matchingDocs.length;
+    const taskCount = matchingTaskIds.size;
+    if (docCount === 0 && taskCount === 0) {
+      toast('Nothing matches that search.');
+      return;
+    }
+    const ok = await confirm({
+      title: `Delete everything matching "${search.trim()}"?`,
+      message: `${docCount} document${docCount === 1 ? '' : 's'} and ${taskCount} task${taskCount === 1 ? '' : 's'} (with their history rows) will be removed. The PDFs will also be deleted from storage.`,
+      confirmLabel: `Delete ${docCount + taskCount}`,
+      destructive: true,
+    });
+    if (!ok) return;
+    setBulkDeleting(true);
+    const tId = toast.loading(`Deleting ${docCount + taskCount} items…`);
+    try {
+      const taskIds = Array.from(matchingTaskIds);
+      if (taskIds.length > 0) {
+        await supabase.from('task_history').delete().in('task_id', taskIds);
+        await supabase.from('tasks').delete().in('id', taskIds);
+      }
+      const docIds = matchingDocs.map((d) => d.id);
+      if (docIds.length > 0) {
+        await supabase.from('documents').delete().in('id', docIds);
+        const paths = matchingDocs.map((d) => d.file_path).filter(Boolean) as string[];
+        if (paths.length > 0) {
+          await supabase.storage.from('documents').remove(paths);
+        }
+      }
+      const droppedDocs = new Set(docIds);
+      const droppedTasks = matchingTaskIds;
+      setDocuments(documents.filter((d) => !droppedDocs.has(d.id)));
+      setTasks(tasks.filter((t) => !droppedTasks.has(t.id)));
+      setHistory(
+        history.filter((h) => !droppedTasks.has(((h as any).task_id) || ''))
+      );
+      toast.dismiss(tId);
+      toast.success(`Deleted ${docCount + taskCount} items`);
+      setSearch('');
+    } catch (err: any) {
+      toast.dismiss(tId);
+      toast.error(err?.message || 'Bulk delete failed');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   // Run classify on each uploaded document. If the user didn't pick a
   // category in the form, use the classifier's pick. Always store the
   // searchable_text. Returns the documents reflecting any updates so the
@@ -1816,6 +1884,21 @@ export default function DocumentsPage() {
               className="ios-input pl-9"
             />
           </div>
+          {search.trim().length > 0 && (visible.length > 0 ||
+            tasks.some((t) =>
+              `${t.title || ''} ${t.description || ''}`
+                .toLowerCase()
+                .includes(search.trim().toLowerCase())
+            )) && (
+            <button
+              type="button"
+              onClick={bulkDeleteMatching}
+              disabled={bulkDeleting}
+              className="mt-2 w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-ios border border-red-200 bg-red-50 text-red-700 text-[12px] font-semibold active:bg-red-100 md:hover:bg-red-100 disabled:opacity-50"
+            >
+              {bulkDeleting ? 'Deleting…' : `Delete everything matching "${search.trim()}"`}
+            </button>
+          )}
         </div>
       )}
 
