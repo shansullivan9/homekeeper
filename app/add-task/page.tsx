@@ -796,7 +796,7 @@ function AddTaskForm() {
         {/* Category */}
         <div>
           <label className="text-xs font-semibold text-ink-secondary uppercase tracking-wide mb-1.5 block">Category</label>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid grid-cols-3 gap-2">
             {activeCategories.map((cat) => (
               <button
                 key={cat.id}
@@ -804,13 +804,14 @@ function AddTaskForm() {
                   setUserTouchedCategory(true);
                   setCategoryId(categoryId === cat.id ? '' : cat.id);
                 }}
-                className={`px-3 py-2 rounded-ios text-sm font-medium transition-colors ${
+                className={`px-3 py-2.5 rounded-ios text-sm font-medium transition-colors flex items-center gap-1.5 min-w-0 ${
                   categoryId === cat.id
                     ? 'bg-brand-500 text-white'
                     : 'bg-surface-secondary text-ink-secondary active:bg-surface-tertiary'
                 }`}
               >
-                {categoryEmoji(cat)} {cat.name}
+                <span className="text-base leading-none flex-shrink-0">{categoryEmoji(cat)}</span>
+                <span className="truncate">{cat.name}</span>
               </button>
             ))}
           </div>
