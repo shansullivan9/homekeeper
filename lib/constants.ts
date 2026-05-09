@@ -21,10 +21,51 @@ export const PRIORITY_CONFIG = {
   high: { label: 'High', color: '#FF3B30', bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200' },
 };
 
+// Icon-name → emoji map. Categories store an icon NAME in the DB
+// (e.g. 'home', 'trees') and the UI looks it up here. Every entry is
+// unique so no two categories ever render the same emoji.
 export const CATEGORY_ICONS: Record<string, string> = {
-  home: '🏠', trees: '🌲', thermometer: '🌡️', droplets: '💧', zap: '⚡',
-  flower2: '🌸', refrigerator: '🔧', receipt: '📄', hammer: '🔨', wrench: '🔩',
+  home: '🏠',
+  trees: '🌳',
+  thermometer: '🌡️',
+  droplets: '💧',
+  zap: '⚡',
+  flower2: '🌳', // legacy 'Yard' icon — collapses to Exterior's tree
+  refrigerator: '🧊',
+  receipt: '📄',
+  hammer: '🔨',
+  broom: '🧹',
+  bug: '🐜',
 };
+
+// Name-based fallback for categories whose `icon` column wasn't set
+// (e.g. user-created Cleaning / Pest Control rows that never got a
+// proper icon name written to the DB). Looked up after the icon-name
+// map so an explicit DB icon still wins.
+export const CATEGORY_NAME_ICONS: Record<string, string> = {
+  Interior: '🏠',
+  Exterior: '🌳',
+  HVAC: '🌡️',
+  Plumbing: '💧',
+  Electrical: '⚡',
+  Appliances: '🧊',
+  'HOA / Bills': '📄',
+  Projects: '🔨',
+  Cleaning: '🧹',
+  'Pest Control': '🐜',
+};
+
+/**
+ * Resolve the emoji for a category in one place. Tries the DB icon
+ * name first, then the category name, then a neutral fallback. Use
+ * this everywhere instead of `CATEGORY_ICONS[cat.icon] || '🔧'` so a
+ * future emoji change only has to land in one map.
+ */
+export function categoryEmoji(cat: { name?: string | null; icon?: string | null }): string {
+  if (cat.icon && CATEGORY_ICONS[cat.icon]) return CATEGORY_ICONS[cat.icon];
+  if (cat.name && CATEGORY_NAME_ICONS[cat.name]) return CATEGORY_NAME_ICONS[cat.name];
+  return '📌';
+}
 
 // Title-keyword → emoji map. We try these in order, longest/most-specific
 // first, so "pressure wash" beats "wash", "co detector" beats "detector",
@@ -98,8 +139,10 @@ const CATEGORY_KEYWORDS: { keywords: string[]; categoryName: string }[] = [
   { keywords: ['hvac', 'furnace', 'air filter', 'thermostat', 'ductwork', 'air condition', 'humidifier', 'dehumidifier'], categoryName: 'HVAC' },
   { keywords: ['plumb', 'water heater', 'water softener', 'pipe', 'leak', 'faucet', 'drain', 'toilet', 'sump', 'sewer'], categoryName: 'Plumbing' },
   { keywords: ['electric', 'breaker', 'gfci', 'outlet', 'panel', 'wiring', 'ceiling fan', 'light bulb', 'lamp'], categoryName: 'Electrical' },
-  { keywords: ['gutter', 'roof', 'chimney', 'siding', 'paint', 'fence', 'driveway', 'deck', 'patio', 'pressure wash', 'power wash', 'window clean'], categoryName: 'Exterior' },
-  { keywords: ['lawn', 'yard', 'garden', 'tree', 'mulch', 'weed', 'fertiliz', 'mow', 'sprinkler', 'irrigation', 'shrub', 'leaf'], categoryName: 'Yard' },
+  // Exterior absorbed the old Yard category — keywords from both land
+  // here so existing user data and AI prompts keep working without a
+  // separate "Yard" pile.
+  { keywords: ['gutter', 'roof', 'chimney', 'siding', 'paint', 'fence', 'driveway', 'deck', 'patio', 'pressure wash', 'power wash', 'window clean', 'lawn', 'yard', 'garden', 'tree', 'mulch', 'weed', 'fertiliz', 'mow', 'sprinkler', 'irrigation', 'shrub', 'leaf'], categoryName: 'Exterior' },
   { keywords: ['pest', 'termite', 'roach', 'rodent', 'mice', 'mosquito', 'extermin', 'rat', 'spider'], categoryName: 'Pest Control' },
   { keywords: ['detector', 'smoke alarm', 'co alarm', 'carbon monoxide', 'fire extinguish'], categoryName: 'Interior' },
   { keywords: ['clean', 'vacuum', 'dust', 'mop', 'sweep'], categoryName: 'Cleaning' },

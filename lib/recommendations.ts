@@ -145,8 +145,8 @@ export const CATEGORY_MAP: Record<string, string> = {
 // Override for specific features
 export const FEATURE_CATEGORY_MAP: Record<string, string> = {
   hvac: 'HVAC',
-  lawn: 'Yard',
-  irrigation: 'Yard',
+  lawn: 'Exterior',
+  irrigation: 'Exterior',
   roof: 'Exterior',
   gutters: 'Exterior',
   deck: 'Exterior',

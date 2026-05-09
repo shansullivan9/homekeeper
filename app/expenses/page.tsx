@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '@/lib/store';
 import { createClient } from '@/lib/supabase-browser';
 import PageHeader from '@/components/layout/PageHeader';
-import { formatCurrency, CATEGORY_ICONS } from '@/lib/constants';
+import { formatCurrency, categoryEmoji } from '@/lib/constants';
 import { TaskHistory } from '@/lib/types';
 import { parseISO, getYear } from 'date-fns';
 import { X, ChevronRight } from 'lucide-react';
@@ -357,7 +357,7 @@ export default function ExpensesPage() {
                           : 'bg-surface-secondary text-ink-secondary active:bg-surface-tertiary md:hover:bg-surface-tertiary'
                       }`}
                     >
-                      {CATEGORY_ICONS[cat.icon] || '🔧'} {cat.name}
+                      {categoryEmoji(cat)} {cat.name}
                     </button>
                   );
                 })}

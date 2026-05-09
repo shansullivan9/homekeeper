@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { Task } from '@/lib/types';
-import { getTaskUrgency, urgencyColor, sectionColorForTask, CATEGORY_ICONS, RECURRENCE_LABELS, formatCurrency, emojiForTaskTitle } from '@/lib/constants';
+import { getTaskUrgency, urgencyColor, sectionColorForTask, categoryEmoji, RECURRENCE_LABELS, formatCurrency, emojiForTaskTitle } from '@/lib/constants';
 import { format, isToday, isTomorrow, isPast, parseISO } from 'date-fns';
 import { Check, ChevronRight, RotateCcw, UserPlus, User, Trash2, X, Plus } from 'lucide-react';
 import { createClient } from '@/lib/supabase-browser';
@@ -39,8 +39,8 @@ export default function TaskCard({ task, compact, onComplete, sectionColor }: Ta
   const catIcon =
     titleEmoji
       ? titleEmoji
-      : taskCategory?.icon
-      ? (CATEGORY_ICONS[taskCategory.icon] || '🔧')
+      : taskCategory
+      ? categoryEmoji(taskCategory)
       : '📋';
 
   const assignee = (task as any).assigned_to
