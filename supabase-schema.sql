@@ -175,10 +175,11 @@ INSERT INTO public.categories (name, icon, color, is_default, sort_order) VALUES
   ('HVAC', 'thermometer', '#FF9F0A', true, 3),
   ('Plumbing', 'droplets', '#5AC8FA', true, 4),
   ('Electrical', 'zap', '#FFCC00', true, 5),
-  ('Yard', 'flower2', '#30D158', true, 6),
-  ('Appliances', 'refrigerator', '#AF52DE', true, 7),
-  ('HOA / Bills', 'receipt', '#FF6482', true, 8),
-  ('Projects', 'hammer', '#FF3B30', true, 9);
+  ('Appliances', 'refrigerator', '#AF52DE', true, 6),
+  ('HOA / Bills', 'receipt', '#FF6482', true, 7),
+  ('Cleaning', 'broom', '#5856D6', true, 8),
+  ('Pest Control', 'bug', '#FF6B35', true, 9),
+  ('Projects', 'hammer', '#FF3B30', true, 10);
 
 -- ============================================================
 -- TASKS
@@ -456,7 +457,6 @@ DECLARE
   v_exterior_cat UUID;
   v_appliance_cat UUID;
   v_interior_cat UUID;
-  v_yard_cat UUID;
 BEGIN
   SELECT * INTO v_home FROM public.homes WHERE id = p_home_id;
   IF NOT FOUND THEN RETURN; END IF;
@@ -467,7 +467,6 @@ BEGIN
   SELECT id INTO v_exterior_cat FROM public.categories WHERE name = 'Exterior' AND is_default = true LIMIT 1;
   SELECT id INTO v_appliance_cat FROM public.categories WHERE name = 'Appliances' AND is_default = true LIMIT 1;
   SELECT id INTO v_interior_cat FROM public.categories WHERE name = 'Interior' AND is_default = true LIMIT 1;
-  SELECT id INTO v_yard_cat FROM public.categories WHERE name = 'Yard' AND is_default = true LIMIT 1;
 
   -- Delete old unaccepted suggestions
   DELETE FROM public.tasks WHERE home_id = p_home_id AND is_suggestion = true AND status = 'pending';
@@ -508,16 +507,16 @@ BEGIN
   IF v_home.has_pool THEN
     INSERT INTO public.tasks (home_id, category_id, title, description, due_date, recurrence, estimated_minutes, is_suggestion)
     VALUES
-      (p_home_id, v_yard_cat, 'Test Pool Water Chemistry', 'Check pH, chlorine, and alkalinity levels.', CURRENT_DATE + INTERVAL '7 days', 'weekly', 15, true),
-      (p_home_id, v_yard_cat, 'Professional Pool Service', 'Annual pool opening/closing and equipment check.', CURRENT_DATE + INTERVAL '60 days', 'yearly', 120, true);
+      (p_home_id, v_exterior_cat, 'Test Pool Water Chemistry', 'Check pH, chlorine, and alkalinity levels.', CURRENT_DATE + INTERVAL '7 days', 'weekly', 15, true),
+      (p_home_id, v_exterior_cat, 'Professional Pool Service', 'Annual pool opening/closing and equipment check.', CURRENT_DATE + INTERVAL '60 days', 'yearly', 120, true);
   END IF;
 
   -- Irrigation
   IF v_home.has_irrigation THEN
     INSERT INTO public.tasks (home_id, category_id, title, description, due_date, recurrence, estimated_minutes, is_suggestion)
     VALUES
-      (p_home_id, v_yard_cat, 'Winterize Irrigation System', 'Blow out sprinkler lines before freeze.', CURRENT_DATE + INTERVAL '180 days', 'yearly', 60, true),
-      (p_home_id, v_yard_cat, 'Spring Irrigation Startup', 'Check sprinkler heads and test zones.', CURRENT_DATE + INTERVAL '90 days', 'yearly', 45, true);
+      (p_home_id, v_exterior_cat, 'Winterize Irrigation System', 'Blow out sprinkler lines before freeze.', CURRENT_DATE + INTERVAL '180 days', 'yearly', 60, true),
+      (p_home_id, v_exterior_cat, 'Spring Irrigation Startup', 'Check sprinkler heads and test zones.', CURRENT_DATE + INTERVAL '90 days', 'yearly', 45, true);
   END IF;
 
   -- Septic
