@@ -87,14 +87,32 @@ function InlineCalendar({
                 isSelected
                   ? 'bg-gradient-hero text-white shadow-card'
                   : today
-                  ? 'bg-brand-50 text-brand-600 ring-1 ring-brand-200'
+                  ? 'text-brand-600'
                   : 'text-ink-primary active:bg-gray-100 md:hover:bg-gray-100'
               } ${!inMonth ? 'opacity-30' : ''} ${disabled ? 'opacity-30 cursor-not-allowed' : ''}`}
             >
               {format(day, 'd')}
+              {today && (
+                <span
+                  aria-hidden="true"
+                  className={`absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${
+                    isSelected ? 'bg-white' : 'bg-brand-500'
+                  }`}
+                />
+              )}
             </button>
           );
         })}
+      </div>
+      <div className="flex items-center gap-4 mt-2 px-1 text-[10px] text-ink-tertiary">
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded-md bg-gradient-hero" />
+          Selected
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-1 h-1 rounded-full bg-brand-500" />
+          Today
+        </span>
       </div>
     </div>
   );
