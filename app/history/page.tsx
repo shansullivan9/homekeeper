@@ -183,7 +183,7 @@ export default function HistoryPage() {
       if (days) {
         const target = new Date();
         target.setDate(target.getDate() + days);
-        dueDate = target.toISOString().slice(0, 10);
+        dueDate = format(target, 'yyyy-MM-dd');
       }
       const matchedCategory = h.category_name
         ? categories.find((c) => c.name === h.category_name) || null

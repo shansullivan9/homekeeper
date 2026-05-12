@@ -1,0 +1,8 @@
+name = "homekeeper-inbox"
+main = "src/index.js"
+compatibility_date = "2025-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Configure these in the Cloudflare dashboard or via `wrangler secret put`:
+# - HOMEKEEPER_WEBHOOK_URL  → e.g. https://homekeeper.app/api/inbox/email
+# - INBOX_WEBHOOK_SECRET    → must match the same env var on Vercel

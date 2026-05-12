@@ -9,7 +9,7 @@ import { confirm } from '@/lib/confirm';
 import {
   Users, Plus, LogOut, Home, ChevronRight,
   UserCircle2, Mail, Share2, RefreshCw, X, Bell,
-  Building2, LogOut as LeaveIcon,
+  Building2, LogOut as LeaveIcon, Inbox, Copy,
 } from 'lucide-react';
 
 // "abcdef012345" → "abcd-ef01-2345"
@@ -21,6 +21,69 @@ export default function SettingsPage() {
   const supabase = createClient();
   const router = useRouter();
   const [otherHomes, setOtherHomes] = useState<{ id: string; name: string }[]>([]);
+
+  // Auto-import bills via email forwarding. The address is
+  // <slug>@inbox.<NEXT_PUBLIC_INBOX_DOMAIN>; the slug lives in the
+  // home_inboxes table. Each home owns one inbox row — RLS lets a
+  // member create/read/update it.
+  const [inboxSlug, setInboxSlug] = useState<string | null>(null);
+  const [inboxLoading, setInboxLoading] = useState(true);
+  const [provisioningInbox, setProvisioningInbox] = useState(false);
+  const inboxDomain = process.env.NEXT_PUBLIC_INBOX_DOMAIN || '';
+  const inboxAddress = inboxSlug && inboxDomain ? `${inboxSlug}@${inboxDomain}` : '';
+
+  useEffect(() => {
+    if (!home?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('home_inboxes')
+        .select('address_slug')
+        .eq('home_id', home.id)
+        .maybeSingle();
+      if (cancelled) return;
+      setInboxSlug((data as any)?.address_slug || null);
+      setInboxLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [home?.id]);
+
+  const provisionInbox = async () => {
+    if (!home?.id || provisioningInbox) return;
+    setProvisioningInbox(true);
+    // 8 random hex chars — opaque enough that someone can't guess
+    // another home's address from yours.
+    const c: any = (globalThis as any).crypto;
+    const arr = new Uint8Array(4);
+    if (c?.getRandomValues) c.getRandomValues(arr);
+    else for (let i = 0; i < 4; i++) arr[i] = Math.floor(Math.random() * 256);
+    const slug =
+      'bills-' + Array.from(arr).map((b) => b.toString(16).padStart(2, '0')).join('');
+    const { data, error } = await supabase
+      .from('home_inboxes')
+      .insert({ home_id: home.id, address_slug: slug })
+      .select('address_slug')
+      .single();
+    setProvisioningInbox(false);
+    if (error || !data) {
+      toast.error(error?.message || 'Could not set up forwarding. Try again?');
+      return;
+    }
+    setInboxSlug((data as any).address_slug);
+    toast.success('Forwarding address ready');
+  };
+
+  const copyInboxAddress = async () => {
+    if (!inboxAddress) return;
+    try {
+      await navigator.clipboard.writeText(inboxAddress);
+      toast.success('Copied');
+    } catch {
+      toast.error('Copy failed — long-press the address to copy manually.');
+    }
+  };
 
   // Look up names for the user's other households so the switcher
   // can label them. We only fetch what's not already the current
@@ -636,6 +699,90 @@ export default function SettingsPage() {
                 <span className="text-[15px] font-medium text-status-red">Leave Household</span>
               </div>
             </button>
+          </div>
+        </div>
+
+        {/* Auto-import bills via email forwarding */}
+        <div className="mx-4">
+          <p className="section-header flex items-center gap-2 mb-2">
+            <Inbox size={14} className="text-ink-secondary" />
+            Auto-import bills
+          </p>
+          <div className="ios-card overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-100">
+              <p className="text-[12px] text-ink-secondary leading-snug">
+                Forward utility, mortgage, and HOA emails to your unique
+                address and HomeKeeper will turn each statement into a
+                tracked task with cost — no manual upload.
+              </p>
+            </div>
+            {inboxLoading ? (
+              <div className="px-4 py-3 text-[13px] text-ink-tertiary">Loading…</div>
+            ) : inboxSlug ? (
+              <>
+                <div className="px-4 py-3">
+                  <p className="text-[11px] uppercase font-semibold text-ink-tertiary mb-1.5 tracking-wide">
+                    Your forwarding address
+                  </p>
+                  {inboxDomain ? (
+                    <div className="flex items-center gap-2">
+                      <code className="text-[13px] flex-1 font-mono break-all bg-gray-50 px-2 py-1.5 rounded">
+                        {inboxAddress}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={copyInboxAddress}
+                        className="px-3 py-1.5 rounded-full bg-brand-50 text-brand-600 text-[12px] font-semibold border border-brand-200 active:bg-brand-100 md:hover:bg-brand-100 inline-flex items-center gap-1 flex-shrink-0"
+                      >
+                        <Copy size={12} /> Copy
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="rounded-ios border border-amber-200 bg-amber-50 text-amber-900 text-[12px] px-3 py-2 leading-snug">
+                      <p className="font-semibold mb-1">Server config missing</p>
+                      <p>
+                        Set <code className="font-mono">NEXT_PUBLIC_INBOX_DOMAIN</code>{' '}
+                        in Vercel to your inbound subdomain (e.g.{' '}
+                        <code className="font-mono">inbox.homekeeper.online</code>),
+                        redeploy, then come back. Your slug{' '}
+                        <code className="font-mono">{inboxSlug}</code> is already saved.
+                      </p>
+                    </div>
+                  )}
+                </div>
+                <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 text-[12px] text-ink-secondary leading-snug space-y-2">
+                  <p className="font-semibold text-ink-primary">Set up auto-forwarding (one-time)</p>
+                  <p>
+                    <span className="font-semibold">Gmail:</span> Settings →
+                    Filters and Blocked Addresses → Create a new filter →
+                    From: <code className="font-mono">@spectrum.com</code>{' '}
+                    (or your vendor) → Create filter → check{' '}
+                    <em>Forward it to:</em> and pick the address above.
+                    Repeat per vendor.
+                  </p>
+                  <p>
+                    <span className="font-semibold">Outlook:</span> Settings
+                    → Mail → Rules → Add new rule → Condition: From contains
+                    vendor → Action: Forward to → paste the address.
+                  </p>
+                  <p className="text-ink-tertiary">
+                    First-time forwarders need to confirm a verification email
+                    Gmail/Outlook sends — check the inbox.
+                  </p>
+                </div>
+              </>
+            ) : (
+              <div className="px-4 py-3">
+                <button
+                  type="button"
+                  onClick={provisionInbox}
+                  disabled={provisioningInbox}
+                  className="w-full py-2.5 rounded-ios bg-brand-500 text-white text-sm font-semibold active:bg-brand-600 md:hover:bg-brand-600 disabled:opacity-50"
+                >
+                  {provisioningInbox ? 'Setting up…' : 'Generate my forwarding address'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

@@ -1,6 +1,7 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { format } from 'date-fns';
 import { LayoutDashboard, Calendar, PlusCircle, Clock, Settings } from 'lucide-react';
 import QuickAddMenu from '@/components/layout/QuickAddMenu';
 import { useStore } from '@/lib/store';
@@ -23,7 +24,7 @@ export default function BottomNav() {
   // any page so users always know how many tasks are past due
   // without needing to nav back to the dashboard.
   const overdueCount = useMemo(() => {
-    const todayIso = new Date().toISOString().slice(0, 10);
+    const todayIso = format(new Date(), 'yyyy-MM-dd');
     return tasks.filter(
       (t) =>
         !t.is_suggestion &&
