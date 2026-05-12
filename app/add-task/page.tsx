@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, Suspense, useMemo } from 'react';
+import { useState, useEffect, Suspense, useMemo, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase-browser';
@@ -8,7 +8,7 @@ import { useAppInit } from '@/hooks/useAppInit';
 import PageHeader from '@/components/layout/PageHeader';
 import { RECURRENCE_LABELS, categoryEmoji, categoryFromTitle, recurrenceFromTitle, isVisibleCategory } from '@/lib/constants';
 import { Recurrence, Priority, Task, Document } from '@/lib/types';
-import { Trash2, FileText, ChevronRight, Calendar as CalendarIcon, ChevronLeft, Pencil, Lock, X } from 'lucide-react';
+import { Trash2, FileText, ChevronRight, Calendar as CalendarIcon, ChevronLeft, Pencil, Lock, X, Plus } from 'lucide-react';
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday,
@@ -105,7 +105,7 @@ function AddTaskForm() {
   const editId = searchParams.get('edit');
   const router = useRouter();
   const supabase = createClient();
-  const { home, user, categories, tasks, appliances, documents, members, history, contractors } = useStore();
+  const { home, user, categories, tasks, appliances, documents, members, history, contractors, setDocuments } = useStore();
   const { loadData } = useAppInit();
 
   const [title, setTitle] = useState('');
@@ -115,6 +115,64 @@ function AddTaskForm() {
   const [isCompleted, setIsCompleted] = useState(false);
   const [sourceDocumentId, setSourceDocumentId] = useState<string | null>(null);
   const [showAttach, setShowAttach] = useState(false);
+  const [attachUploading, setAttachUploading] = useState(false);
+  const attachFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Upload a file from the device straight into the Documents bucket
+  // for this home and link it to the current task. Mirrors the upload
+  // path used by /documents so the new row shows up in both places.
+  const uploadAttachFromDevice = async (file: File) => {
+    if (!home?.id || !file) return;
+    setAttachUploading(true);
+    const t = toast.loading('Uploading…');
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      // Local UUID — keeps storage paths unique without an extra round-trip.
+      const c: any = (globalThis as any).crypto;
+      const arr = new Uint8Array(16);
+      if (c?.getRandomValues) c.getRandomValues(arr);
+      else for (let i = 0; i < 16; i++) arr[i] = Math.floor(Math.random() * 256);
+      arr[6] = (arr[6] & 0x0f) | 0x40;
+      arr[8] = (arr[8] & 0x3f) | 0x80;
+      const hex = Array.from(arr).map((b) => b.toString(16).padStart(2, '0'));
+      const uuid = `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex.slice(6, 8).join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10, 16).join('')}`;
+      const path = `${home.id}/${uuid}-${safeName}`;
+      const { error: upErr } = await supabase.storage
+        .from('documents')
+        .upload(path, file, { contentType: file.type || undefined, upsert: false });
+      if (upErr) throw upErr;
+      const baseName = file.name.replace(/\.[^.]+$/, '');
+      const { data: doc, error: insErr } = await supabase
+        .from('documents')
+        .insert({
+          home_id: home.id,
+          title: baseName,
+          category: 'Invoice',
+          file_path: path,
+          file_name: file.name,
+          mime_type: file.type || null,
+          file_size: file.size,
+          uploaded_by: user?.id || null,
+        })
+        .select()
+        .single();
+      if (insErr || !doc) {
+        await supabase.storage.from('documents').remove([path]);
+        throw insErr || new Error('Insert failed');
+      }
+      setDocuments([doc as Document, ...documents]);
+      setSourceDocumentId((doc as any).id);
+      setShowAttach(false);
+      toast.dismiss(t);
+      toast.success('Invoice attached');
+    } catch (err: any) {
+      toast.dismiss(t);
+      toast.error(err?.message || 'Upload failed');
+    } finally {
+      setAttachUploading(false);
+      if (attachFileInputRef.current) attachFileInputRef.current.value = '';
+    }
+  };
   const [recurrence, setRecurrence] = useState<Recurrence>('one_time');
   const [recurrenceDays, setRecurrenceDays] = useState('');
   const [notes, setNotes] = useState('');
@@ -699,17 +757,19 @@ function AddTaskForm() {
                 <p className="text-[14px] font-medium truncate">{linkedSource.title}</p>
               </div>
             </button>
-            <button
-              type="button"
-              onClick={() => setSourceDocumentId(null)}
-              title="Detach invoice"
-              className="text-ink-tertiary hover:text-status-red active:text-status-red p-1 flex-shrink-0"
-            >
-              <X size={16} />
-            </button>
+            {editMode && (
+              <button
+                type="button"
+                onClick={() => setSourceDocumentId(null)}
+                title="Detach invoice"
+                className="text-ink-tertiary hover:text-status-red active:text-status-red p-1 flex-shrink-0"
+              >
+                <X size={16} />
+              </button>
+            )}
           </div>
         ) : (
-          editId && (
+          editId && editMode && (
             <button
               type="button"
               onClick={() => setShowAttach(true)}
@@ -859,7 +919,7 @@ function AddTaskForm() {
             onClick={() => setIsCompleted((v) => !v)}
             className="ios-list-item w-full bg-white rounded-ios shadow-card"
           >
-            <span className="text-[15px]">Already done?</span>
+            <span className="text-[15px]">Task Completed?</span>
             <div className={`w-12 h-7 rounded-full transition-colors relative ${isCompleted ? 'bg-status-green' : 'bg-gray-200'}`}>
               <div className={`absolute top-0.5 w-6 h-6 rounded-full bg-white shadow transition-transform ${isCompleted ? 'translate-x-5' : 'translate-x-0.5'}`} />
             </div>
@@ -1221,6 +1281,32 @@ function AddTaskForm() {
               </button>
             </div>
             <div className="px-4 py-3 overflow-y-auto">
+              <input
+                ref={attachFileInputRef}
+                type="file"
+                accept="application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) uploadAttachFromDevice(f);
+                }}
+              />
+              <button
+                type="button"
+                disabled={attachUploading}
+                onClick={() => attachFileInputRef.current?.click()}
+                className="w-full mb-3 flex items-center gap-3 p-3 rounded-ios border-2 border-dashed border-brand-200 bg-brand-50 text-brand-700 active:bg-brand-100 md:hover:bg-brand-100 text-left disabled:opacity-60"
+              >
+                <div className="w-8 h-8 rounded-lg bg-white text-brand-500 flex items-center justify-center flex-shrink-0">
+                  <Plus size={16} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-semibold">
+                    {attachUploading ? 'Uploading…' : 'Upload from this device'}
+                  </p>
+                  <p className="text-[11px] opacity-80">PDF, JPG, PNG, HEIC</p>
+                </div>
+              </button>
               {(() => {
                 const sourceMap = new Map<string, boolean>();
                 for (const t of tasks) {
