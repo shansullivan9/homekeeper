@@ -8,7 +8,7 @@ import { useAppInit } from '@/hooks/useAppInit';
 import PageHeader from '@/components/layout/PageHeader';
 import { RECURRENCE_LABELS, categoryEmoji, categoryFromTitle, recurrenceFromTitle, isVisibleCategory } from '@/lib/constants';
 import { Recurrence, Priority, Task, Document } from '@/lib/types';
-import { Trash2, FileText, ChevronRight, Calendar as CalendarIcon, ChevronLeft, Pencil, Lock } from 'lucide-react';
+import { Trash2, FileText, ChevronRight, Calendar as CalendarIcon, ChevronLeft, Pencil, Lock, X } from 'lucide-react';
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, isToday,
@@ -114,6 +114,7 @@ function AddTaskForm() {
   const [completedOn, setCompletedOn] = useState('');
   const [isCompleted, setIsCompleted] = useState(false);
   const [sourceDocumentId, setSourceDocumentId] = useState<string | null>(null);
+  const [showAttach, setShowAttach] = useState(false);
   const [recurrence, setRecurrence] = useState<Recurrence>('one_time');
   const [recurrenceDays, setRecurrenceDays] = useState('');
   const [notes, setNotes] = useState('');
@@ -266,7 +267,7 @@ function AddTaskForm() {
     if (!days) return;
     const target = new Date();
     target.setDate(target.getDate() + days);
-    setDueDate(target.toISOString().slice(0, 10));
+    setDueDate(format(target, 'yyyy-MM-dd'));
     // Mark untouched so further recurrence changes can keep updating
     // it. (touched flag flips only when the user clicks a date chip
     // or the calendar.)
@@ -298,7 +299,15 @@ function AddTaskForm() {
         setSourceDocumentId(task.source_document_id || null);
         const done = task.status === 'completed';
         setIsCompleted(done);
-        setCompletedOn(done && task.completed_at ? task.completed_at.slice(0, 10) : '');
+        // completed_at is a UTC ISO string. Slicing "T" off would give
+        // the UTC date, which is "tomorrow" for late-evening US users.
+        // Format through the local TZ so the calendar lands on the day
+        // the user actually tapped Complete.
+        setCompletedOn(
+          done && task.completed_at
+            ? format(new Date(task.completed_at), 'yyyy-MM-dd')
+            : ''
+        );
       }
     }
   }, [editId, tasks]);
@@ -384,14 +393,14 @@ function AddTaskForm() {
         }
         default: return null;
       }
-      return next.toISOString().slice(0, 10);
+      return format(next, 'yyyy-MM-dd');
     };
     // Advance one cycle at a time until the next date is today or
     // later. Logging an old bill (e.g. completed Jan 10, today is May)
     // should land the user's next pending task on an UPCOMING date,
     // not an already-overdue one. Capped at 240 iterations so a
     // misconfigured weekly task can't spin forever.
-    const todayIso = new Date().toISOString().slice(0, 10);
+    const todayIso = format(new Date(), 'yyyy-MM-dd');
     let cursor = completedDate;
     for (let i = 0; i < 240; i++) {
       const next = advanceOnce(cursor);
@@ -527,7 +536,7 @@ function AddTaskForm() {
           // this, the user just sees a one-off completed row and the
           // recurrence is effectively dropped.
           if (recurrence !== 'one_time') {
-            const baseDate = completedOn || new Date().toISOString().slice(0, 10);
+            const baseDate = completedOn || format(new Date(), 'yyyy-MM-dd');
             const nextDue = nextDueFromCompleted(baseDate, recurrence);
             if (nextDue) {
               // Don't double-insert if a pending sibling with the same
@@ -675,20 +684,47 @@ function AddTaskForm() {
       />
 
       <div className="px-4 py-4 space-y-4 md:max-w-2xl md:mx-auto">
-        {linkedSource && (
-          <button
-            onClick={openSource}
-            className="ios-card flex items-center gap-3 p-3 active:bg-gray-50 w-full text-left"
-          >
-            <div className="w-9 h-9 rounded-lg bg-sky-50 text-sky-500 flex items-center justify-center flex-shrink-0">
-              <FileText size={18} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-ink-secondary">Source document</p>
-              <p className="text-[14px] font-medium truncate">{linkedSource.title}</p>
-            </div>
-            <ChevronRight size={16} className="text-ink-tertiary" />
-          </button>
+        {linkedSource ? (
+          <div className="ios-card flex items-center gap-3 p-3">
+            <button
+              type="button"
+              onClick={openSource}
+              className="flex items-center gap-3 flex-1 min-w-0 text-left active:bg-gray-50 -mx-3 -my-3 px-3 py-3 rounded-ios"
+            >
+              <div className="w-9 h-9 rounded-lg bg-sky-50 text-sky-500 flex items-center justify-center flex-shrink-0">
+                <FileText size={18} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-ink-secondary">Invoice</p>
+                <p className="text-[14px] font-medium truncate">{linkedSource.title}</p>
+              </div>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSourceDocumentId(null)}
+              title="Detach invoice"
+              className="text-ink-tertiary hover:text-status-red active:text-status-red p-1 flex-shrink-0"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        ) : (
+          editId && (
+            <button
+              type="button"
+              onClick={() => setShowAttach(true)}
+              className="ios-card flex items-center gap-3 p-3 active:bg-gray-50 w-full text-left border-2 border-dashed border-gray-200"
+            >
+              <div className="w-9 h-9 rounded-lg bg-gray-100 text-ink-tertiary flex items-center justify-center flex-shrink-0">
+                <FileText size={18} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[14px] font-medium">Attach invoice</p>
+                <p className="text-xs text-ink-tertiary">Link an uploaded receipt or bill to this task</p>
+              </div>
+              <ChevronRight size={16} className="text-ink-tertiary flex-shrink-0" />
+            </button>
+          )
         )}
 
         {pastStatements.length > 0 && (
@@ -845,7 +881,7 @@ function AddTaskForm() {
             <InlineCalendar
               value={completedOn}
               onChange={setCompletedOn}
-              maxDate={new Date().toISOString().slice(0, 10)}
+              maxDate={format(new Date(), 'yyyy-MM-dd')}
             />
             {completedOn && (
               <button
@@ -881,7 +917,7 @@ function AddTaskForm() {
               ].map(({ label, daysFromNow }) => {
                 const target = new Date();
                 target.setDate(target.getDate() + daysFromNow);
-                const targetStr = target.toISOString().slice(0, 10);
+                const targetStr = format(target, 'yyyy-MM-dd');
                 const active = dueDate === targetStr;
                 return (
                   <button
@@ -1155,6 +1191,129 @@ function AddTaskForm() {
           </div>
         )}
       </div>
+
+      {showAttach && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-4"
+          onClick={() => setShowAttach(false)}
+        >
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 animate-fade-in"
+            style={{
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              WebkitBackdropFilter: 'blur(20px)',
+              backdropFilter: 'blur(20px)',
+            }}
+          />
+          <div
+            className="relative bg-white rounded-ios-lg w-full max-w-md shadow-xl overflow-hidden flex flex-col max-h-[80vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
+              <p className="text-[15px] font-semibold">Attach invoice</p>
+              <button
+                type="button"
+                onClick={() => setShowAttach(false)}
+                className="p-1 text-ink-tertiary"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="px-4 py-3 overflow-y-auto">
+              {(() => {
+                const sourceMap = new Map<string, boolean>();
+                for (const t of tasks) {
+                  const sid = (t as any).source_document_id as string | null;
+                  if (sid) sourceMap.set(sid, true);
+                }
+                const candidates = documents.filter((d) => {
+                  const cat = (d.category || '').trim();
+                  if (cat === 'Manual' || cat === 'Builder Doc') return false;
+                  return true;
+                });
+                const unlinked = candidates.filter((d) => !sourceMap.get(d.id));
+                const linked = candidates.filter((d) => sourceMap.get(d.id));
+                const ordered = [...unlinked, ...linked];
+                if (ordered.length === 0) {
+                  return (
+                    <p className="text-[13px] text-ink-tertiary py-6 text-center">
+                      No documents yet. Upload one from the Documents page and come back here.
+                    </p>
+                  );
+                }
+                return (
+                  <div className="space-y-1">
+                    {unlinked.length > 0 && (
+                      <p className="text-[10px] uppercase tracking-wide font-semibold text-ink-tertiary px-1 mb-1">
+                        Unlinked
+                      </p>
+                    )}
+                    {unlinked.map((d) => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => {
+                          setSourceDocumentId(d.id);
+                          setShowAttach(false);
+                        }}
+                        className="w-full flex items-center gap-3 p-3 rounded-ios border border-gray-200 active:bg-gray-50 md:hover:bg-gray-50 text-left"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-sky-50 text-sky-500 flex items-center justify-center flex-shrink-0">
+                          <FileText size={14} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-medium truncate">{d.title || d.file_name}</p>
+                          <p className="text-[11px] text-ink-tertiary truncate">
+                            {d.category || 'Document'} ·{' '}
+                            {new Date(d.uploaded_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                    {linked.length > 0 && (
+                      <p className="text-[10px] uppercase tracking-wide font-semibold text-ink-tertiary px-1 mt-3 mb-1">
+                        Already linked to another task
+                      </p>
+                    )}
+                    {linked.map((d) => (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => {
+                          setSourceDocumentId(d.id);
+                          setShowAttach(false);
+                        }}
+                        className="w-full flex items-center gap-3 p-3 rounded-ios border border-gray-200 active:bg-gray-50 md:hover:bg-gray-50 text-left opacity-70"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-gray-100 text-ink-tertiary flex items-center justify-center flex-shrink-0">
+                          <FileText size={14} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-medium truncate">{d.title || d.file_name}</p>
+                          <p className="text-[11px] text-ink-tertiary truncate">
+                            {d.category || 'Document'} ·{' '}
+                            {new Date(d.uploaded_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+            <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowAttach(false)}
+                className="w-full py-2.5 rounded-ios bg-white border border-gray-200 text-sm font-semibold text-ink-secondary md:hover:bg-gray-50 active:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

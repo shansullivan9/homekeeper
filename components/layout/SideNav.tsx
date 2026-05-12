@@ -1,6 +1,7 @@
 'use client';
 import { useMemo, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { format } from 'date-fns';
 import { useStore } from '@/lib/store';
 import {
   LayoutDashboard,
@@ -45,7 +46,7 @@ export default function SideNav() {
   const tasks = useStore((s) => s.tasks);
 
   const overdueCount = useMemo(() => {
-    const todayIso = new Date().toISOString().slice(0, 10);
+    const todayIso = format(new Date(), 'yyyy-MM-dd');
     return tasks.filter(
       (t) =>
         !t.is_suggestion &&
